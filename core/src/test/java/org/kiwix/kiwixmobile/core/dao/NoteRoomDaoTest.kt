@@ -58,7 +58,6 @@ class NoteRoomDaoTest {
     kiwixRoomDatabase.close()
   }
 
-  @Suppress("LongMethod")
   @Test
   fun testNotesRoomDao() =
     runBlocking {
