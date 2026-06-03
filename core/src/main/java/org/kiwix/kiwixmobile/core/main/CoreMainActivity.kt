@@ -314,7 +314,7 @@ abstract class CoreMainActivity : BaseActivity() {
     super.onStart()
     externalLinkOpener.initialize(this, alertDialogShower)
     rateDialogHandler.setAlertDialogShower(alertDialogShower)
-    rateDialogHandler.checkForRateDialog(getIconResId())
+    rateDialogHandler.checkForRateDialog()
   }
 
   override fun onResume() {
