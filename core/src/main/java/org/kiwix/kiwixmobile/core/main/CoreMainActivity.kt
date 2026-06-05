@@ -637,7 +637,7 @@ abstract class CoreMainActivity : BaseActivity() {
     }
   }
 
-  protected abstract fun getIconResId(): Int
+
   abstract suspend fun createApplicationShortcuts()
   abstract fun hideBottomAppBar()
   abstract fun showBottomAppBar()
