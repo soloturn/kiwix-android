@@ -313,7 +313,6 @@ abstract class CoreMainActivity : BaseActivity() {
   override fun onStart() {
     super.onStart()
     externalLinkOpener.initialize(this, alertDialogShower)
-    rateDialogHandler.setAlertDialogShower(alertDialogShower)
     rateDialogHandler.checkForRateDialog()
   }
 
