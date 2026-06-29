@@ -100,7 +100,8 @@ class CopyMoveFileHandlerTest {
       fat32Checker = fat32Checker,
       fileOperationHandler = fileOperationHandler,
       copyMoveProgressBarController = copyMoveProgressBarController,
-      mainDispatcher = mainDispatcherRule.mainDispatcher
+      mainDispatcher = mainDispatcherRule.dispatcher,
+      ioDispatcher = mainDispatcherRule.dispatcher
     )
 
     fileHandler.setStorageFileForUnitTest(storageFile)
