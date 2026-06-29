@@ -19,6 +19,7 @@
 package org.kiwix.kiwixmobile.migration.data
 
 import io.objectbox.Box
+import kotlinx.coroutines.CoroutineDispatcher
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
 import kotlinx.coroutines.flow.first
@@ -26,6 +27,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.page.bookmark.models.LibkiwixBookmarkItem
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
@@ -42,7 +44,8 @@ class ObjectBoxToLibkiwixMigrator @Inject constructor(
   private val boxStore: BoxStore,
   private val kiwixDataStore: KiwixDataStore,
   private val libkiwixBookmarks: LibkiwixBookmarks,
-  private val libkiwixBookOnDisk: LibkiwixBookOnDisk
+  private val libkiwixBookOnDisk: LibkiwixBookOnDisk,
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
   private val migrationMutex = Mutex()
 
@@ -61,7 +64,7 @@ class ObjectBoxToLibkiwixMigrator @Inject constructor(
       bookOnDiskEntity.file.let { file ->
         // set zimReaderSource for previously saved books(before we introduced the zimReaderSource)
         val zimReaderSource = ZimReaderSource(file)
-        if (zimReaderSource.canOpenInLibkiwix()) {
+        if (zimReaderSource.canOpenInLibkiwix(ioDispatcher)) {
           bookOnDiskEntity.zimReaderSource = zimReaderSource
         }
       }
@@ -101,7 +104,7 @@ class ObjectBoxToLibkiwixMigrator @Inject constructor(
           // set zimReaderSource for previously saved bookmarks
           if (bookmarkEntity.zimReaderSource == null) {
             val zimReaderSource = ZimReaderSource(File(filePath))
-            if (zimReaderSource.canOpenInLibkiwix()) {
+            if (zimReaderSource.canOpenInLibkiwix(ioDispatcher)) {
               bookmarkEntity.zimReaderSource = zimReaderSource
             }
           }

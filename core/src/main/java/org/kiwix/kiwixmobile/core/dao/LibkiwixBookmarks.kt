@@ -33,6 +33,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.modules.BOOKMARK_LIBRARY
 import org.kiwix.kiwixmobile.core.di.modules.BOOKMARK_MANAGER
 import org.kiwix.kiwixmobile.core.extensions.deleteFile
@@ -58,13 +59,15 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 
+@Suppress("LongParameterList")
 @Singleton
 class LibkiwixBookmarks @Inject constructor(
   @Named(BOOKMARK_LIBRARY) private val library: Library,
   @Named(BOOKMARK_MANAGER) private val manager: Manager,
   private val kiwixDataStore: KiwixDataStore,
   private val libkiwixBookOnDisk: LibkiwixBookOnDisk,
-  private val zimReaderContainer: ZimReaderContainer?
+  private val zimReaderContainer: ZimReaderContainer?,
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : PageDao {
   /**
    * Request new data from Libkiwix when changes occur inside it; otherwise,
@@ -423,11 +426,12 @@ class LibkiwixBookmarks @Inject constructor(
       zimReaderContainer?.zimFileReader
     } else {
       bookmarkItem.zimReaderSource?.let {
-        it.createArchive()?.let { archive ->
+        it.createArchive(ioDispatcher)?.let { archive ->
           ZimFileReader(
             it,
             archive,
-            SuggestionSearcher(archive)
+            SuggestionSearcher(archive),
+            ioDispatcher
           )
         }
       }
