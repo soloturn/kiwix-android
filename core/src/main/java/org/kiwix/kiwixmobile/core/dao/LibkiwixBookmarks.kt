@@ -508,7 +508,7 @@ class LibkiwixBookmarks @Inject constructor(
     kiwixDataStore.context.toast(R.string.bookmark_imported_message)
 
     if (bookmarkFile.exists()) {
-      bookmarkFile.deleteFile()
+      bookmarkFile.deleteFile(ioDispatcher)
     }
   }
 

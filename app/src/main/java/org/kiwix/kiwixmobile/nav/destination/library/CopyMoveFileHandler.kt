@@ -364,7 +364,7 @@ class CopyMoveFileHandler @Inject constructor(
     copyMoveProgressBarController.dismissCopyMoveProgressDialog()
     fileCopyMoveCallback?.onError("$errorMessage").also {
       // Clean up the destination file if an error occurs
-      destinationFile.deleteFile()
+      destinationFile.deleteFile(ioDispatcher)
     }
   }
 
