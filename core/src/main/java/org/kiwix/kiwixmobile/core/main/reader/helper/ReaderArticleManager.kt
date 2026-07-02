@@ -57,6 +57,7 @@ class ReaderArticleManager @Inject constructor(
     suspendCancellableCoroutine { continuation ->
       if (webView.progress < HUNDERED) {
         continuation.resume(Result.success(PageStillLoading))
+        return@suspendCancellableCoroutine
       }
 
       val title = webView.title ?: "Article"

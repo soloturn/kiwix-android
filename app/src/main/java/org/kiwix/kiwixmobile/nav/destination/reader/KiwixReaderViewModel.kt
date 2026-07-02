@@ -22,10 +22,12 @@ import android.app.Application
 import androidx.core.net.toUri
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavOptions
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R.string
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -85,7 +87,8 @@ class KiwixReaderViewModel @Inject constructor(
   readerArticleManager: ReaderArticleManager,
   readAloudManager: ReadAloudManager,
   donationDialogHandler: DonationDialogHandler,
-  findInPageManager: FindInPageManager
+  findInPageManager: FindInPageManager,
+  @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : CoreReaderViewModel(
     context,
     kiwixDataStore,
@@ -104,7 +107,8 @@ class KiwixReaderViewModel @Inject constructor(
     readerArticleManager,
     readAloudManager,
     donationDialogHandler,
-    findInPageManager
+    findInPageManager,
+    mainDispatcher
   ) {
   override fun shouldShowSpellCheckedSuggestions(): Boolean = false
   override fun isBrandedApp(): Boolean = false

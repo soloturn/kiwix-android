@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.core.main.reader.helper
 
-import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -55,7 +54,6 @@ class TabsManager @Inject constructor() {
         selectedIndex = if (selectTab) list.lastIndex else state.selectedIndex
       )
     }
-    Log.e("HISTORY", "addWebView: ${currentState().webViews}")
   }
 
   fun getCurrentWebView(): KiwixWebView? = tabState.value.currentWebView

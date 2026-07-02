@@ -20,7 +20,6 @@ package org.kiwix.kiwixmobile.custom.search
 
 import android.Manifest
 import android.content.Context
-import android.content.res.AssetFileDescriptor
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -29,7 +28,6 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
-import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import androidx.test.platform.app.InstrumentationRegistry
@@ -49,7 +47,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
-import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.search.viewmodel.Action
 import org.kiwix.kiwixmobile.core.search.viewmodel.SearchViewModel
 import org.kiwix.kiwixmobile.core.ui.components.NAVIGATION_ICON_TESTING_TAG
@@ -57,7 +54,6 @@ import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.custom.main.BrandedMainActivity
-import org.kiwix.kiwixmobile.custom.main.BrandedReaderFragment
 import org.kiwix.kiwixmobile.custom.testutils.RetryRule
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.closeSystemDialogs
@@ -178,10 +174,7 @@ class SearchScreenTestForBrandedApp {
       searchWithFrequentlyTypedWords(searchTerm, 300, composeTestRule)
       assertSearchSuccessful(searchedItem, composeTestRule)
       deleteSearchedQueryFrequently(searchTerm, uiDevice, 300, composeTestRule)
-      // to close the keyboard
-      pressBack()
-      // go to reader screen
-      pressBack()
+      closeSearchScreen(composeTestRule)
     }
 
     // Added test for checking the crash scenario where the application was crashing when we
@@ -321,29 +314,13 @@ class SearchScreenTestForBrandedApp {
     }
   }
 
-  private fun openZimFileInReader(
-    assetFileDescriptor: AssetFileDescriptor? = null,
-    zimFile: File? = null
-  ) {
+  private fun openZimFileInReader(zimFile: File) {
     UiThreadStatement.runOnUiThread {
-      val brandedReaderFragment =
-        brandedMainActivity.supportFragmentManager.fragments
-          .filterIsInstance<BrandedReaderFragment>()
-          .firstOrNull()
-      runBlocking {
-        assetFileDescriptor?.let {
-          brandedReaderFragment?.openZimFile(
-            ZimReaderSource(assetFileDescriptorList = listOf(assetFileDescriptor)),
-            true
-          )
-        } ?: run {
-          brandedReaderFragment?.openZimFile(
-            ZimReaderSource(zimFile),
-            true
-          )
-        }
-      }
+      brandedMainActivity.readerIntentManager.openZimFileFromPath(zimFile.path, "")
     }
+    // Wait a bit to properly load the ZIM file in reader.
+    composeTestRule.waitForIdle()
+    composeTestRule.waitUntilTimeout()
   }
 
   private fun writeZimFileData(responseBody: ResponseBody, file: File) {

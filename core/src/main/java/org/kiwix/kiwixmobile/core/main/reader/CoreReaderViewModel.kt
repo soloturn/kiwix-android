@@ -46,8 +46,10 @@ import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavOptions
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,9 +59,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
 import org.kiwix.kiwixmobile.core.extensions.runSafelyInLifecycleScope
@@ -156,8 +160,9 @@ abstract class CoreReaderViewModel(
   val pendingSearchItemManager: PendingSearchItemManager,
   private val readerArticleManager: ReaderArticleManager,
   private val readAloudManager: ReadAloudManager,
-  val donationDialogHandler: DonationDialogHandler,
-  private val findInPageManager: FindInPageManager
+  private val donationDialogHandler: DonationDialogHandler,
+  private val findInPageManager: FindInPageManager,
+  @MainDispatcher private val mainDispatcher: CoroutineDispatcher
 ) : ViewModel(),
   WebViewCallback,
   ReaderMenuState.MenuClickListener,
@@ -1365,7 +1370,7 @@ abstract class CoreReaderViewModel(
     readerMenuState?.showTabSwitcherOptions()
   }
 
-  fun onBookmarkButtonClicked() {
+  private fun onBookmarkButtonClicked() {
     viewModelScope.launch {
       val pageTitle = getCurrentWebView().title
       val articleUrl = getCurrentWebView().url
@@ -1447,7 +1452,9 @@ abstract class CoreReaderViewModel(
       webViewHistoryItemList,
       currentTab
     ) {
-      createNewTab("", shouldLoadUrl = false)
+      withContext(mainDispatcherImmediate()) {
+        createNewTab("", shouldLoadUrl = false)
+      }
     }
     when (result) {
       ReaderWebViewManager.RestoreTabsResult.TabsRestored -> {
@@ -1742,6 +1749,8 @@ abstract class CoreReaderViewModel(
     actionMode = null
     super.onCleared()
   }
+
+  protected fun mainDispatcherImmediate() = (mainDispatcher as MainCoroutineDispatcher).immediate
 }
 
 enum class RestoreOrigin {

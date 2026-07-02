@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import org.kiwix.kiwixmobile.core.LibkiwixBookFactory
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
@@ -39,7 +40,8 @@ import javax.inject.Inject
 class BookmarkManager @Inject constructor(
   private val libkiwixBookmarks: LibkiwixBookmarks,
   private val zimReaderContainer: ZimReaderContainer,
-  private val mainRepositoryActions: MainRepositoryActions
+  private val mainRepositoryActions: MainRepositoryActions,
+  private val libkiwixBookFactory: LibkiwixBookFactory
 ) {
   data class BookmarkState(val isBookmarked: Boolean = false)
   sealed interface BookmarkSaveResult {
@@ -114,7 +116,7 @@ class BookmarkManager @Inject constructor(
    */
   private fun getLibkiwixBook(zimFileReader: ZimFileReader): Book {
     libkiwixBook?.let { return it }
-    val book = Book().apply {
+    val book = libkiwixBookFactory.create().apply {
       update(zimFileReader.jniKiwixReader)
     }
     libkiwixBook = book

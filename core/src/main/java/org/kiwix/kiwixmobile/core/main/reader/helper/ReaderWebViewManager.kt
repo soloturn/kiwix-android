@@ -58,7 +58,7 @@ class ReaderWebViewManager @Inject constructor(
 
   fun webViewList() = currentTabsState().webViews
 
-  val currentWebViewIndex = currentTabsState().selectedIndex
+  val currentWebViewIndex: Int get() = currentTabsState().selectedIndex
 
   /**
    * Initializes a new instance of `KiwixWebView` with the specified URL.
@@ -173,7 +173,7 @@ class ReaderWebViewManager @Inject constructor(
   suspend fun restoreTabs(
     webViewHistoryItemList: List<WebViewHistoryItem>,
     currentTab: Int,
-    createWebView: () -> KiwixWebView
+    createWebView: suspend () -> KiwixWebView
   ): RestoreTabsResult =
     runCatching {
       setCurrentWebViewIndex(ZERO)

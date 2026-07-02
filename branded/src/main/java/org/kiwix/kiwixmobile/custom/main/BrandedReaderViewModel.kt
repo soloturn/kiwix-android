@@ -21,6 +21,7 @@ package org.kiwix.kiwixmobile.custom.main
 import android.app.Application
 import android.util.Log
 import android.view.Menu
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
@@ -29,9 +30,9 @@ import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavOptions
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R.drawable
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
@@ -97,7 +98,7 @@ class BrandedReaderViewModel @Inject constructor(
   readAloudManager: ReadAloudManager,
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
-  @MainDispatcher private val mainDispatcher: CoroutineDispatcher
+  @MainDispatcher mainDispatcher: CoroutineDispatcher
 ) : CoreReaderViewModel(
     context,
     kiwixDataStore,
@@ -116,7 +117,8 @@ class BrandedReaderViewModel @Inject constructor(
     readerArticleManager,
     readAloudManager,
     donationDialogHandler,
-    findInPageManager
+    findInPageManager,
+    mainDispatcher
   ) {
   override suspend fun initialize(
     coreMainActivity: CoreMainActivity,
@@ -187,7 +189,7 @@ class BrandedReaderViewModel @Inject constructor(
       onFilesFound = {
         when (it) {
           is ValidationState.HasFile -> {
-            launchInViewModelScope((mainDispatcher as MainCoroutineDispatcher).immediate) {
+            launchInViewModelScope(mainDispatcherImmediate()) {
               openZimFile(
                 ZimReaderSource(
                   file = it.file,
@@ -205,7 +207,7 @@ class BrandedReaderViewModel @Inject constructor(
 
           is ValidationState.HasBothFiles -> {
             it.zimFile.delete()
-            launchInViewModelScope((mainDispatcher as MainCoroutineDispatcher).immediate) {
+            launchInViewModelScope(mainDispatcherImmediate()) {
               openZimFile(ZimReaderSource(it.obbFile))
               if (shouldManageExternalLaunch) {
                 // Open the previous loaded pages after ZIM file loads.
@@ -236,7 +238,9 @@ class BrandedReaderViewModel @Inject constructor(
         )
         kiwixDataStore.setPrefLanguage(BuildConfig.ENFORCED_LANG)
       }
-      coreMainActivity.recreate()
+      withContext(mainDispatcherImmediate()) {
+        coreMainActivity.recreate()
+      }
       return true
     }
     return false
@@ -384,12 +388,16 @@ class BrandedReaderViewModel @Inject constructor(
     openHomeScreen()
   }
 
+  /**
+   * This method is only used for UI test cases.
+   */
+  @VisibleForTesting
   override suspend fun openZimFileWithArguments(
     zimFileUri: String,
     pageUrl: String,
     searchItemTitle: String
   ) {
-    // Do nothing here as branded apps does not open ZIM files from storage.
+    openZimFile(ZimReaderSource(File(zimFileUri)))
   }
 
   override fun showNoBookOpenViews() {
