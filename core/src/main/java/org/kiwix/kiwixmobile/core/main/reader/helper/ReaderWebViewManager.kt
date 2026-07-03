@@ -197,7 +197,7 @@ class ReaderWebViewManager @Inject constructor(
   private fun safePosition(position: Int): Int =
     when {
       position < 0 -> 0
-      position >= webViewList().size -> webViewList().size - 1
+      position >= tabsSize() -> tabsSize() - 1
       else -> position
     }
 

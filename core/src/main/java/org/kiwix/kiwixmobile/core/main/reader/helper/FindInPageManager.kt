@@ -63,6 +63,7 @@ class FindInPageManager @Inject constructor() {
     this.webView = webView
     requireWebView("WebView supplied to FindInPageManager cannot be null")
       .setFindListener(findListener)
+    _uiState.update { it.copy(visible = true) }
   }
 
   fun search(text: String) {

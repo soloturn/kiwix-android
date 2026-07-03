@@ -19,6 +19,7 @@
 package org.kiwix.kiwixmobile.core.main.reader
 
 import android.Manifest.permission.POST_NOTIFICATIONS
+import android.app.Activity
 import android.app.Application
 import android.content.Intent
 import android.view.ActionMode
@@ -299,6 +300,7 @@ abstract class CoreReaderViewModel(
     setDonationDialogCallBack()
     observeTabsState()
     observeReaderPendingIntent()
+    observeFindInPage()
   }
 
   private fun setupDocumentParser() {
@@ -330,7 +332,7 @@ abstract class CoreReaderViewModel(
   }
 
   private fun observeSettings() {
-    viewModelScope.apply {
+    launchInViewModelScope {
       launch {
         bookmarkManager.bookmarkState.collect {
           updateState {
@@ -350,6 +352,14 @@ abstract class CoreReaderViewModel(
           }
           // Showing backToTop button based on webView scrolling.
         }
+      }
+    }
+  }
+
+  private fun observeFindInPage() {
+    launchInViewModelScope {
+      findInPageManager.uiState.collect {
+        updateState { copy(findInPageUiState = it) }
       }
     }
   }
@@ -375,7 +385,12 @@ abstract class CoreReaderViewModel(
   }
 
   private fun onReadAloudSpeakStarted() {
-    updateState { copy(showTtsControls = true) }
+    updateState {
+      copy(
+        showTtsControls = true,
+        pauseTtsButtonText = context.getString(string.tts_pause)
+      )
+    }
     readerMenuState?.onTextToSpeechStarted()
   }
 
@@ -595,7 +610,7 @@ abstract class CoreReaderViewModel(
     launchInViewModelScope {
       when (val result = readerArticleManager.getRandomArticle()) {
         is ReaderArticleManager.GetRandomArticleResult.Success -> {
-          loadUrlWithCurrentWebview(result.articleUrl)
+          readerWebViewManager.openArticle(result.articleUrl, getCurrentWebView())
         }
 
         ReaderArticleManager.GetRandomArticleResult.NoZimFileLoaded -> {
@@ -661,9 +676,9 @@ abstract class CoreReaderViewModel(
     }
   }
 
+  @Suppress("UnusedParameter")
   fun onSelectionActionModeFinished(actionMode: ActionMode) {
-    actionMode.finish()
-    this.actionMode = null
+    // Do nothing
   }
 
   override fun onSearchMenuClickedMenuClicked() {
@@ -736,7 +751,6 @@ abstract class CoreReaderViewModel(
    */
   override fun onFindInPageMenuClicked() {
     findInPageManager.setWebView(getCurrentWebView())
-    updateState { copy(findInPageUiState = findInPageUiState.copy(visible = true)) }
   }
 
   private fun onFindSearchChanged(text: String) {
@@ -753,7 +767,6 @@ abstract class CoreReaderViewModel(
 
   private fun closeFindInPage() {
     findInPageManager.stop()
-    updateState { copy(findInPageUiState = findInPageUiState.copy(visible = false)) }
   }
 
   override fun webViewUrlLoading() {
@@ -819,7 +832,7 @@ abstract class CoreReaderViewModel(
   }
 
   override fun webViewTitleUpdated(title: String) {
-    updateTabIcon(readerWebViewManager.webViewList().size)
+    updateTabIcon(readerWebViewManager.tabsSize())
   }
 
   private fun updateTabIcon(size: Int) {
@@ -919,7 +932,7 @@ abstract class CoreReaderViewModel(
     }
     if (selectTab) {
       launchInViewModelScope {
-        selectTab(readerWebViewManager.webViewList().size - 1)
+        selectTab(readerWebViewManager.tabsSize() - 1)
       }
     }
     return webView
@@ -955,7 +968,7 @@ abstract class CoreReaderViewModel(
   }
 
   override fun openExternalUrl(intent: Intent) {
-    viewModelScope.launch {
+    launchInViewModelScope {
       externalLinkOpener.openExternalUrl(intent, lifecycleScope = this)
     }
   }
@@ -1716,9 +1729,12 @@ abstract class CoreReaderViewModel(
     donationDialogHandler.setDonationDialogCallBack(this)
   }
 
-  protected fun addAlertDialogToDialogHost(alertDialogShower: AlertDialogShower) {
-    externalLinkOpener.setAlertDialogShower(alertDialogShower)
-    unsupportedMimeTypeHandler.setAlertDialogShower(alertDialogShower)
+  protected fun addAlertDialogToDialogHost(
+    activity: Activity,
+    alertDialogShower: AlertDialogShower
+  ) {
+    externalLinkOpener.initialize(activity, alertDialogShower)
+    unsupportedMimeTypeHandler.initialize(activity, alertDialogShower)
   }
 
   protected fun launchInViewModelScope(

@@ -29,6 +29,8 @@ import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Before
 import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -87,6 +89,7 @@ class FindInPageManagerTest {
     manager.search("Kiwix")
 
     assertThat(manager.uiState.value.query).isEqualTo("Kiwix")
+    assertTrue(manager.uiState.value.visible)
 
     verify {
       webView.findAllAsync("Kiwix")
@@ -139,6 +142,7 @@ class FindInPageManagerTest {
     verify {
       webView.clearMatches()
     }
+    assertFalse(manager.uiState.value.visible)
   }
 
   @Test

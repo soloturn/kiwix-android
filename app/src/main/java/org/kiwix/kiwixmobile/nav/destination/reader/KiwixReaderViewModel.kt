@@ -121,7 +121,7 @@ class KiwixReaderViewModel @Inject constructor(
     coreMainActivity: CoreMainActivity,
     alertDialogShower: AlertDialogShower
   ) {
-    addAlertDialogToDialogHost(alertDialogShower)
+    addAlertDialogToDialogHost(coreMainActivity, alertDialogShower)
     val appName = kiwixDataStore.appName.first()
     updateState { copy(isTocButtonEnable = true, appName = appName) }
     enableLeftDrawer()

@@ -94,8 +94,8 @@ class ExternalLinkOpenerTest {
       }
     )
     every { kiwixDataStore.externalLinkPopup } returns flowOf(true)
-    val externalLinkOpener = ExternalLinkOpener(activity, kiwixDataStore).apply {
-      setAlertDialogShower(alertDialogShower)
+    val externalLinkOpener = ExternalLinkOpener(kiwixDataStore).apply {
+      initialize(activity, alertDialogShower)
     }
     externalLinkOpener.openExternalUrl(intent, lifecycleScope = this)
     val dialogData = alertDialogShower.dialogState.value
@@ -124,8 +124,8 @@ class ExternalLinkOpenerTest {
       }
     )
     every { kiwixDataStore.externalLinkPopup } returns flowOf(true)
-    val externalLinkOpener = ExternalLinkOpener(activity, kiwixDataStore).apply {
-      setAlertDialogShower(alertDialogShower)
+    val externalLinkOpener = ExternalLinkOpener(kiwixDataStore).apply {
+      initialize(activity, alertDialogShower)
     }
     externalLinkOpener.openExternalUrl(intent, lifecycleScope = this)
     val dialogData = alertDialogShower.dialogState.value
@@ -151,8 +151,8 @@ class ExternalLinkOpenerTest {
       }
     )
     every { kiwixDataStore.externalLinkPopup } returns flowOf(true)
-    val externalLinkOpener = ExternalLinkOpener(activity, kiwixDataStore).apply {
-      setAlertDialogShower(alertDialogShower)
+    val externalLinkOpener = ExternalLinkOpener(kiwixDataStore).apply {
+      initialize(activity, alertDialogShower)
     }
     externalLinkOpener.openExternalUrl(intent, lifecycleScope = this)
     val dialogData = alertDialogShower.dialogState.value
@@ -179,8 +179,8 @@ class ExternalLinkOpenerTest {
       )
       every { kiwixDataStore.externalLinkPopup } returns flowOf(true)
       coJustRun { kiwixDataStore.setExternalLinkPopup(any()) }
-      val externalLinkOpener = ExternalLinkOpener(activity, kiwixDataStore).apply {
-        setAlertDialogShower(alertDialogShower)
+      val externalLinkOpener = ExternalLinkOpener(kiwixDataStore).apply {
+        initialize(activity, alertDialogShower)
       }
       externalLinkOpener.openExternalUrl(intent, lifecycleScope = this)
       val dialogData = alertDialogShower.dialogState.value
@@ -209,8 +209,8 @@ class ExternalLinkOpenerTest {
       }
     )
     every { kiwixDataStore.externalLinkPopup } returns flowOf(false)
-    val externalLinkOpener = ExternalLinkOpener(activity, kiwixDataStore).apply {
-      setAlertDialogShower(alertDialogShower)
+    val externalLinkOpener = ExternalLinkOpener(kiwixDataStore).apply {
+      initialize(activity, alertDialogShower)
     }
     externalLinkOpener.openExternalUrl(intent, lifecycleScope = this)
     val startedIntent = Shadows.shadowOf(activity).nextStartedActivity
@@ -224,8 +224,8 @@ class ExternalLinkOpenerTest {
     // or just not add any resolves.
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/"))
     // Don't add resolve info.
-    val externalLinkOpener = ExternalLinkOpener(activity, kiwixDataStore).apply {
-      setAlertDialogShower(alertDialogShower)
+    val externalLinkOpener = ExternalLinkOpener(kiwixDataStore).apply {
+      initialize(activity, alertDialogShower)
     }
 
     externalLinkOpener.openExternalUrl(intent, lifecycleScope = this)
@@ -249,8 +249,8 @@ class ExternalLinkOpenerTest {
         }
       }
     )
-    val externalLinkOpener = ExternalLinkOpener(activity, kiwixDataStore).apply {
-      setAlertDialogShower(alertDialogShower)
+    val externalLinkOpener = ExternalLinkOpener(kiwixDataStore).apply {
+      initialize(activity, alertDialogShower)
     }
     externalLinkOpener.openExternalLinkWithDialog(
       intent,
@@ -266,8 +266,8 @@ class ExternalLinkOpenerTest {
   fun openExternalLinkWithDialog_showsToastIfIntentIsNotResolvable() = runTest {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/"))
     // No resolve info.
-    val externalLinkOpener = ExternalLinkOpener(activity, kiwixDataStore).apply {
-      setAlertDialogShower(alertDialogShower)
+    val externalLinkOpener = ExternalLinkOpener(kiwixDataStore).apply {
+      initialize(activity, alertDialogShower)
     }
     externalLinkOpener.openExternalLinkWithDialog(
       intent,
