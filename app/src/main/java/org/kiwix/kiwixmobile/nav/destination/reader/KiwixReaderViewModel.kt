@@ -121,6 +121,7 @@ class KiwixReaderViewModel @Inject constructor(
     coreMainActivity: CoreMainActivity,
     alertDialogShower: AlertDialogShower
   ) {
+    readerMenuState = createMainMenu()
     addAlertDialogToDialogHost(coreMainActivity, alertDialogShower)
     val appName = kiwixDataStore.appName.first()
     updateState { copy(isTocButtonEnable = true, appName = appName) }
@@ -211,7 +212,7 @@ class KiwixReaderViewModel @Inject constructor(
     currentTab: Int,
     currentZimFile: String?,
     restoreOrigin: RestoreOrigin,
-    onComplete: () -> Unit
+    onComplete: suspend () -> Unit
   ) {
     when (restoreOrigin) {
       FromExternalLaunch -> {

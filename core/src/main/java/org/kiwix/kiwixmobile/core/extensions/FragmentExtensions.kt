@@ -30,7 +30,7 @@ import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 
 inline fun <reified T : ViewModel> Fragment.viewModel(
   viewModelFactory: ViewModelProvider.Factory
-) = ViewModelProviders.of(this, viewModelFactory).get(T::class.java)
+) = ViewModelProviders.of(this, viewModelFactory)[T::class.java]
 
 fun Fragment.toast(stringId: Int, length: Int = Toast.LENGTH_LONG) {
   requireActivity().toast(stringId, length)

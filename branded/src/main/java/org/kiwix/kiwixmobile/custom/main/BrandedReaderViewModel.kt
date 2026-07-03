@@ -127,6 +127,7 @@ class BrandedReaderViewModel @Inject constructor(
     if (enforcedLanguage(coreMainActivity)) {
       return
     }
+    readerMenuState = createMainMenu()
     addAlertDialogToDialogHost(coreMainActivity, alertDialogShower)
     val appName = kiwixDataStore.appName.first()
     updateState { copy(isTocButtonEnable = !BuildConfig.DISABLE_SIDEBAR, appName = appName) }
@@ -374,7 +375,7 @@ class BrandedReaderViewModel @Inject constructor(
     currentZimFile: String?,
     // Unused in custom apps as there is only one ZIM file that is already set.
     restoreOrigin: RestoreOrigin,
-    onComplete: () -> Unit
+    onComplete: suspend () -> Unit
   ) {
     restoreTabs(webViewHistoryItemList, currentTab, onComplete)
   }
@@ -455,7 +456,7 @@ class BrandedReaderViewModel @Inject constructor(
    * provided configuration. It takes into account whether read aloud and tabs are enabled or disabled
    * and creates the menu accordingly.
    */
-  override fun createMainMenu(): ReaderMenuState =
+  override suspend fun createMainMenu(): ReaderMenuState =
     ReaderMenuState(
       this,
       isUrlValidInitially = urlIsValid(),

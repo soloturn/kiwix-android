@@ -45,7 +45,6 @@ import org.kiwix.kiwixmobile.core.main.reader.READER_BOTTOM_BAR_HOME_BUTTON_TEST
 import org.kiwix.kiwixmobile.core.page.SEARCH_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.SEARCH_FIELD_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.SEARCH_ITEM_TESTING_TAG
-import org.kiwix.kiwixmobile.core.ui.components.NAVIGATION_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.TEST_PAUSE_MS
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.TEST_PAUSE_MS_FOR_SEARCH_TEST
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.testFlakyView
@@ -61,9 +60,10 @@ class SearchRobot {
   ) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         val searchView = onNodeWithTag(SEARCH_FIELD_TESTING_TAG)
         searchView.performTextInput("")
+        waitForIdle()
         for (char in query) {
           searchView.performTextInput(char.toString())
           if (wait != 0L) {
@@ -115,6 +115,7 @@ class SearchRobot {
 
   fun searchAndClickOnArticle(searchString: String, composeTestRule: ComposeContentTestRule) {
     // wait a bit to properly load the ZIM file in the reader
+    composeTestRule.waitForIdle()
     composeTestRule.waitUntilTimeout()
     openSearchScreen(composeTestRule)
     // Wait a bit to properly visible the search screen.
@@ -124,10 +125,13 @@ class SearchRobot {
   }
 
   private fun clickOnSearchItemInSearchList(composeTestRule: ComposeContentTestRule) {
-    composeTestRule.apply {
-      waitUntilTimeout()
-      onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0].performClick()
-    }
+    testFlakyView({
+      composeTestRule.apply {
+        waitUntilTimeout()
+        waitForIdle()
+        onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0].performClick()
+      }
+    })
   }
 
   fun assertArticleLoaded() {
@@ -190,9 +194,5 @@ class SearchRobot {
         onNodeWithTag(LEFT_DRAWER_NOTES_ITEM_TESTING_TAG).performClick()
       }
     })
-  }
-
-  fun closeSearchScreen(composeTestRule: ComposeContentTestRule) {
-    composeTestRule.onNodeWithTag(NAVIGATION_ICON_TESTING_TAG).performClick()
   }
 }

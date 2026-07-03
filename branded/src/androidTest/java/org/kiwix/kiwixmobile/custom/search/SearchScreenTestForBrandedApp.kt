@@ -28,6 +28,7 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import androidx.test.platform.app.InstrumentationRegistry
@@ -46,6 +47,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.kiwix.kiwixmobile.core.extensions.closeKeyboard
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.search.viewmodel.Action
 import org.kiwix.kiwixmobile.core.search.viewmodel.SearchViewModel
@@ -150,8 +152,9 @@ class SearchScreenTestForBrandedApp {
         }
       }
     })
-    UiThreadStatement.runOnUiThread {
-      brandedMainActivity.navigate(brandedMainActivity.readerScreenRoute)
+    activityScenario.onActivity {
+      brandedMainActivity = it
+      it.navigate(brandedMainActivity.readerScreenRoute)
     }
     openZimFileInReader(zimFile = downloadingZimFile)
     openSearchWithQuery()
@@ -174,7 +177,10 @@ class SearchScreenTestForBrandedApp {
       searchWithFrequentlyTypedWords(searchTerm, 300, composeTestRule)
       assertSearchSuccessful(searchedItem, composeTestRule)
       deleteSearchedQueryFrequently(searchTerm, uiDevice, 300, composeTestRule)
-      closeSearchScreen(composeTestRule)
+      // to close the keyboard
+      brandedMainActivity.currentFocus?.closeKeyboard()
+      // go to reader screen
+      pressBack()
     }
 
     // Added test for checking the crash scenario where the application was crashing when we

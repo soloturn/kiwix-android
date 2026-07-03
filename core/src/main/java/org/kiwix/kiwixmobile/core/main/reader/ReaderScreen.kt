@@ -85,6 +85,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -116,6 +117,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
@@ -205,7 +207,7 @@ fun ReaderScreen(
   snackBarHost: SnackbarHostState,
   onReaderAction: (ReaderAction) -> Unit,
   actionMenuItems: List<ActionMenuItem>,
-  onUserBackPressed: () -> FragmentActivityExtensions.Super,
+  onUserBackPressed: suspend () -> FragmentActivityExtensions.Super,
   navHostController: NavHostController,
   mainActivityBottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
   navigationIcon: @Composable () -> Unit
@@ -292,20 +294,23 @@ fun ReaderScreen(
 
 @Composable
 fun OnBackPressed(
-  onUserBackPressed: () -> FragmentActivityExtensions.Super,
+  onUserBackPressed: suspend () -> FragmentActivityExtensions.Super,
   navHostController: NavHostController
 ) {
   // Tracks whether the fragment's BackHandler should be enabled.
   var shouldEnableBackPress by rememberSaveable { mutableStateOf(true) }
+  val coroutineScope = rememberCoroutineScope()
   BackHandler(enabled = shouldEnableBackPress) {
-    val result = onUserBackPressed()
-    if (result == FragmentActivityExtensions.Super.ShouldCall) {
-      // Disable the fragment's BackHandler so that MainActivity's back handler can be triggered.
-      shouldEnableBackPress = false
-      navHostController.popBackStack()
-    } else {
-      // Keep the fragment's BackHandler active.
-      shouldEnableBackPress = true
+    coroutineScope.launch {
+      val result = onUserBackPressed()
+      if (result == FragmentActivityExtensions.Super.ShouldCall) {
+        // Disable the fragment's BackHandler so that MainActivity's back handler can be triggered.
+        shouldEnableBackPress = false
+        navHostController.popBackStack()
+      } else {
+        // Keep the fragment's BackHandler active.
+        shouldEnableBackPress = true
+      }
     }
   }
 }

@@ -36,6 +36,7 @@ import com.google.android.apps.common.testing.accessibility.framework.checks.Dup
 import com.google.android.apps.common.testing.accessibility.framework.checks.SpeakableTextPresentCheck
 import com.google.android.apps.common.testing.accessibility.framework.checks.TouchTargetSizeCheck
 import com.google.android.apps.common.testing.accessibility.framework.integrations.espresso.AccessibilityValidator
+import kotlinx.coroutines.runBlocking
 import leakcanary.LeakAssertions
 import okhttp3.Request
 import okhttp3.ResponseBody
@@ -317,7 +318,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
       kiwixMainActivity.viewModelFactory
     )[KiwixReaderViewModel::class.java]
 
-    val kiwixWebView = viewModel.getCurrentWebView()
+    val kiwixWebView = runBlocking { viewModel.getCurrentWebView() }
     val base64Src =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABAABJzQnCgAAAABJRU5ErkJggg=="
 

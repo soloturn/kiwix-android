@@ -35,6 +35,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.kiwix.kiwixmobile.BaseActivityTest
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationResultOnCurrent
+import org.kiwix.kiwixmobile.core.extensions.closeKeyboard
 import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
 import org.kiwix.kiwixmobile.core.search.viewmodel.Action
 import org.kiwix.kiwixmobile.core.search.viewmodel.SearchViewModel
@@ -112,7 +113,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       assertSearchSuccessful(searchUnitTestResult, composeTestRule)
       deleteSearchedQueryFrequently(searchUnitTestingQuery, uiDevice, 300, composeTestRule)
       // to close the keyboard
-      pressBack()
+      kiwixMainActivity.currentFocus?.closeKeyboard()
       // go to reader screen
       pressBack()
     }

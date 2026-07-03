@@ -295,7 +295,6 @@ abstract class CoreReaderViewModel(
     setupDocumentParser()
     setTtsCallback()
     observeSettings()
-    readerMenuState = createMainMenu()
     readAloudManager.setUpTTS()
     setDonationDialogCallBack()
     observeTabsState()
@@ -405,12 +404,16 @@ abstract class CoreReaderViewModel(
   }
 
   private fun startReadSelection() {
-    readAloudManager.readSelection(getCurrentWebView())
+    launchInViewModelScope {
+      readAloudManager.readSelection(getCurrentWebView())
+    }
   }
 
   private fun startReadAloud() {
-    val index = readerWebViewManager.currentWebViewIndex
-    readAloudManager.startReadAloud(getCurrentWebView(), index)
+    launchInViewModelScope {
+      val index = readerWebViewManager.currentWebViewIndex
+      readAloudManager.startReadAloud(getCurrentWebView(), index)
+    }
   }
 
   override fun onReadAloudPauseOrResume(isPauseTTS: Boolean) {
@@ -433,15 +436,21 @@ abstract class CoreReaderViewModel(
     }
 
   private fun goBack() {
-    getCurrentWebView().goBack()
+    launchInViewModelScope {
+      getCurrentWebView().goBack()
+    }
   }
 
   private fun goForward() {
-    getCurrentWebView().goForward()
+    launchInViewModelScope {
+      getCurrentWebView().goForward()
+    }
   }
 
   private fun backToTop() {
-    getCurrentWebView().pageUp(true)
+    launchInViewModelScope {
+      getCurrentWebView().pageUp(true)
+    }
   }
 
   @Suppress("CyclomaticComplexMethod")
@@ -450,7 +459,7 @@ abstract class CoreReaderViewModel(
       ReaderAction.BookmarkClicked -> onBookmarkButtonClicked()
       ReaderAction.BookmarkLongClicked -> openBookmarkScreen()
       ReaderAction.CloseAllTabs -> closeAllTabs()
-      ReaderAction.HomeClicked -> openMainPage()
+      ReaderAction.HomeClicked -> launchInViewModelScope { openMainPage() }
       ReaderAction.NextClicked -> goForward()
       ReaderAction.NextLongClicked -> showBackwordForwardHistory(true)
       ReaderAction.OpenLibrary -> openLocalLibrary()
@@ -464,7 +473,10 @@ abstract class CoreReaderViewModel(
       ReaderAction.DonateButtonClick -> donateButtonClick()
       ReaderAction.DonateLaterButtonClick -> donateLaterButtonClick()
       ReaderAction.ClearNavigationHistory -> clearNavigationHistory()
-      is ReaderAction.NavigationHistoryItemClick -> loadUrlWithCurrentWebview(action.navigationHistoryListItem.pageUrl)
+      is ReaderAction.NavigationHistoryItemClick -> launchInViewModelScope {
+        loadUrlWithCurrentWebview(action.navigationHistoryListItem.pageUrl)
+      }
+
       is ReaderAction.SelectTab -> {
         launchInViewModelScope {
           hideTabSwitcher()
@@ -578,7 +590,9 @@ abstract class CoreReaderViewModel(
   }
 
   override fun onAddNoteMenuClicked() {
-    emitEffect(ReaderEffect.ShowAddNoteDialog(getCurrentWebView()))
+    launchInViewModelScope {
+      emitEffect(ReaderEffect.ShowAddNoteDialog(getCurrentWebView()))
+    }
   }
 
   override fun onShareMenuClicked() {
@@ -730,14 +744,16 @@ abstract class CoreReaderViewModel(
         }
       )
       ReaderEffect.ShowKiwixDialog(dialog) {
-        val result = ShortcutUtils.addBookShortcut(
-          context = context,
-          zimFileReader = reader,
-          pageUrl = getCurrentWebView().url,
-          customName = nameState.value
-        )
-        if (result == ShortcutResult.NotSupported) {
-          emitEffect(ReaderEffect.ShowToast(context.getString(string.shortcut_disabled_message)))
+        launchInViewModelScope(mainDispatcherImmediate()) {
+          val result = ShortcutUtils.addBookShortcut(
+            context = context,
+            zimFileReader = reader,
+            pageUrl = getCurrentWebView().url,
+            customName = nameState.value
+          )
+          if (result == ShortcutResult.NotSupported) {
+            emitEffect(ReaderEffect.ShowToast(context.getString(string.shortcut_disabled_message)))
+          }
         }
       }
     }
@@ -750,7 +766,9 @@ abstract class CoreReaderViewModel(
    * specified title and displays the search input UI.
    */
   override fun onFindInPageMenuClicked() {
-    findInPageManager.setWebView(getCurrentWebView())
+    launchInViewModelScope {
+      findInPageManager.setWebView(getCurrentWebView())
+    }
   }
 
   private fun onFindSearchChanged(text: String) {
@@ -790,19 +808,17 @@ abstract class CoreReaderViewModel(
   }
 
   override fun webViewUrlFinishedLoading() {
-    updateTableOfContents()
-    updateBottomToolbarArrowsAlpha()
-    viewModelScope.launch {
+    launchInViewModelScope(mainDispatcherImmediate()) {
+      updateTableOfContents()
+      updateBottomToolbarArrowsAlpha()
       val currentWebView = getCurrentWebView()
       readerHistoryManager.saveHistory(
         currentWebView.url,
         currentWebView.title,
         zimFileManager.zimFileReader
       )
-    }
-    updateBottomToolbarVisibility()
-    if (!isWebViewHistoryRestoring) {
-      launchInViewModelScope {
+      updateBottomToolbarVisibility()
+      if (!isWebViewHistoryRestoring) {
         readerSessionManager.saveReaderSession()
       }
     }
@@ -827,7 +843,7 @@ abstract class CoreReaderViewModel(
     showProgressBarWithProgress(progress)
     if (progress == HUNDERED) {
       hideProgressBar()
-      Log.d(TAG_KIWIX, "Loaded URL: " + getCurrentWebView().url)
+      Log.d(TAG_KIWIX, "Loaded URL: " + webView.url)
     }
   }
 
@@ -844,7 +860,7 @@ abstract class CoreReaderViewModel(
     viewModelScope.launch {
       if (!isBackToTopEnabled()) return@launch
       restartHideBackToTopTimer()
-      val scrollY = getCurrentWebView().scrollY
+      val scrollY = withContext(mainDispatcherImmediate()) { getCurrentWebView().scrollY }
       if (scrollY > 200 && !uiState.value.showTtsControls) {
         showBackToTopButton()
       } else {
@@ -998,17 +1014,19 @@ abstract class CoreReaderViewModel(
     emitEffect(effect)
   }
 
-  private fun updateBottomToolbarArrowsAlpha() {
-    val currentWebView = getCurrentWebView()
-    updateState {
-      copy(
-        isPreviousPageButtonEnable = currentWebView.canGoBack(),
-        isNextPageButtonEnable = currentWebView.canGoForward()
-      )
+  private suspend fun updateBottomToolbarArrowsAlpha() {
+    withContext(mainDispatcherImmediate()) {
+      val currentWebView = getCurrentWebView()
+      updateState {
+        copy(
+          isPreviousPageButtonEnable = currentWebView.canGoBack(),
+          isNextPageButtonEnable = currentWebView.canGoForward()
+        )
+      }
     }
   }
 
-  private fun updateTableOfContents() {
+  private suspend fun updateTableOfContents() {
     val js = documentParser?.requireDocumentParserJs()
     loadUrlWithCurrentWebview("javascript:($js)()")
   }
@@ -1104,14 +1122,15 @@ abstract class CoreReaderViewModel(
     }
   }
 
-  protected fun urlIsValid(): Boolean = getCurrentWebView().url != null
+  protected suspend fun urlIsValid(): Boolean =
+    withContext(mainDispatcherImmediate()) { getCurrentWebView().url != null }
 
-  private fun openMainPage() {
+  private suspend fun openMainPage() {
     val articleUrl = zimReaderContainer.mainPage
     readerWebViewManager.openArticle(articleUrl, getCurrentWebView())
   }
 
-  protected fun loadUrlWithCurrentWebview(url: String?) {
+  protected suspend fun loadUrlWithCurrentWebview(url: String?) {
     readerWebViewManager.loadUrlWithCurrentWebview(url, getCurrentWebView())
   }
 
@@ -1128,7 +1147,9 @@ abstract class CoreReaderViewModel(
   }
 
   private fun updateUrlFlow() {
-    getCurrentWebView().url?.let { webUrlsFlow.value = it }
+    launchInViewModelScope(mainDispatcherImmediate()) {
+      getCurrentWebView().url?.let { webUrlsFlow.value = it }
+    }
   }
 
   protected fun observeBookmarks(zimFileReader: ZimFileReader) {
@@ -1161,7 +1182,7 @@ abstract class CoreReaderViewModel(
     }
   }
 
-  private fun onSessionRestoreCompleted() {
+  private suspend fun onSessionRestoreCompleted() {
     // Set up the bookmark for the currently opened book after all pages are restored.
     // This is especially important for custom apps, where the ZIM file is now loaded
     // only if it's not already open in the reader. So when the user navigates to another
@@ -1172,7 +1193,7 @@ abstract class CoreReaderViewModel(
     // to open the specified item, then sets `searchItemToOpen` to null to prevent
     // any unexpected behavior on future calls.
     isWebViewHistoryRestoring = false
-    pendingSearchItemManager.consume()?.let(::openSearchItem)
+    pendingSearchItemManager.consume()?.let { openSearchItem(it) }
 
     handlePendingIntent()
     // When the restoration completes than save the tabs history.
@@ -1224,11 +1245,11 @@ abstract class CoreReaderViewModel(
    * it attempts to convert the page title to a URL using the ZIM reader container. The
    * resulting URL is then loaded in the current web view.
    */
-  private fun openSearchItem(item: SearchItemToOpen) {
+  private suspend fun openSearchItem(item: SearchItemToOpen) {
     if (item.shouldOpenInNewTab) {
       newMainPageTab()
     }
-    item.pageUrl?.let(::loadUrlWithCurrentWebview) ?: run {
+    item.pageUrl?.let { loadUrlWithCurrentWebview(it) } ?: run {
       zimReaderContainer.titleToUrl(item.pageTitle)?.apply {
         loadUrlWithCurrentWebview(zimReaderContainer.urlSuffixToParsableUrl(this))
       }
@@ -1240,8 +1261,9 @@ abstract class CoreReaderViewModel(
     return createNewTab(mainPageUrl)
   }
 
-  fun getCurrentWebView(): KiwixWebView =
+  suspend fun getCurrentWebView(): KiwixWebView = withContext(mainDispatcherImmediate()) {
     readerWebViewManager.getCurrentWebView() ?: newMainPageTab()
+  }
 
   protected open fun openHomeScreen() {
     launchInViewModelScope {
@@ -1384,7 +1406,7 @@ abstract class CoreReaderViewModel(
   }
 
   private fun onBookmarkButtonClicked() {
-    viewModelScope.launch {
+    launchInViewModelScope {
       val pageTitle = getCurrentWebView().title
       val articleUrl = getCurrentWebView().url
       val result = bookmarkManager.addBookmark(
@@ -1459,7 +1481,7 @@ abstract class CoreReaderViewModel(
   protected suspend fun restoreTabs(
     webViewHistoryItemList: List<WebViewHistoryItem>,
     currentTab: Int,
-    onComplete: () -> Unit
+    onComplete: suspend () -> Unit
   ) {
     val result = readerWebViewManager.restoreTabs(
       webViewHistoryItemList,
@@ -1508,7 +1530,7 @@ abstract class CoreReaderViewModel(
   }
 
   @Suppress("ReturnCount")
-  fun onUserBackPressed(coreMainActivity: CoreMainActivity?): FragmentActivityExtensions.Super {
+  suspend fun onUserBackPressed(coreMainActivity: CoreMainActivity?): FragmentActivityExtensions.Super {
     when {
       coreMainActivity?.navigationDrawerIsOpen() == true -> {
         coreMainActivity.closeNavigationDrawer()
@@ -1626,7 +1648,7 @@ abstract class CoreReaderViewModel(
     currentTab: Int,
     currentZimFile: String?,
     restoreOrigin: RestoreOrigin,
-    onComplete: () -> Unit
+    onComplete: suspend () -> Unit
   )
 
   /**
@@ -1695,7 +1717,7 @@ abstract class CoreReaderViewModel(
    * WARNING: If modifying this method, ensure thorough testing with custom apps
    * to verify proper functionality.
    */
-  protected open fun createMainMenu(): ReaderMenuState =
+  protected open suspend fun createMainMenu(): ReaderMenuState =
     ReaderMenuState(
       this,
       isUrlValidInitially = urlIsValid(),
