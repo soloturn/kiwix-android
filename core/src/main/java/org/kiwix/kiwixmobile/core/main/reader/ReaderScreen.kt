@@ -104,6 +104,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -120,25 +121,25 @@ import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.BookmarkButtonItem
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.BackToTopButtonClick
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.BookmarkClicked
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.BookmarkLongClicked
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.CloseAllTabs
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.CloseTab
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.CloseTocDrawer
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.DonateButtonClick
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.DonateLaterButtonClick
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.HomeClicked
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.NextClicked
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.NextLongClicked
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.OpenLibrary
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.OpenSearch
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.OpenTocDrawer
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.PauseTts
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.PreviousClicked
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.PreviousLongClicked
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.SelectTab
-import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.BackToTopButtonClick
-import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.PauseTts
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.StopTts
-import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.DonateButtonClick
-import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.DonateLaterButtonClick
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderUiState
 import org.kiwix.kiwixmobile.core.main.reader.helper.TabsManager
 import org.kiwix.kiwixmobile.core.ui.components.ContentLoadingProgressBar
@@ -663,7 +664,10 @@ private fun BottomAppBarOfReaderScreen(
         onLongClick = { onReaderAction(BookmarkLongClicked) },
         buttonIcon = bookmarkButtonItem.icon,
         contentDescription = stringResource(R.string.bookmarks),
-        testingTag = READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG
+        testingTag = READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG,
+        modifier = Modifier.semantics {
+          selected = bookmarkButtonItem.isBookmarked
+        }
       )
       // Back Icon(for going to previous page)
       BottomAppBarButtonIcon(
@@ -704,6 +708,7 @@ private fun BottomAppBarOfReaderScreen(
 
 @Composable
 private fun BottomAppBarButtonIcon(
+  modifier: Modifier = Modifier,
   onClick: () -> Unit,
   onLongClick: (() -> Unit)? = null,
   buttonIcon: IconItem,
@@ -712,7 +717,7 @@ private fun BottomAppBarButtonIcon(
   testingTag: String
 ) {
   Box(
-    modifier = Modifier
+    modifier = modifier
       .size(READER_BOTTOM_APP_BAR_BUTTON_ICON_SIZE + TEN_DP)
       .clip(CircleShape)
       .combinedClickable(

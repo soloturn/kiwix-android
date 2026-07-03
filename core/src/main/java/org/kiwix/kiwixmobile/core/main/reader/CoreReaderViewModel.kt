@@ -1240,11 +1240,11 @@ abstract class CoreReaderViewModel(
     return createNewTab(mainPageUrl)
   }
 
-  private fun getCurrentWebView(): KiwixWebView =
+  fun getCurrentWebView(): KiwixWebView =
     readerWebViewManager.getCurrentWebView() ?: newMainPageTab()
 
   protected open fun openHomeScreen() {
-    viewModelScope.launch {
+    launchInViewModelScope {
       // Run safely because it is runs after 300 MS.
       runCatching {
         delay(OPEN_HOME_SCREEN_DELAY)

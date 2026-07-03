@@ -30,7 +30,9 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.spyk
 import io.mockk.verify
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -86,10 +88,6 @@ class ReaderWebViewManagerTest {
       verify {
         webView.loadUrl("url")
       }
-
-      verify {
-        tabsManager.selectTab(0)
-      }
     }
 
     @Test
@@ -120,10 +118,7 @@ class ReaderWebViewManagerTest {
         videoView = frameLayout
       )
       verify {
-        tabsManager.addWebView(webView)
-      }
-      verify(exactly = 0) {
-        tabsManager.selectTab(any())
+        tabsManager.addWebView(webView, false)
       }
     }
   }
@@ -258,10 +253,6 @@ class ReaderWebViewManagerTest {
         tabsManager.clearTabsState()
       }
 
-      verify {
-        tabsManager.selectTab(1)
-      }
-
       coVerify {
         readerSessionManager.restoreTabState(webView, history[0])
         readerSessionManager.restoreTabState(webView1, history[1])
@@ -299,15 +290,6 @@ class ReaderWebViewManagerTest {
       every { tabsManager.size() } returns 4
 
       assertEquals(4, readerWebViewManager.tabsSize())
-    }
-
-    @Test
-    fun `selectTab delegates to tabsManager`() {
-      readerWebViewManager.selectTab(2)
-
-      verify {
-        tabsManager.selectTab(2)
-      }
     }
 
     @Test
@@ -366,6 +348,7 @@ class ReaderWebViewManagerTest {
     }
   }
 
+  @OptIn(ExperimentalCoroutinesApi::class)
   @Nested
   inner class SafelyGetWebView {
     @Test
@@ -390,11 +373,12 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `safelyGetWebView returns last item for out of bounds index`() {
+    fun `safelyGetWebView returns last item for out of bounds index`() = runTest {
       val first = mockk<KiwixWebView>()
       val second = mockk<KiwixWebView>()
+      every { tabsManager.size() } returns 2
       tabsState.value = TabsManager.TabsState(listOf(first, second), 0)
-
+      advanceUntilIdle()
       assertEquals(
         second,
         readerWebViewManager.safelyGetWebView(10) { null }
@@ -402,11 +386,12 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `safelyGetWebView returns requested webview`() {
+    fun `safelyGetWebView returns requested webview`() = runTest {
       val first = mockk<KiwixWebView>()
       val second = mockk<KiwixWebView>()
+      every { tabsManager.size() } returns 2
       tabsState.value = TabsManager.TabsState(listOf(first, second), 0)
-
+      advanceUntilIdle()
       assertEquals(
         second,
         readerWebViewManager.safelyGetWebView(1) { null }

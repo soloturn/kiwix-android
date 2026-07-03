@@ -59,13 +59,6 @@ class TabsManager @Inject constructor() {
   fun getCurrentWebView(): KiwixWebView? = tabState.value.currentWebView
 
   fun setCurrentWebViewIndex(index: Int) {
-    _tabState.update { it.copy(selectedIndex = index) }
-  }
-
-  /**
-   * Update the currentWebViewIndex.
-   */
-  fun selectTab(index: Int) {
     _tabState.update { state ->
       if (index !in state.webViews.indices) {
         state

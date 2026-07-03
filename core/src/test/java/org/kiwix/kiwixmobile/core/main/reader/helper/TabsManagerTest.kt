@@ -74,14 +74,14 @@ class TabsManagerTest {
   }
 
   @Test
-  fun `selectTab should update selected index`() {
+  fun `setCurrentWebViewIndex should update selected index`() {
     val first = webView()
     val second = webView()
 
     tabsManager.addWebView(first)
     tabsManager.addWebView(second)
 
-    tabsManager.selectTab(0)
+    tabsManager.setCurrentWebViewIndex(0)
 
     val state = tabsManager.currentState()
 
@@ -90,12 +90,12 @@ class TabsManagerTest {
   }
 
   @Test
-  fun `selectTab with invalid index should not change state`() {
+  fun `setCurrentWebViewIndex with invalid index should not change state`() {
     val first = webView()
 
     tabsManager.addWebView(first)
 
-    tabsManager.selectTab(10)
+    tabsManager.setCurrentWebViewIndex(10)
 
     val state = tabsManager.currentState()
 
@@ -130,7 +130,7 @@ class TabsManagerTest {
     tabsManager.addWebView(second)
     tabsManager.addWebView(third)
 
-    tabsManager.selectTab(2)
+    tabsManager.setCurrentWebViewIndex(2)
 
     tabsManager.closeTab(1)
 
@@ -224,7 +224,7 @@ class TabsManagerTest {
     tabsManager.addWebView(first)
     tabsManager.addWebView(second)
 
-    tabsManager.selectTab(0)
+    tabsManager.setCurrentWebViewIndex(0)
 
     assertEquals(first, tabsManager.getCurrentWebView())
   }

@@ -31,7 +31,6 @@ import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavOptions
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
-import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Rule
@@ -40,7 +39,6 @@ import org.kiwix.kiwixmobile.BaseActivityTest
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationResultOnCurrent
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
-import org.kiwix.kiwixmobile.core.main.reader.CoreReaderFragment
 import org.kiwix.kiwixmobile.core.page.bookmark.models.LibkiwixBookmarkItem
 import org.kiwix.kiwixmobile.core.ui.components.NAVIGATION_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
@@ -101,18 +99,16 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       pressBack()
     }
     waitComposeToSettleViews()
-    val coreReaderFragment = kiwixMainActivity.supportFragmentManager.fragments
-      .filterIsInstance<CoreReaderFragment>()
-      .firstOrNull()
+    val zimReaderContainer = kiwixMainActivity.zimReaderContainer
     val libKiwixBook =
       Book().apply {
-        update(coreReaderFragment?.zimReaderContainer?.zimFileReader?.jniKiwixReader)
+        update(zimReaderContainer.zimFileReader?.jniKiwixReader)
       }
     val bookmarkList = arrayListOf<LibkiwixBookmarkItem>()
     for (i in 1..500) {
       val bookmark =
         Bookmark().apply {
-          bookId = coreReaderFragment?.zimReaderContainer?.zimFileReader?.id
+          bookId = zimReaderContainer.zimFileReader?.id
           title = "bookmark$i"
           url = "http://kiwix.org/demoBookmark$i"
           bookTitle = libKiwixBook.title
@@ -120,11 +116,11 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       val libkiwixItem =
         LibkiwixBookmarkItem(
           bookmark,
-          coreReaderFragment?.zimReaderContainer?.zimFileReader?.favicon,
-          coreReaderFragment?.zimReaderContainer?.zimFileReader?.zimReaderSource
+          zimReaderContainer.zimFileReader?.favicon,
+          zimReaderContainer.zimFileReader?.zimReaderSource
         )
       runBlocking {
-        coreReaderFragment?.libkiwixBookmarks?.saveBookmark(libkiwixItem).also {
+        kiwixMainActivity.libkiwixBookmarks.saveBookmark(libkiwixItem).also {
           bookmarkList.add(libkiwixItem)
         }
       }
@@ -159,13 +155,13 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       assertZimFileLoadedIntoTheReader(composeTestRule)
 
       // Ensure the bookmark toggle reflects the saved state.
-      assertEquals(true, isBookmarked())
+      assertBookmarkButtonShowBookmarked(composeTestRule)
       waitComposeToSettleViews()
 
       // Remove the bookmark and verify it is removed from the reader and the bookmark list.
       clickOnSaveBookmarkImage(composeTestRule)
       composeTestRule.waitUntilTimeout(TEST_PAUSE_MS_FOR_SNACKBAR)
-      assertEquals(false, isBookmarked())
+      assertBookmarkButtonShowNotBookmarked(composeTestRule)
       longClickOnSaveBookmarkImage(composeTestRule, TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
       assertNoBookMarkTextDisplayed(composeTestRule)
       pressBack()
@@ -180,7 +176,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
           composeTestRule.onNodeWithTag(NAVIGATION_ICON_TESTING_TAG).performClick()
           waitComposeToSettleViews()
           assertZimFileLoadedIntoTheReader(composeTestRule)
-          assertEquals(true, isBookmarked())
+          assertBookmarkButtonShowBookmarked(composeTestRule)
         }
       }
 
@@ -198,7 +194,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       openBookmarkInReader(composeTestRule)
       waitComposeToSettleViews()
       assertAndroidArticleLoadedInReader(composeTestRule)
-      assertEquals(true, isBookmarked())
+      assertBookmarkButtonShowBookmarked(composeTestRule)
       clickOnSaveBookmarkImage(composeTestRule)
       composeTestRule.waitUntilTimeout(TEST_PAUSE_MS_FOR_SNACKBAR)
 
@@ -219,7 +215,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       InstrumentationRegistry.getInstrumentation().waitForIdleSync()
       waitComposeToSettleViews()
       assertZimFileLoadedIntoTheReader(composeTestRule)
-      assertEquals(true, isBookmarked())
+      assertBookmarkButtonShowBookmarked(composeTestRule)
       topLevel {
         // Verify the bookmark appears in the bookmark screen.
         clickBookmarksOnNavDrawer(kiwixMainActivity as CoreMainActivity, composeTestRule) {
@@ -228,11 +224,6 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       }
     }
   }
-
-  private fun isBookmarked() = kiwixMainActivity.supportFragmentManager.fragments
-    .filterIsInstance<CoreReaderFragment>()
-    .firstOrNull()
-    ?.getIsBookmarked() ?: false
 
   private fun deletePreviouslySavedBookmarks() {
     bookmarks {

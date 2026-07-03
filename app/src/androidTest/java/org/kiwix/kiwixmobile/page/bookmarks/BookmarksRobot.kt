@@ -18,6 +18,8 @@
 
 package org.kiwix.kiwixmobile.page.bookmarks
 
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDisplayed
@@ -201,6 +203,26 @@ class BookmarksRobot : BaseRobot() {
             "//*[contains(text(), 'Android_(operating_system)')]"
           )
         )
+    })
+  }
+
+  fun assertBookmarkButtonShowBookmarked(composeTestRule: ComposeContentTestRule) {
+    testFlakyView({
+      composeTestRule.waitForIdle()
+      composeTestRule.waitUntilTimeout()
+      composeTestRule
+        .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
+        .assertIsSelected()
+    })
+  }
+
+  fun assertBookmarkButtonShowNotBookmarked(composeTestRule: ComposeContentTestRule) {
+    testFlakyView({
+      composeTestRule.waitForIdle()
+      composeTestRule.waitUntilTimeout()
+      composeTestRule
+        .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
+        .assertIsNotSelected()
     })
   }
 

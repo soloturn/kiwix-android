@@ -80,11 +80,7 @@ class ReaderWebViewManager @Inject constructor(
     shouldLoadUrl: Boolean = true
   ): KiwixWebView {
     val webView = webViewFactory.create(callback, videoView)
-    tabsManager.addWebView(webView)
-    if (selectTab) {
-      tabsManager.selectTab(tabsManager.size() - 1)
-    }
-
+    tabsManager.addWebView(webView, selectTab)
     if (shouldLoadUrl) {
       loadUrl(url, webView)
     }
@@ -154,10 +150,6 @@ class ReaderWebViewManager @Inject constructor(
    */
   fun tabsSize(): Int = tabsManager.size()
 
-  fun selectTab(index: Int) {
-    tabsManager.selectTab(index)
-  }
-
   fun closeTab(index: Int): KiwixWebView? = tabsManager.closeTab(index)
 
   fun closeAllTabs(): TabsManager.TabsState = tabsManager.closeAllTabs()
@@ -181,7 +173,7 @@ class ReaderWebViewManager @Inject constructor(
       webViewHistoryItemList.forEach { webViewHistoryItem ->
         readerSessionManager.restoreTabState(createWebView(), webViewHistoryItem)
       }
-      selectTab(currentTab)
+      setCurrentWebViewIndex(currentTab)
       RestoreTabsResult.TabsRestored
     }.getOrElse { RestoreTabsResult.ErrorInRestoringTabs(it) }
 

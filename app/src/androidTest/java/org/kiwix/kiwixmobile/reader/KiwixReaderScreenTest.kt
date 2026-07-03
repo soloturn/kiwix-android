@@ -27,6 +27,7 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.core.net.toUri
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavOptions
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import androidx.test.platform.app.InstrumentationRegistry
@@ -49,11 +50,11 @@ import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationRes
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
-import org.kiwix.kiwixmobile.core.main.reader.CoreReaderFragment
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.main.topLevel
+import org.kiwix.kiwixmobile.nav.destination.reader.KiwixReaderViewModel
 import org.kiwix.kiwixmobile.page.bookmarks.bookmarks
 import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils
@@ -65,7 +66,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.URI
 
-class KiwixReaderFragmentTest : BaseActivityTest() {
+class KiwixReaderScreenTest : BaseActivityTest() {
   @Rule(order = RETRY_RULE_ORDER)
   @JvmField
   val retryRule = RetryRule()
@@ -311,12 +312,12 @@ class KiwixReaderFragmentTest : BaseActivityTest() {
     }
     // try to save the base64 image. Since there is no longClick method available
     // in testing for webview so we are directly calling the method to verify the real behaviour.
-    val coreReaderFragment =
-      kiwixMainActivity.supportFragmentManager.fragments
-        .filterIsInstance<CoreReaderFragment>()
-        .firstOrNull()
-    val kiwixWebView = coreReaderFragment?.getCurrentWebView()
-      ?: throw IllegalStateException("Could not get current webView")
+    val viewModel = ViewModelProvider(
+      kiwixMainActivity,
+      kiwixMainActivity.viewModelFactory
+    )[KiwixReaderViewModel::class.java]
+
+    val kiwixWebView = viewModel.getCurrentWebView()
     val base64Src =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABAABJzQnCgAAAABJRU5ErkJggg=="
 

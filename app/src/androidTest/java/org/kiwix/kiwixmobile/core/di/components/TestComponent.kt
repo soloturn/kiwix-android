@@ -28,6 +28,7 @@ import org.kiwix.kiwixmobile.core.di.modules.CoreViewModelModule
 import org.kiwix.kiwixmobile.core.di.modules.JNIModule
 import org.kiwix.kiwixmobile.core.di.modules.KiwixPermissionModule
 import org.kiwix.kiwixmobile.core.di.modules.MutexModule
+import org.kiwix.kiwixmobile.core.di.modules.ReaderModule
 import org.kiwix.kiwixmobile.core.di.modules.SearchModule
 import org.kiwix.kiwixmobile.core.di.modules.TestNetworkModule
 import org.kiwix.kiwixmobile.migration.di.module.MigrationModule
@@ -48,7 +49,8 @@ import javax.inject.Singleton
     SearchModule::class,
     MutexModule::class,
     MigrationModule::class,
-    KiwixPermissionModule::class
+    KiwixPermissionModule::class,
+    ReaderModule::class
   ]
 )
 interface TestComponent : CoreComponent {
