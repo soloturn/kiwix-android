@@ -72,6 +72,7 @@ class WebViewHistoryRoomDaoTest {
 
   @Test
   fun testInsertWebViewPageHistoryItems() = runTest {
+    // Tests Production logic 'ORDER BY webViewIndex ASC'
     val entities = listOf(
       createEntity(zimId = "zim1", webViewIndex = 1),
       createEntity(zimId = "zim2", webViewIndex = 0)
