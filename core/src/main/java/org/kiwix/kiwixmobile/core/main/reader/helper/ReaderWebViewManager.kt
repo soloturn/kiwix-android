@@ -20,7 +20,11 @@ package org.kiwix.kiwixmobile.core.main.reader.helper
 
 import android.widget.FrameLayout
 import androidx.core.net.toUri
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.WebViewCallback
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderWebViewManager.WebViewNavigationHistoryResult.HistoryFound
@@ -35,7 +39,8 @@ import javax.inject.Inject
 class ReaderWebViewManager @Inject constructor(
   private val tabsManager: TabsManager,
   private val readerSessionManager: ReaderSessionManager,
-  private val webViewFactory: WebViewFactory
+  private val webViewFactory: WebViewFactory,
+  @MainDispatcher private val mainDispatcher: CoroutineDispatcher
 ) {
   sealed interface WebViewNavigationHistoryResult {
     data class HistoryFound(
@@ -193,28 +198,30 @@ class ReaderWebViewManager @Inject constructor(
       else -> position
     }
 
-  fun destroyAllTabs() {
+  suspend fun destroyAllTabs() {
     runCatching {
-      webViewList().apply {
-        forEach { webView ->
-          // Stop any ongoing loading of the WebView
-          webView.stopLoading()
-          // Clear the navigation history of the WebView
-          webView.clearHistory()
-          // Clear cached resources to prevent loading old content
-          webView.clearCache(true)
-          // Pause any ongoing activity in the WebView to prevent resource usage
-          webView.onPause()
-          // Break the reference chain from WebView → Fragment (via callback)
-          // to prevent memory leaks through InputMethodManager/DecorView retention.
-          webView.dispose()
-          // Forcefully destroy the WebView before setting the new ZIM file
-          // to ensure that it does not continue attempting to load internal links
-          // from the previous ZIM file, which could cause errors.
-          webView.destroy()
+      withContext((mainDispatcher as MainCoroutineDispatcher).immediate) {
+        webViewList().apply {
+          forEach { webView ->
+            // Stop any ongoing loading of the WebView
+            webView.stopLoading()
+            // Clear the navigation history of the WebView
+            webView.clearHistory()
+            // Clear cached resources to prevent loading old content
+            webView.clearCache(true)
+            // Pause any ongoing activity in the WebView to prevent resource usage
+            webView.onPause()
+            // Break the reference chain from WebView → Fragment (via callback)
+            // to prevent memory leaks through InputMethodManager/DecorView retention.
+            webView.dispose()
+            // Forcefully destroy the WebView before setting the new ZIM file
+            // to ensure that it does not continue attempting to load internal links
+            // from the previous ZIM file, which could cause errors.
+            webView.destroy()
+          }
+          // Clear the WebView list after destroying the WebViews
+          closeAllTabs()
         }
-        // Clear the WebView list after destroying the WebViews
-        closeAllTabs()
       }
     }.onFailure {
       it.printStackTrace()

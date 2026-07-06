@@ -121,8 +121,7 @@ class KiwixReaderViewModel @Inject constructor(
     coreMainActivity: CoreMainActivity,
     alertDialogShower: AlertDialogShower
   ) {
-    readerMenuState = createMainMenu()
-    addAlertDialogToDialogHost(coreMainActivity, alertDialogShower)
+    super.initialize(coreMainActivity, alertDialogShower)
     val appName = kiwixDataStore.appName.first()
     updateState { copy(isTocButtonEnable = true, appName = appName) }
     enableLeftDrawer()
@@ -217,7 +216,6 @@ class KiwixReaderViewModel @Inject constructor(
     when (restoreOrigin) {
       FromExternalLaunch -> {
         val zimReaderSource = fromDatabaseValue(currentZimFile)
-        Log.e("ZIM_READER", "restoreViewStateOnValidWebViewHistory: $zimReaderSource")
         if (zimReaderSource?.canOpenInLibkiwix() == true) {
           if (zimReaderContainer.zimReaderSource == null) {
             openZimFile(zimReaderSource)

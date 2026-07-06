@@ -28,6 +28,7 @@ import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -266,6 +267,7 @@ abstract class CoreReaderViewModel(
     data object RequestNotificationPermission : ReaderEffect
   }
 
+  private val coroutineJobs: MutableList<Job> = mutableListOf()
   private val _uiState: MutableStateFlow<ReaderUiState> = MutableStateFlow(ReaderUiState())
   val uiState: StateFlow<ReaderUiState> get() = _uiState.asStateFlow()
   private val _effects = MutableSharedFlow<ReaderEffect>(extraBufferCapacity = Int.MAX_VALUE)
@@ -277,6 +279,9 @@ abstract class CoreReaderViewModel(
   private var actionMode: ActionMode? = null
 
   val isAndroid13OrAbove = kiwixPermissionChecker.isAndroid13orAbove()
+
+  @VisibleForTesting
+  fun getUiState() = _uiState
 
   private var documentSectionListener: SectionsListener? = object : SectionsListener {
     override fun sectionsLoaded(
@@ -291,15 +296,15 @@ abstract class CoreReaderViewModel(
     }
   }
 
-  init {
-    setupDocumentParser()
-    setTtsCallback()
-    observeSettings()
-    readAloudManager.setUpTTS()
-    setDonationDialogCallBack()
-    observeTabsState()
-    observeReaderPendingIntent()
-    observeFindInPage()
+  private fun observeCoroutineFlows() {
+    clearObservers()
+    coroutineJobs.apply {
+      add(observeSettings())
+      add(observeFindInPage())
+      add(observeTabsState())
+      add(observeReaderPendingIntent())
+      add(observeBookmarkState())
+    }
   }
 
   private fun setupDocumentParser() {
@@ -330,41 +335,40 @@ abstract class CoreReaderViewModel(
     updateState { copy(pauseTtsButtonText = context.getString(string)) }
   }
 
-  private fun observeSettings() {
-    launchInViewModelScope {
-      launch {
-        bookmarkManager.bookmarkState.collect {
-          updateState {
-            copy(
-              bookmarkButtonItem = bookmarkButtonItem.copy(
-                isBookmarked = it.isBookmarked,
-                icon = getBookMarkButtonIcon(it.isBookmarked)
-              )
+  private fun observeBookmarkState() = viewModelScope.launch {
+    launch {
+      bookmarkManager.bookmarkState.collect {
+        updateState {
+          copy(
+            bookmarkButtonItem = bookmarkButtonItem.copy(
+              isBookmarked = it.isBookmarked,
+              icon = getBookMarkButtonIcon(it.isBookmarked)
             )
-          }
-        }
-      }
-      launch {
-        kiwixDataStore.backToTop.collect {
-          if (!it) {
-            hideBackToTopButton()
-          }
-          // Showing backToTop button based on webView scrolling.
+          )
         }
       }
     }
   }
 
-  private fun observeFindInPage() {
-    launchInViewModelScope {
+  private fun observeSettings() =
+    viewModelScope.launch {
+      kiwixDataStore.backToTop.collect {
+        if (!it) {
+          hideBackToTopButton()
+        }
+        // Showing backToTop button based on webView scrolling.
+      }
+    }
+
+  private fun observeFindInPage() =
+    viewModelScope.launch {
       findInPageManager.uiState.collect {
         updateState { copy(findInPageUiState = it) }
       }
     }
-  }
 
-  private fun observeTabsState() {
-    launchInViewModelScope {
+  private fun observeTabsState() =
+    viewModelScope.launch {
       readerWebViewManager.tabsState.collect { tabsState ->
         updateTabIcon(tabsState.webViews.size)
         _uiState.update {
@@ -372,16 +376,14 @@ abstract class CoreReaderViewModel(
         }
       }
     }
-  }
 
-  private fun observeReaderPendingIntent() {
-    launchInViewModelScope {
+  private fun observeReaderPendingIntent() =
+    viewModelScope.launch {
       readerIntentManager.events.collect {
         if (isWebViewHistoryRestoring) return@collect
         handlePendingIntent()
       }
     }
-  }
 
   private fun onReadAloudSpeakStarted() {
     updateState {
@@ -857,10 +859,10 @@ abstract class CoreReaderViewModel(
 
   @Suppress("MagicNumber")
   override fun webViewPageChanged(page: Int, maxPages: Int) {
-    viewModelScope.launch {
-      if (!isBackToTopEnabled()) return@launch
+    launchInViewModelScope(mainDispatcherImmediate()) {
+      if (!isBackToTopEnabled()) return@launchInViewModelScope
       restartHideBackToTopTimer()
-      val scrollY = withContext(mainDispatcherImmediate()) { getCurrentWebView().scrollY }
+      val scrollY = getCurrentWebView().scrollY
       if (scrollY > 200 && !uiState.value.showTtsControls) {
         showBackToTopButton()
       } else {
@@ -1628,10 +1630,25 @@ abstract class CoreReaderViewModel(
    * Initializes the reader view model, sub viewModels should override this method
    * to provide custom initialization logic.
    */
-  abstract suspend fun initialize(
+  open suspend fun initialize(
     coreMainActivity: CoreMainActivity,
     alertDialogShower: AlertDialogShower
-  )
+  ) {
+    observeCoroutineFlows()
+    setupDocumentParser()
+    setTtsCallback()
+    readAloudManager.setUpTTS()
+    setDonationDialogCallBack()
+    readerMenuState = createMainMenu()
+    addAlertDialogToDialogHost(coreMainActivity, alertDialogShower)
+  }
+
+  private fun clearObservers() {
+    coroutineJobs.forEach {
+      it.cancel()
+    }
+    coroutineJobs.clear()
+  }
 
   abstract fun openBookmarkScreen()
 
@@ -1775,6 +1792,7 @@ abstract class CoreReaderViewModel(
   }
 
   override fun onCleared() {
+    clearObservers()
     bookmarkManager.stopObserving()
     pendingSearchItemManager.consume()
     readAloudManager.stopReadAloudSafely()

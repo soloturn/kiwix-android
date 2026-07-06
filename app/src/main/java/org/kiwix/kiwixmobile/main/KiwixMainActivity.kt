@@ -385,7 +385,7 @@ class KiwixMainActivity : CoreMainActivity() {
     }
   }
 
-  private fun openZimFromFilePath(path: String, pageUrl: String? = null) {
+  fun openZimFromFilePath(path: String, pageUrl: String? = null) {
     val isAlreadyOnReader =
       navController.currentDestination?.route == KiwixDestination.Reader.route
     if (!isAlreadyOnReader) {

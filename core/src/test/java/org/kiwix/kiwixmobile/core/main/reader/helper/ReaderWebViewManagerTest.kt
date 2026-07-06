@@ -30,6 +30,7 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.spyk
 import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -38,13 +39,18 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.WebViewCallback
 import org.kiwix.kiwixmobile.core.page.history.models.NavigationHistoryListItem
 import org.kiwix.kiwixmobile.core.page.history.models.WebViewHistoryItem
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
+import org.kiwix.sharedFunctions.MainDispatcherRule
 
 class ReaderWebViewManagerTest {
+  @RegisterExtension
+  @JvmField
+  val mainDispatcherRule = MainDispatcherRule()
   private lateinit var readerWebViewManager: ReaderWebViewManager
 
   private val tabsManager = mockk<TabsManager>(relaxed = true)
@@ -54,6 +60,7 @@ class ReaderWebViewManagerTest {
   private val callback = mockk<WebViewCallback>()
   private val frameLayout = mockk<FrameLayout>()
   private val historyList = mockk<WebBackForwardList>()
+  private val mainDispatcher = Dispatchers.Main
 
   @BeforeEach
   fun setup() {
@@ -61,7 +68,7 @@ class ReaderWebViewManagerTest {
     tabsState = MutableStateFlow(TabsManager.TabsState())
     every { tabsManager.tabState } returns tabsState
     readerWebViewManager =
-      ReaderWebViewManager(tabsManager, readerSessionManager, webViewFactory)
+      ReaderWebViewManager(tabsManager, readerSessionManager, webViewFactory, mainDispatcher)
   }
 
   @Nested
@@ -402,7 +409,7 @@ class ReaderWebViewManagerTest {
   @Nested
   inner class DestroyTabs {
     @Test
-    fun `destroyAllTabs destroys every webview`() {
+    fun `destroyAllTabs destroys every webview`() = runTest {
       val first = mockk<KiwixWebView>(relaxed = true)
       val second = mockk<KiwixWebView>(relaxed = true)
       tabsState.value = TabsManager.TabsState(listOf(first, second), 0)
@@ -429,7 +436,7 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `destroyAllTabs clears tabs when destroy throws`() {
+    fun `destroyAllTabs clears tabs when destroy throws`() = runTest {
       val webView = mockk<KiwixWebView>()
       every { webView.stopLoading() } just Runs
       every { webView.clearHistory() } just Runs

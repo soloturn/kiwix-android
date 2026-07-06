@@ -26,7 +26,6 @@ import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavOptions
 import androidx.test.core.app.ApplicationProvider
@@ -36,16 +35,12 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.kiwix.kiwixmobile.BaseActivityTest
-import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationResultOnCurrent
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
-import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
 import org.kiwix.kiwixmobile.core.page.bookmark.models.LibkiwixBookmarkItem
 import org.kiwix.kiwixmobile.core.ui.components.NAVIGATION_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
-import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.main.topLevel
-import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SNACKBAR
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
@@ -55,21 +50,17 @@ import org.kiwix.libkiwix.Book
 import org.kiwix.libkiwix.Bookmark
 
 class LibkiwixBookmarkTest : BaseActivityTest() {
-  @Rule(order = RETRY_RULE_ORDER)
-  @JvmField
-  val retryRule = RetryRule()
+  // @Rule(order = RETRY_RULE_ORDER)
+  // @JvmField
+  // val retryRule = RetryRule()
 
   @Rule(order = COMPOSE_TEST_RULE_ORDER)
   @JvmField
   val composeTestRule = createAndroidComposeRule<KiwixMainActivity>()
 
-  private lateinit var kiwixMainActivity: KiwixMainActivity
-
   @Before
   override fun waitForIdle() {
     super.waitForIdle()
-    kiwixMainActivity = composeTestRule.activity
-
     composeTestRule.apply {
       runOnUiThread {
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
@@ -99,7 +90,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       pressBack()
     }
     waitComposeToSettleViews()
-    val zimReaderContainer = kiwixMainActivity.zimReaderContainer
+    val zimReaderContainer = composeTestRule.activity.zimReaderContainer
     val libKiwixBook =
       Book().apply {
         update(zimReaderContainer.zimFileReader?.jniKiwixReader)
@@ -120,14 +111,14 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
           zimReaderContainer.zimFileReader?.zimReaderSource
         )
       runBlocking {
-        kiwixMainActivity.libkiwixBookmarks.saveBookmark(libkiwixItem).also {
+        composeTestRule.activity.libkiwixBookmarks.saveBookmark(libkiwixItem).also {
           bookmarkList.add(libkiwixItem)
         }
       }
     }
     bookmarks {
       // test all the saved bookmarks are showing on the bookmarks screen
-      openBookmarkScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
+      openBookmarkScreen(composeTestRule.activity as CoreMainActivity, composeTestRule)
       testAllBookmarkShowing(bookmarkList, composeTestRule)
     }
   }
@@ -145,7 +136,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       waitComposeToSettleViews()
 
       // Verify bookmark appears in the bookmark list
-      openBookmarkScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
+      openBookmarkScreen(composeTestRule.activity as CoreMainActivity, composeTestRule)
       assertBookmarkSaved(composeTestRule)
       waitComposeToSettleViews()
 
@@ -172,7 +163,11 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       // in reader and user navigate back to reader).
       topLevel {
         // open settings screen
-        clickSettingsOnSideNav(kiwixMainActivity as CoreMainActivity, composeTestRule, true) {
+        clickSettingsOnSideNav(
+          composeTestRule.activity as CoreMainActivity,
+          composeTestRule,
+          true
+        ) {
           composeTestRule.onNodeWithTag(NAVIGATION_ICON_TESTING_TAG).performClick()
           waitComposeToSettleViews()
           assertZimFileLoadedIntoTheReader(composeTestRule)
@@ -190,7 +185,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       waitComposeToSettleViews()
       clickOnSaveBookmarkImage(composeTestRule)
       clickOnBackwardButton(composeTestRule)
-      openBookmarkScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
+      openBookmarkScreen(composeTestRule.activity as CoreMainActivity, composeTestRule)
       openBookmarkInReader(composeTestRule)
       waitComposeToSettleViews()
       assertAndroidArticleLoadedInReader(composeTestRule)
@@ -218,7 +213,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       assertBookmarkButtonShowBookmarked(composeTestRule)
       topLevel {
         // Verify the bookmark appears in the bookmark screen.
-        clickBookmarksOnNavDrawer(kiwixMainActivity as CoreMainActivity, composeTestRule) {
+        clickBookmarksOnNavDrawer(composeTestRule.activity as CoreMainActivity, composeTestRule) {
           assertBookmarkSaved(composeTestRule)
         }
       }
@@ -227,7 +222,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
 
   private fun deletePreviouslySavedBookmarks() {
     bookmarks {
-      openBookmarkScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
+      openBookmarkScreen(composeTestRule.activity as CoreMainActivity, composeTestRule)
       clickOnTrashIcon(composeTestRule)
       assertDeleteBookmarksDialogDisplayed(composeTestRule)
       clickOnDeleteButton(composeTestRule)
@@ -239,18 +234,22 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
 
   private fun openZimFileInReader() {
     val zimFile = getZimFileFromResourceFolder(context, "testzim.zim")
-    composeTestRule.apply {
-      runOnUiThread {
-        kiwixMainActivity.navigate(KiwixDestination.Library.route)
-        val navOptions = NavOptions.Builder()
-          .setPopUpTo(KiwixDestination.Reader.route, false)
-          .build()
-        kiwixMainActivity.apply {
-          kiwixMainActivity.navigate(KiwixDestination.Reader.route, navOptions)
-          setNavigationResultOnCurrent(zimFile.toUri().toString(), ZIM_FILE_URI_KEY)
-        }
-      }
-      waitComposeToSettleViews()
+
+    composeTestRule.runOnUiThread {
+      val navOptions = NavOptions.Builder()
+        .setPopUpTo(KiwixDestination.Reader.route, false)
+        .build()
+
+      composeTestRule.activity.navigate(
+        KiwixDestination.Reader.route,
+        navOptions
+      )
     }
+
+    composeTestRule.runOnUiThread {
+      composeTestRule.activity.openZimFromFilePath(zimFile.absolutePath)
+    }
+
+    composeTestRule.waitForIdle()
   }
 }

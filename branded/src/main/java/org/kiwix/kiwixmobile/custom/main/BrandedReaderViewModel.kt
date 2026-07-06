@@ -127,8 +127,7 @@ class BrandedReaderViewModel @Inject constructor(
     if (enforcedLanguage(coreMainActivity)) {
       return
     }
-    readerMenuState = createMainMenu()
-    addAlertDialogToDialogHost(coreMainActivity, alertDialogShower)
+    super.initialize(coreMainActivity, alertDialogShower)
     val appName = kiwixDataStore.appName.first()
     updateState { copy(isTocButtonEnable = !BuildConfig.DISABLE_SIDEBAR, appName = appName) }
     enableLeftDrawer()
