@@ -16,7 +16,7 @@
  *
  */
 
-package org.kiwix.kiwixmobile.core.roomDao
+package org.kiwix.kiwixmobile.core.dao
 
 import android.content.Context
 import android.os.Build
@@ -32,7 +32,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.data.KiwixRoomDatabaseTest.Companion.getHistoryItem
-import org.kiwix.kiwixmobile.core.dao.HistoryRoomDao
 import org.kiwix.kiwixmobile.core.data.KiwixRoomDatabase
 import org.kiwix.kiwixmobile.core.page.history.models.HistoryListItem
 import org.kiwix.sharedFunctions.TestApplication

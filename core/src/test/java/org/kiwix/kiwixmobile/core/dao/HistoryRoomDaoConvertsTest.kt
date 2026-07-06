@@ -16,13 +16,12 @@
  *
  */
 
-package org.kiwix.kiwixmobile.core.roomDao
+package org.kiwix.kiwixmobile.core.dao
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import org.kiwix.kiwixmobile.core.dao.HistoryRoomDaoCoverts
 import org.kiwix.kiwixmobile.core.dao.entities.HistoryRoomEntity
 import org.kiwix.kiwixmobile.core.page.history.models.HistoryListItem
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource

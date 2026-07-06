@@ -16,7 +16,7 @@
  *
  */
 
-package org.kiwix.kiwixmobile.core.roomDao
+package org.kiwix.kiwixmobile.core.dao
 
 import android.content.Context
 import android.os.Build
@@ -33,7 +33,6 @@ import org.junit.Assert.assertEquals
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.data.KiwixRoomDatabaseTest.Companion.getNoteListItem
 import org.kiwix.sharedFunctions.TestApplication
-import org.kiwix.kiwixmobile.core.dao.NotesRoomDao
 import org.kiwix.kiwixmobile.core.data.KiwixRoomDatabase
 import org.kiwix.kiwixmobile.core.page.notes.models.NoteListItem
 import org.robolectric.RobolectricTestRunner
