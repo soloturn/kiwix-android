@@ -25,6 +25,7 @@ import android.print.PdfPrint
 import dagger.BindsInstance
 import dagger.Component
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.LibkiwixBookFactory
@@ -41,6 +42,7 @@ import org.kiwix.kiwixmobile.core.data.DataSource
 import org.kiwix.kiwixmobile.core.data.remote.KiwixService
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
+import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
 import org.kiwix.kiwixmobile.core.di.OPDSKiwixService
 import org.kiwix.kiwixmobile.core.di.modules.ApplicationModule
 import org.kiwix.kiwixmobile.core.di.modules.CoreViewModelModule
@@ -122,6 +124,9 @@ interface CoreComponent {
 
   @MainDispatcher
   fun provideMainDispatcher(): CoroutineDispatcher
+
+  @MainUiDispatcher
+  fun provideMainUiDispatcher(): MainCoroutineDispatcher
   fun providePdfPrinter(): PdfPrint
   fun provideTabsManager(): TabsManager
   fun provideReaderIntentManager(): ReaderIntentManager

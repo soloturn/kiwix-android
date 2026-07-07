@@ -20,14 +20,12 @@ package org.kiwix.kiwixmobile.nav.destination.reader
 
 import android.app.Application
 import androidx.core.net.toUri
-import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavOptions
-import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R.string
-import org.kiwix.kiwixmobile.core.di.MainDispatcher
+import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -35,21 +33,21 @@ import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.main.PAGE_URL_KEY
 import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel
-import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.OPEN_HOME_SCREEN_DELAY
 import org.kiwix.kiwixmobile.core.main.reader.RestoreOrigin
 import org.kiwix.kiwixmobile.core.main.reader.RestoreOrigin.FromExternalLaunch
 import org.kiwix.kiwixmobile.core.main.reader.RestoreOrigin.FromSearchScreen
 import org.kiwix.kiwixmobile.core.main.reader.SEARCH_ITEM_TITLE_KEY
 import org.kiwix.kiwixmobile.core.main.reader.helper.BookmarkManager
+import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.PendingSearchItemManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReadAloudManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderArticleManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderHistoryManager
-import org.kiwix.kiwixmobile.core.main.reader.helper.intent.ReaderIntentManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderSessionManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderWebViewManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.ZimFileManager
+import org.kiwix.kiwixmobile.core.main.reader.helper.intent.ReaderIntentManager
 import org.kiwix.kiwixmobile.core.page.history.models.WebViewHistoryItem
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
@@ -88,7 +86,7 @@ class KiwixReaderViewModel @Inject constructor(
   readAloudManager: ReadAloudManager,
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
-  @MainDispatcher mainDispatcher: CoroutineDispatcher
+  @MainUiDispatcher mainDispatcher: MainCoroutineDispatcher
 ) : CoreReaderViewModel(
     context,
     kiwixDataStore,
@@ -150,25 +148,28 @@ class KiwixReaderViewModel @Inject constructor(
     pageUrl: String,
     searchItemTitle: String
   ) {
-    if (zimFileUri.isNotEmpty()) {
-      tryOpeningZimFile(zimFileUri)
-    } else if (pageUrl.isNotEmpty()) {
-      // Set up bookmarks for the current book when opening bookmarks from the
-      // Bookmark screen. Since the current book is already open, the ZIM file
-      // does not need to be reopened.
-      // See https://github.com/kiwix/kiwix-android/issues/3541
-      zimReaderContainer.zimFileReader?.let(::observeBookmarks)
-    }
-
     if (pageUrl.isNotEmpty()) {
+      if (zimFileUri.isNotEmpty()) {
+        tryOpeningZimFile(zimFileUri)
+      }
       hideProgressBar()
       loadUrlWithCurrentWebview(pageUrl)
-    } else if (zimFileUri.isEmpty()) {
-      isWebViewHistoryRestoring = true
-      val restoreOrigin =
-        if (searchItemTitle.isNotEmpty()) FromSearchScreen else FromExternalLaunch
-
-      manageExternalLaunchAndRestoringViewState(restoreOrigin)
+      if (zimFileUri.isEmpty()) {
+        // Set up bookmarks for the current book when opening bookmarks from the Bookmark screen.
+        // This is necessary because we are not opening the ZIM file again; the bookmark is
+        // inside the currently opened book. Bookmarks are set up when opening the ZIM file.
+        // See https://github.com/kiwix/kiwix-android/issues/3541
+        zimReaderContainer.zimFileReader?.let(::observeBookmarks)
+      }
+    } else {
+      if (zimFileUri.isNotEmpty()) {
+        tryOpeningZimFile(zimFileUri)
+      } else {
+        isWebViewHistoryRestoring = true
+        val restoreOrigin =
+          if (searchItemTitle.isNotEmpty()) FromSearchScreen else FromExternalLaunch
+        manageExternalLaunchAndRestoringViewState(restoreOrigin)
+      }
     }
   }
 
@@ -269,14 +270,14 @@ class KiwixReaderViewModel @Inject constructor(
   }
 
   override fun openHomeScreen() {
-    viewModelScope.launch {
+    launchInMainScope {
       // Run safely because it is runs after 300 MS.
       delay(OPEN_HOME_SCREEN_DELAY)
       runCatching {
         if (readerWebViewManager.webViewList().isEmpty()) {
           hideTabSwitcher(false)
         }
-      }
+      }.onFailure { it.printStackTrace() }
     }
   }
 

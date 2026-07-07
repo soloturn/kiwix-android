@@ -31,9 +31,7 @@ import io.mockk.mockk
 import io.mockk.spyk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -74,7 +72,7 @@ class ReaderWebViewManagerTest {
   @Nested
   inner class CreateNewTab {
     @Test
-    fun `createNewTab creates webview`() {
+    fun `createNewTab creates webview`() = runTest {
       val webView = mockk<KiwixWebView>()
       every {
         webViewFactory.create(callback, frameLayout)
@@ -83,9 +81,15 @@ class ReaderWebViewManagerTest {
       every { tabsManager.size() } returns 1
 
       readerWebViewManager.createNewTab(
-        url = "url",
-        callback = callback,
-        videoView = frameLayout
+        tabConfig = TabsManager.NewTabConfig(
+          url = "url",
+          selectTab = false,
+          callback = callback,
+          videoView = frameLayout,
+          readAloudManager = mockk(),
+          documentParser = mockk(),
+          selectTabCallback = {},
+        )
       )
 
       verify {
@@ -98,14 +102,20 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `createNewTab does not load url when shouldLoadUrl is false`() {
+    fun `createNewTab does not load url when shouldLoadUrl is false`() = runTest {
       val webView = mockk<KiwixWebView>()
       every { webViewFactory.create(callback, frameLayout) } returns webView
       readerWebViewManager.createNewTab(
-        url = "url",
-        callback = callback,
-        videoView = frameLayout,
-        shouldLoadUrl = false
+        tabConfig = TabsManager.NewTabConfig(
+          url = "url",
+          selectTab = false,
+          callback = callback,
+          videoView = frameLayout,
+          shouldLoadUrl = false,
+          readAloudManager = mockk(),
+          documentParser = mockk(),
+          selectTabCallback = {},
+        )
       )
 
       verify(exactly = 0) {
@@ -114,15 +124,20 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `createNewTab does not select tab when selectTab is false`() {
+    fun `createNewTab does not select tab when selectTab is false`() = runTest {
       val webView = mockk<KiwixWebView>()
       every { webViewFactory.create(callback, frameLayout) } returns webView
 
       readerWebViewManager.createNewTab(
-        url = "url",
-        selectTab = false,
-        callback = callback,
-        videoView = frameLayout
+        tabConfig = TabsManager.NewTabConfig(
+          url = "url",
+          selectTab = false,
+          callback = callback,
+          videoView = frameLayout,
+          readAloudManager = mockk(),
+          documentParser = mockk(),
+          selectTabCallback = {},
+        )
       )
       verify {
         tabsManager.addWebView(webView, false)
@@ -133,7 +148,7 @@ class ReaderWebViewManagerTest {
   @Nested
   inner class LoadUrl {
     @Test
-    fun `loadUrl loads valid url`() {
+    fun `loadUrl loads valid url`() = runTest {
       val webView = mockk<KiwixWebView>()
       readerWebViewManager.loadUrl("testUrl", webView)
 
@@ -143,7 +158,7 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `loadUrl ignores null url`() {
+    fun `loadUrl ignores null url`() = runTest {
       val webView = mockk<KiwixWebView>()
       readerWebViewManager.loadUrl(null, webView)
 
@@ -153,7 +168,7 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `loadUrl ignores url ending with null`() {
+    fun `loadUrl ignores url ending with null`() = runTest {
       val webView = mockk<KiwixWebView>()
       readerWebViewManager.loadUrl("content://null", webView)
 
@@ -163,7 +178,7 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `loadUrlWithCurrentWebview delegates to webview`() {
+    fun `loadUrlWithCurrentWebview delegates to webview`() = runTest {
       val webView = mockk<KiwixWebView>()
       readerWebViewManager.loadUrlWithCurrentWebview("url", webView)
 
@@ -176,7 +191,7 @@ class ReaderWebViewManagerTest {
   @Nested
   inner class OpenArticle {
     @Test
-    fun `openArticle with null url does nothing`() {
+    fun `openArticle with null url does nothing`() = runTest {
       val webView = mockk<KiwixWebView>()
       val manager = spyk(readerWebViewManager)
 
@@ -188,7 +203,7 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `openArticle loads redirected url`() {
+    fun `openArticle loads redirected url`() = runTest {
       val webView = mockk<KiwixWebView>()
       val manager = spyk(readerWebViewManager)
 
@@ -208,7 +223,7 @@ class ReaderWebViewManagerTest {
     }
 
     @Test
-    fun `openArticle loads original url when not redirected`() {
+    fun `openArticle loads original url when not redirected`() = runTest {
       val webView = mockk<KiwixWebView>()
       val manager = spyk(readerWebViewManager)
 
@@ -233,7 +248,6 @@ class ReaderWebViewManagerTest {
     fun `restoreTabs restores all tabs`() = runTest {
       val webView = mockk<KiwixWebView>()
       val webView1 = mockk<KiwixWebView>()
-      var index = 0
       val history = listOf(
         mockk<WebViewHistoryItem>(),
         mockk<WebViewHistoryItem>()
@@ -246,10 +260,16 @@ class ReaderWebViewManagerTest {
       val result =
         readerWebViewManager.restoreTabs(
           history,
-          currentTab = 1
-        ) {
-          listOf(webView, webView1)[index++]
-        }
+          currentTab = 1,
+          newTabConfig = TabsManager.NewTabConfig(
+            callback = mockk(),
+            videoView = mockk(),
+            url = null,
+            readAloudManager = mockk(),
+            documentParser = mockk(),
+            selectTabCallback = {},
+          )
+        )
 
       assertEquals(
         ReaderWebViewManager.RestoreTabsResult.TabsRestored,
@@ -268,7 +288,6 @@ class ReaderWebViewManagerTest {
 
     @Test
     fun `restoreTabs returns error when restore fails`() = runTest {
-      val webView = mockk<KiwixWebView>()
       val throwable = RuntimeException("failure")
 
       coEvery {
@@ -278,10 +297,16 @@ class ReaderWebViewManagerTest {
       val result =
         readerWebViewManager.restoreTabs(
           listOf(mockk()),
-          currentTab = 0
-        ) {
-          webView
-        }
+          currentTab = 0,
+          newTabConfig = TabsManager.NewTabConfig(
+            callback = mockk(),
+            videoView = mockk(),
+            url = null,
+            readAloudManager = mockk(),
+            documentParser = mockk(),
+            selectTabCallback = {},
+          )
+        )
 
       assertEquals(
         ReaderWebViewManager.RestoreTabsResult.ErrorInRestoringTabs(throwable),
@@ -352,57 +377,6 @@ class ReaderWebViewManagerTest {
       verify {
         tabsManager.setCurrentWebViewIndex(3)
       }
-    }
-  }
-
-  @OptIn(ExperimentalCoroutinesApi::class)
-  @Nested
-  inner class SafelyGetWebView {
-    @Test
-    fun `safelyGetWebView creates new tab when list is empty`() {
-      val webView = mockk<KiwixWebView>()
-      assertEquals(
-        webView,
-        readerWebViewManager.safelyGetWebView(0) { webView }
-      )
-    }
-
-    @Test
-    fun `safelyGetWebView returns first item for negative index`() {
-      val first = mockk<KiwixWebView>()
-      val second = mockk<KiwixWebView>()
-      tabsState.value = TabsManager.TabsState(listOf(first, second), 0)
-
-      assertEquals(
-        first,
-        readerWebViewManager.safelyGetWebView(-1) { null }
-      )
-    }
-
-    @Test
-    fun `safelyGetWebView returns last item for out of bounds index`() = runTest {
-      val first = mockk<KiwixWebView>()
-      val second = mockk<KiwixWebView>()
-      every { tabsManager.size() } returns 2
-      tabsState.value = TabsManager.TabsState(listOf(first, second), 0)
-      advanceUntilIdle()
-      assertEquals(
-        second,
-        readerWebViewManager.safelyGetWebView(10) { null }
-      )
-    }
-
-    @Test
-    fun `safelyGetWebView returns requested webview`() = runTest {
-      val first = mockk<KiwixWebView>()
-      val second = mockk<KiwixWebView>()
-      every { tabsManager.size() } returns 2
-      tabsState.value = TabsManager.TabsState(listOf(first, second), 0)
-      advanceUntilIdle()
-      assertEquals(
-        second,
-        readerWebViewManager.safelyGetWebView(1) { null }
-      )
     }
   }
 

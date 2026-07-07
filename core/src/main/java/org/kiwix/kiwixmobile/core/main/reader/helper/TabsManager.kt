@@ -18,16 +18,30 @@
 
 package org.kiwix.kiwixmobile.core.main.reader.helper
 
+import android.widget.FrameLayout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
+import org.kiwix.kiwixmobile.core.main.WebViewCallback
+import org.kiwix.kiwixmobile.core.main.reader.helper.documentparser.DocumentParser
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class TabsManager @Inject constructor() {
+  data class NewTabConfig(
+    val url: String?,
+    val selectTab: Boolean = true,
+    val shouldLoadUrl: Boolean = true,
+    val callback: WebViewCallback,
+    val videoView: FrameLayout,
+    val readAloudManager: ReadAloudManager,
+    val documentParser: DocumentParser?,
+    val selectTabCallback: suspend (position: Int) -> Unit
+  )
+
   data class TabsState(
     val webViews: List<KiwixWebView> = emptyList(),
     val selectedIndex: Int = ZERO
@@ -46,7 +60,7 @@ class TabsManager @Inject constructor() {
    * @param webView: Webview for adding in the list.
    * @param selectTab: A boolean value, if false it will add the webView in background.
    */
-  fun addWebView(webView: KiwixWebView, selectTab: Boolean = true) {
+  fun addWebView(webView: KiwixWebView, selectTab: Boolean = false) {
     _tabState.update { state ->
       val list = state.webViews + webView
       state.copy(
@@ -56,7 +70,7 @@ class TabsManager @Inject constructor() {
     }
   }
 
-  fun getCurrentWebView(): KiwixWebView? = tabState.value.currentWebView
+  fun getCurrentWebView(): KiwixWebView? = currentState().currentWebView
 
   fun setCurrentWebViewIndex(index: Int) {
     _tabState.update { state ->
@@ -114,14 +128,15 @@ class TabsManager @Inject constructor() {
       val safeIndex = index.coerceIn(ZERO, list.size)
       list.add(safeIndex, kiwixWebView)
 
+      val newSelectedIndex = when {
+        state.webViews.isEmpty() -> 0
+        safeIndex <= state.selectedIndex -> state.selectedIndex + 1
+        else -> state.selectedIndex
+      }
+
       state.copy(
         webViews = list,
-        selectedIndex =
-          if (safeIndex <= state.selectedIndex) {
-            state.selectedIndex + 1
-          } else {
-            state.selectedIndex
-          }
+        selectedIndex = newSelectedIndex
       )
     }
   }

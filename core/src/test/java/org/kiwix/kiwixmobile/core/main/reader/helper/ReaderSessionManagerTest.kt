@@ -66,6 +66,7 @@ class ReaderSessionManagerTest {
       kiwixDataStore,
       mainRepositoryActions,
       zimReaderContainer,
+      mainDispatcherRule.dispatcher,
       mainDispatcherRule.dispatcher
     )
   }

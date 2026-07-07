@@ -18,15 +18,12 @@
 
 package org.kiwix.kiwixmobile.core.main.reader.helper
 
-import android.widget.FrameLayout
 import androidx.core.net.toUri
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
-import org.kiwix.kiwixmobile.core.di.MainDispatcher
+import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
-import org.kiwix.kiwixmobile.core.main.WebViewCallback
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderWebViewManager.WebViewNavigationHistoryResult.HistoryFound
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderWebViewManager.WebViewNavigationHistoryResult.NoHistoryFound
 import org.kiwix.kiwixmobile.core.main.reader.helper.TabsManager.TabsState
@@ -40,7 +37,7 @@ class ReaderWebViewManager @Inject constructor(
   private val tabsManager: TabsManager,
   private val readerSessionManager: ReaderSessionManager,
   private val webViewFactory: WebViewFactory,
-  @MainDispatcher private val mainDispatcher: CoroutineDispatcher
+  @MainUiDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) {
   sealed interface WebViewNavigationHistoryResult {
     data class HistoryFound(
@@ -65,40 +62,43 @@ class ReaderWebViewManager @Inject constructor(
 
   val currentWebViewIndex: Int get() = currentTabsState().selectedIndex
 
-  /**
-   * Initializes a new instance of `KiwixWebView` with the specified URL.
-   *
-   * @param url The URL to load in the web view. This is ignored if [shouldLoadUrl] is false.
-   * @param selectTab A boolean value, when set to false it will load the webView in background.
-   * @param callback A callback that attached to webView and provides the webView callbacks.
-   * @param videoView A frameLayout, in which videos will play.
-   * @param shouldLoadUrl A flag indicating whether to load the specified URL in the web view.
-   *                      When restoring tabs, this should be set to false to avoid loading
-   *                      an extra page, as the previous web view history will be restored directly.
-   * @return The initialized [org.kiwix.kiwixmobile.core.main.KiwixWebView] instance.
-   */
-  fun createNewTab(
-    url: String?,
-    selectTab: Boolean = true,
-    callback: WebViewCallback,
-    videoView: FrameLayout,
-    shouldLoadUrl: Boolean = true
-  ): KiwixWebView {
-    val webView = webViewFactory.create(callback, videoView)
-    tabsManager.addWebView(webView, selectTab)
-    if (shouldLoadUrl) {
-      loadUrl(url, webView)
+  suspend fun createNewTab(tabConfig: TabsManager.NewTabConfig): KiwixWebView {
+    return withContext(mainDispatcher) {
+      val webView = webViewFactory.create(tabConfig.callback, tabConfig.videoView)
+      if (tabConfig.shouldLoadUrl) {
+        loadUrl(tabConfig.url, webView)
+      }
+      setUpWithTextToSpeech(webView, tabConfig.readAloudManager)
+      tabConfig.documentParser?.initInterface(webView)
+      return@withContext webView
     }
-    return webView
   }
 
-  fun openArticle(articleUrl: String?, kiwixWebView: KiwixWebView) {
+  suspend fun addNewTabInTabsManager(webView: KiwixWebView, tabConfig: TabsManager.NewTabConfig) {
+    tabsManager.addWebView(webView, tabConfig.selectTab)
+    if (tabConfig.selectTab) {
+      tabConfig.selectTabCallback(currentWebViewIndex)
+    }
+  }
+
+  suspend fun setUpWithTextToSpeech(
+    kiwixWebView: KiwixWebView?,
+    readAloudManager: ReadAloudManager
+  ) {
+    kiwixWebView?.let {
+      withContext(mainDispatcher) {
+        readAloudManager.initWebView(it)
+      }
+    }
+  }
+
+  suspend fun openArticle(articleUrl: String?, kiwixWebView: KiwixWebView) {
     articleUrl?.let {
       loadUrlWithCurrentWebview(redirectOrOriginal(contentUrl(it)), kiwixWebView)
     }
   }
 
-  fun loadUrlWithCurrentWebview(url: String?, currentWebView: KiwixWebView) {
+  suspend fun loadUrlWithCurrentWebview(url: String?, currentWebView: KiwixWebView) {
     loadUrl(url, currentWebView)
   }
 
@@ -114,9 +114,11 @@ class ReaderWebViewManager @Inject constructor(
     }
   }
 
-  fun loadUrl(url: String?, webview: KiwixWebView) {
+  suspend fun loadUrl(url: String?, webview: KiwixWebView) {
     if (url != null && !url.endsWith("null")) {
-      webview.loadUrl(url)
+      withContext(mainDispatcher) {
+        webview.loadUrl(url)
+      }
     }
   }
 
@@ -170,37 +172,39 @@ class ReaderWebViewManager @Inject constructor(
   suspend fun restoreTabs(
     webViewHistoryItemList: List<WebViewHistoryItem>,
     currentTab: Int,
-    createWebView: suspend () -> KiwixWebView
+    newTabConfig: TabsManager.NewTabConfig
   ): RestoreTabsResult =
     runCatching {
-      setCurrentWebViewIndex(ZERO)
-      tabsManager.clearTabsState()
-      webViewHistoryItemList.forEach { webViewHistoryItem ->
-        readerSessionManager.restoreTabState(createWebView(), webViewHistoryItem)
+      withContext(mainDispatcher) {
+        setCurrentWebViewIndex(ZERO)
+        tabsManager.clearTabsState()
+        webViewHistoryItemList.forEach { webViewHistoryItem ->
+          val webView = createNewTab(newTabConfig)
+          readerSessionManager.restoreTabState(webView, webViewHistoryItem)
+          addNewTabInTabsManager(webView, newTabConfig)
+        }
+        setCurrentWebViewIndex(currentTab)
+        RestoreTabsResult.TabsRestored
       }
-      setCurrentWebViewIndex(currentTab)
-      RestoreTabsResult.TabsRestored
     }.getOrElse { RestoreTabsResult.ErrorInRestoringTabs(it) }
 
   fun getCurrentWebView(): KiwixWebView? = tabsManager.getCurrentWebView()
+
+  suspend fun newMainPageTab(newTabConfig: TabsManager.NewTabConfig): KiwixWebView {
+    val mainPageUrl = contentUrl(readerSessionManager.zimReaderContainer.mainPage)
+    val newConfig = newTabConfig.copy(url = mainPageUrl)
+    return createNewTab(newConfig).also {
+      addNewTabInTabsManager(it, newConfig)
+    }
+  }
 
   fun setCurrentWebViewIndex(index: Int) {
     tabsManager.setCurrentWebViewIndex(index)
   }
 
-  fun safelyGetWebView(position: Int, newMainPageTab: () -> KiwixWebView?): KiwixWebView? =
-    if (webViewList().isEmpty()) newMainPageTab() else webViewList()[safePosition(position)]
-
-  private fun safePosition(position: Int): Int =
-    when {
-      position < 0 -> 0
-      position >= tabsSize() -> tabsSize() - 1
-      else -> position
-    }
-
   suspend fun destroyAllTabs() {
     runCatching {
-      withContext((mainDispatcher as MainCoroutineDispatcher).immediate) {
+      withContext(mainDispatcher.immediate) {
         webViewList().apply {
           forEach { webView ->
             // Stop any ongoing loading of the WebView

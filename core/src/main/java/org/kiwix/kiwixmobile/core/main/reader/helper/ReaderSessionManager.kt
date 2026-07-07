@@ -27,6 +27,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.dao.entities.WebViewHistoryEntity
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.page.history.models.WebViewHistoryItem
@@ -46,7 +47,8 @@ class ReaderSessionManager @Inject constructor(
   private val kiwixDataStore: KiwixDataStore,
   private val mainRepositoryActions: MainRepositoryActions,
   val zimReaderContainer: ZimReaderContainer,
-  @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  @MainDispatcher private val mainDispatcher: CoroutineDispatcher
 ) {
   sealed interface RestoreSessionResult {
     data class Valid(
@@ -151,12 +153,14 @@ class ReaderSessionManager @Inject constructor(
     "${CONTENT_PREFIX}$articleUrl".toUri().toString()
 
   private suspend fun getWebViewHistoryList(): List<WebViewHistoryEntity> {
-    val webViewHistoryEntityList = arrayListOf<WebViewHistoryEntity>()
-    tabsManager.currentState().webViews.forEachIndexed { index, view ->
-      if (view.url == null) return@forEachIndexed
-      getWebViewHistoryEntity(view, index)?.let(webViewHistoryEntityList::add)
+    return withContext(mainDispatcher) {
+      val webViewHistoryEntityList = arrayListOf<WebViewHistoryEntity>()
+      tabsManager.currentState().webViews.forEachIndexed { index, view ->
+        if (view.url == null) return@forEachIndexed
+        getWebViewHistoryEntity(view, index)?.let(webViewHistoryEntityList::add)
+      }
+      return@withContext webViewHistoryEntityList
     }
-    return webViewHistoryEntityList
   }
 
   /**

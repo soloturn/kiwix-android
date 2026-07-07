@@ -29,13 +29,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavOptions
-import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R.drawable
 import org.kiwix.kiwixmobile.core.R.string
-import org.kiwix.kiwixmobile.core.di.MainDispatcher
+import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
@@ -43,10 +43,10 @@ import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.main.PAGE_URL_KEY
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel
-import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.ReaderMenuState
 import org.kiwix.kiwixmobile.core.main.reader.RestoreOrigin
 import org.kiwix.kiwixmobile.core.main.reader.helper.BookmarkManager
+import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.PendingSearchItemManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReadAloudManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderArticleManager
@@ -98,7 +98,7 @@ class BrandedReaderViewModel @Inject constructor(
   readAloudManager: ReadAloudManager,
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
-  @MainDispatcher mainDispatcher: CoroutineDispatcher
+  @MainUiDispatcher mainDispatcher: MainCoroutineDispatcher
 ) : CoreReaderViewModel(
     context,
     kiwixDataStore,
@@ -152,12 +152,13 @@ class BrandedReaderViewModel @Inject constructor(
       // Setup bookmark for current book
       // See https://github.com/kiwix/kiwix-android/issues/3541
       zimReaderContainer.zimFileReader?.let(::observeBookmarks)
+      selectTab(readerWebViewManager.currentWebViewIndex)
     } else {
       isWebViewHistoryRestoring = true
       if (isZimFileAlreadyOpenedInReader()) {
         manageExternalLaunchAndRestoringViewState()
       } else {
-        openObbOrZim(true)
+        openObbOrZim()
       }
     }
     emitEffect(ReaderEffect.ConsumeSavedStateHandle(listOf(PAGE_URL_KEY)))
@@ -179,42 +180,32 @@ class BrandedReaderViewModel @Inject constructor(
    *   - Manages the external launch and restores the view state if specified.
    *
    * If no valid files are found and the app is not in test mode, the user is navigated to
-   * the `customDownloadFragment` to facilitate downloading the required files.
+   * the `BrandedDownloadFragment` to facilitate downloading the required files.
    *
-   * @param shouldManageExternalLaunch Indicates whether to manage external launch and
-   *                                   restore the view state after opening the file. Default is false.
    */
-  private suspend fun openObbOrZim(shouldManageExternalLaunch: Boolean = false) {
+  private suspend fun openObbOrZim() {
     brandedFileValidator.validate(
       onFilesFound = {
         when (it) {
           is ValidationState.HasFile -> {
-            launchInViewModelScope(mainDispatcherImmediate()) {
-              openZimFile(
-                ZimReaderSource(
-                  file = it.file,
-                  null,
-                  it.assetFileDescriptorList
-                )
+            openZimFile(
+              ZimReaderSource(
+                file = it.file,
+                null,
+                it.assetFileDescriptorList
               )
-              if (shouldManageExternalLaunch) {
-                // Open the previous loaded pages after ZIM file loads.
-                manageExternalLaunchAndRestoringViewState()
-              }
-              saveBookToLibrary(it.file)
-            }
+            )
+            // Open the previous loaded pages after ZIM file loads.
+            manageExternalLaunchAndRestoringViewState()
+            saveBookToLibrary(it.file)
           }
 
           is ValidationState.HasBothFiles -> {
             it.zimFile.delete()
-            launchInViewModelScope(mainDispatcherImmediate()) {
-              openZimFile(ZimReaderSource(it.obbFile))
-              if (shouldManageExternalLaunch) {
-                // Open the previous loaded pages after ZIM file loads.
-                manageExternalLaunchAndRestoringViewState()
-              }
-              saveBookToLibrary(it.obbFile)
-            }
+            openZimFile(ZimReaderSource(it.obbFile))
+            // Open the previous loaded pages after ZIM file loads.
+            manageExternalLaunchAndRestoringViewState()
+            saveBookToLibrary(it.obbFile)
           }
 
           else -> {}
