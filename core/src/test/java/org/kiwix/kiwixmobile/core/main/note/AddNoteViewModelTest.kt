@@ -56,7 +56,7 @@ import kotlin.io.path.createTempDirectory
 class AddNoteViewModelTest {
   @Rule
   @JvmField
-  val dispatcherRule = MainDispatcherRule()
+  val mainDispatcherRule = MainDispatcherRule()
   private lateinit var activity: Activity
   private lateinit var noteRepository: NoteRepository
   private lateinit var zimReaderContainer: ZimReaderContainer
@@ -81,7 +81,7 @@ class AddNoteViewModelTest {
       zimReaderContainer = zimReaderContainer,
       noteMetadataFactory = noteMetadataFactory,
       kiwixPermissionChecker = kiwixPermissionChecker,
-      ioDispatcher = dispatcherRule.dispatcher
+      ioDispatcher = mainDispatcherRule.dispatcher
     )
   }
 

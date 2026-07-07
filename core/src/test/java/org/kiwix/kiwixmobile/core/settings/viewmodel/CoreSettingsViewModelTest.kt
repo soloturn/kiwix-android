@@ -144,7 +144,7 @@ private class TestCoreSettingsViewModel(
 internal class CoreSettingsViewModelTest {
   @RegisterExtension
   @JvmField
-  val dispatcherRule = MainDispatcherRule()
+  val mainDispatcherRule = MainDispatcherRule()
   private val context: Application = mockk(relaxed = true)
   private val kiwixDataStore: KiwixDataStore = mockk(relaxed = true)
   private val dataSource: DataSource = mockk(relaxed = true)

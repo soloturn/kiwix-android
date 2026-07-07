@@ -103,7 +103,7 @@ import javax.inject.Provider
 class OnlineLibraryViewModelTest {
   @RegisterExtension
   @JvmField
-  val dispatcherRule = MainDispatcherRule()
+  val mainDispatcherRule = MainDispatcherRule()
   private val downloader: Downloader = mockk(relaxed = true)
   private val downloaderProvider: Provider<Downloader> = mockk(relaxed = true)
   private val kiwixDataStore: KiwixDataStore = mockk(relaxed = true)
@@ -156,7 +156,7 @@ class OnlineLibraryViewModelTest {
       refreshAction,
       observeNetwork,
       storageDeviceProvider,
-      dispatcherRule.dispatcher
+      mainDispatcherRule.dispatcher
     )
     viewModel.networkBooks.tryEmit(emptyList())
   }
@@ -520,7 +520,7 @@ class OnlineLibraryViewModelTest {
         refreshAction,
         observeNetwork,
         storageDeviceProvider,
-        dispatcherRule.dispatcher
+        mainDispatcherRule.dispatcher
       )
       verify(exactly = 0) { downloaderProvider.get() }
     }

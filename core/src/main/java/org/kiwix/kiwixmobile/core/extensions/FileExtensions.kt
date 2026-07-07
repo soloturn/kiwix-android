@@ -23,20 +23,20 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import java.io.File
 
-suspend fun File.isFileExist(dispatcher: CoroutineDispatcher): Boolean =
-  withContext(dispatcher) { exists() }
+suspend fun File.isFileExist(ioDispatcher: CoroutineDispatcher): Boolean =
+  withContext(ioDispatcher) { exists() }
 
-suspend fun File.freeSpace(dispatcher: CoroutineDispatcher): Long =
-  withContext(dispatcher) { freeSpace }
+suspend fun File.freeSpace(ioDispatcher: CoroutineDispatcher): Long =
+  withContext(ioDispatcher) { freeSpace }
 
-suspend fun File.totalSpace(dispatcher: CoroutineDispatcher): Long =
-  withContext(dispatcher) { totalSpace }
+suspend fun File.totalSpace(ioDispatcher: CoroutineDispatcher): Long =
+  withContext(ioDispatcher) { totalSpace }
 
-suspend fun File.canReadFile(dispatcher: CoroutineDispatcher): Boolean =
-  withContext(dispatcher) { canRead() }
+suspend fun File.canReadFile(ioDispatcher: CoroutineDispatcher): Boolean =
+  withContext(ioDispatcher) { canRead() }
 
-suspend fun File.deleteFile(dispatcher: CoroutineDispatcher): Boolean =
-  withContext(dispatcher) { delete() }
+suspend fun File.deleteFile(ioDispatcher: CoroutineDispatcher): Boolean =
+  withContext(ioDispatcher) { delete() }
 
-suspend fun File.hasContent(dispatcher: CoroutineDispatcher): Boolean =
-  withContext(dispatcher) { exists() && length() > ZERO }
+suspend fun File.hasContent(ioDispatcher: CoroutineDispatcher): Boolean =
+  withContext(ioDispatcher) { exists() && length() > ZERO }

@@ -49,7 +49,7 @@ class ObserveOnlineLibraryItemsTest {
 
   @RegisterExtension
   @JvmField
-  val dispatcherRule = MainDispatcherRule()
+  val mainDispatcherRule = MainDispatcherRule()
 
   private lateinit var observeOnlineLibraryItems: ObserveOnlineLibraryItems
 
@@ -58,7 +58,7 @@ class ObserveOnlineLibraryItemsTest {
     observeOnlineLibraryItems = ObserveOnlineLibraryItems(
       kiwixDataStore,
       fat32Checker,
-      dispatcherRule.dispatcher
+      mainDispatcherRule.dispatcher
     )
   }
 

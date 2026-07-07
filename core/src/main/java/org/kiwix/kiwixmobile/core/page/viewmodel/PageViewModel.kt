@@ -118,9 +118,9 @@ abstract class PageViewModel<T : Page, S : PageState<T>>(
       .onEach { newState -> _state.value = newState }
       .launchIn(viewModelScope)
 
-  private fun observePages(dispatcher: CoroutineDispatcher = Dispatchers.IO) =
+  private fun observePages(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) =
     pageDao.pages()
-      .flowOn(dispatcher)
+      .flowOn(ioDispatcher)
       .onEach { actions.tryEmit(UpdatePages(it)) }
       .launchIn(viewModelScope)
 

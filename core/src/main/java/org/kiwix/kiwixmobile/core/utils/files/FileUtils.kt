@@ -106,9 +106,9 @@ object FileUtils {
   @Synchronized
   fun deleteCachedFiles(
     context: Context,
-    dispatcher: CoroutineDispatcher
+    ioDispatcher: CoroutineDispatcher
   ) {
-    CoroutineScope(dispatcher).launch {
+    CoroutineScope(ioDispatcher).launch {
       runCatching {
         val cacheDir = getFileCacheDir(context) ?: return@launch
         when {

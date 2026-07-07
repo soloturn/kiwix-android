@@ -111,20 +111,20 @@ class LibkiwixBookmarks @Inject constructor(
    * Ensure initialization runs once. This method performs all file I/O and manager setup
    * on Dispatchers.IO so it won't block the main thread. It is safe to call multiple times.
    */
-  private suspend fun ensureInitialized(dispatcher: CoroutineDispatcher = Dispatchers.IO) {
+  private suspend fun ensureInitialized(ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
     if (initialized) return
 
     initMutex.withLock {
       if (initialized) return@withLock
-      withContext(dispatcher) {
+      withContext(ioDispatcher) {
         // Check if bookmark folder exist if not then create the folder first.
-        if (!File(bookmarksFolderPath()).isFileExist(dispatcher)) File(bookmarksFolderPath()).mkdir()
+        if (!File(bookmarksFolderPath()).isFileExist(ioDispatcher)) File(bookmarksFolderPath()).mkdir()
         // Check if library file exist if not then create the file to save the library with book information.
-        if (!libraryFile().isFileExist(dispatcher)) libraryFile().createNewFile()
+        if (!libraryFile().isFileExist(ioDispatcher)) libraryFile().createNewFile()
         // set up manager to read the library from this file
         manager.readFile(libraryFile().canonicalPath)
         // Check if bookmark file exist if not then create the file to save the bookmarks.
-        if (!bookmarkFile().isFileExist(dispatcher)) bookmarkFile().createNewFile()
+        if (!bookmarkFile().isFileExist(ioDispatcher)) bookmarkFile().createNewFile()
         // set up manager to read the bookmarks from this file
         manager.readBookmarkFile(bookmarkFile().canonicalPath)
         initialized = true
@@ -279,14 +279,14 @@ class LibkiwixBookmarks @Inject constructor(
 
   fun deleteBookmarks(
     bookmarks: List<LibkiwixBookmarkItem>,
-    dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO
   ) {
-    CoroutineScope(dispatcher).launch {
+    CoroutineScope(ioDispatcher).launch {
       ensureInitialized()
       bookmarks.map { library.removeBookmark(it.zimId, it.bookmarkUrl) }
       writeBookMarksAndSaveLibraryToFile()
       updateFlowBookmarkList()
-      removeBookFromLibraryIfNoRelatedBookmarksAreStored(dispatcher, bookmarks)
+      removeBookFromLibraryIfNoRelatedBookmarksAreStored(ioDispatcher, bookmarks)
     }
   }
 
@@ -300,15 +300,15 @@ class LibkiwixBookmarks @Inject constructor(
    * This function checks if any of the books associated with the given deleted bookmarks
    * are still referenced by other existing bookmarks. If not, those books are removed from the library.
    *
-   * @param dispatcher The coroutine dispatcher to run the operation on (typically Dispatchers.IO).
+   * @param ioDispatcher The coroutine dispatcher to run the operation on (typically Dispatchers.IO).
    * @param deletedBookmarks The list of bookmarks that were just deleted.
    */
   private suspend fun removeBookFromLibraryIfNoRelatedBookmarksAreStored(
-    dispatcher: CoroutineDispatcher,
+    ioDispatcher: CoroutineDispatcher,
     deletedBookmarks: List<LibkiwixBookmarkItem>
   ) {
     ensureInitialized()
-    withContext(dispatcher) {
+    withContext(ioDispatcher) {
       val currentBookmarks = getBookmarksList()
       val deletedZimIds = deletedBookmarks.map { it.zimId }.distinct()
 

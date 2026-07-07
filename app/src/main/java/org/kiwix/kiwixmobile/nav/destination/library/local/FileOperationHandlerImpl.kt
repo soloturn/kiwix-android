@@ -37,7 +37,7 @@ import javax.inject.Inject
 
 class FileOperationHandlerImpl @Inject constructor(
   private val context: Context,
-  @IoDispatcher private val dispatcher: CoroutineDispatcher
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : FileOperationHandler {
   @Suppress("MagicNumber")
   override suspend fun copy(
@@ -45,7 +45,7 @@ class FileOperationHandlerImpl @Inject constructor(
     destinationFile: File,
     onProgress: suspend (Int) -> Unit
   ) {
-    withContext(dispatcher) {
+    withContext(ioDispatcher) {
       val contentResolver = context.contentResolver
       val parcelFileDescriptor =
         contentResolver.openFileDescriptor(sourceUri, "r")
@@ -141,7 +141,7 @@ class FileOperationHandlerImpl @Inject constructor(
     return flags and DocumentsContract.Document.FLAG_SUPPORTS_MOVE != ZERO
   }
 
-  override suspend fun delete(uri: Uri, selectedFile: DocumentFile) = withContext(dispatcher) {
+  override suspend fun delete(uri: Uri, selectedFile: DocumentFile) = withContext(ioDispatcher) {
     runCatching {
       DocumentsContract.deleteDocument(context.contentResolver, uri)
     }.onFailure {

@@ -45,7 +45,7 @@ import retrofit2.Response
 class OnlineLibraryRepositoryImplTest {
   @RegisterExtension
   @JvmField
-  val dispatcherRule = MainDispatcherRule()
+  val mainDispatcherRule = MainDispatcherRule()
   private val onlineLibraryManager: OnlineLibraryManager = mockk()
   private lateinit var kiwixService: KiwixService
   private lateinit var repository: OnlineLibraryRepositoryImpl
@@ -56,7 +56,7 @@ class OnlineLibraryRepositoryImplTest {
     repository = OnlineLibraryRepositoryImpl(
       onlineLibraryManager,
       kiwixService,
-      dispatcherRule.dispatcher
+      mainDispatcherRule.dispatcher
     )
   }
 

@@ -336,9 +336,9 @@ class ZimFileReader constructor(
   @Suppress("InjectDispatcher")
   private suspend fun loadAsset(
     uri: String,
-    dispatcher: CoroutineDispatcher
+    ioDispatcher: CoroutineDispatcher
   ): InputStream? =
-    withContext(dispatcher) {
+    withContext(ioDispatcher) {
       val item =
         try {
           jniKiwixReader.getEntryByPath(uri.filePath).getItem(true)

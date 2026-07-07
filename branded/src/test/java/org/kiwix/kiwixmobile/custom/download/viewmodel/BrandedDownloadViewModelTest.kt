@@ -62,7 +62,7 @@ internal class BrandedDownloadViewModelTest {
 
   @RegisterExtension
   @JvmField
-  val dispatcherRule = MainDispatcherRule()
+  val mainDispatcherRule = MainDispatcherRule()
   private lateinit var brandedDownloadViewModel: BrandedDownloadViewModel
   private lateinit var downloadsFlow: MutableSharedFlow<List<DownloadModel>>
 
@@ -92,7 +92,7 @@ internal class BrandedDownloadViewModelTest {
       navigateToBrandedReader,
       kiwixPermissionChecker,
       requestNotificationPermission,
-      dispatcherRule.dispatcher
+      mainDispatcherRule.dispatcher
     )
   }
 
