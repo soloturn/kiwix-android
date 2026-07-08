@@ -1797,6 +1797,7 @@ abstract class CoreReaderViewModel(
     hideBackToTopJob?.cancel()
     hideBackToTopJob = null
     actionMode = null
+    findInPageManager.stop()
     super.onCleared()
   }
 
