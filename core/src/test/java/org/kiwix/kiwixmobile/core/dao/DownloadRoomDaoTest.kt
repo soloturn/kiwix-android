@@ -24,6 +24,11 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import com.tonyodev.fetch2.Status
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import io.mockk.unmockkAll
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
@@ -36,10 +41,13 @@ import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.dao.entities.DownloadRoomEntity
 import org.kiwix.kiwixmobile.core.dao.entities.PauseReason
 import org.kiwix.kiwixmobile.core.data.KiwixRoomDatabase
+import org.kiwix.kiwixmobile.core.downloader.DownloadRequester
+import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.sharedFunctions.TestApplication
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.R], application = TestApplication::class)
 class DownloadRoomDaoTest {
@@ -59,16 +67,7 @@ class DownloadRoomDaoTest {
   @After
   fun tearDown() {
     kiwixRoomDatabase.close()
-  }
-
-  @Test
-  fun getAllDownloads() = runTest {
-    TODO()
-  }
-
-  @Test
-  fun `downloads when completed moveCompletedToBooksOnDiskDao`() = runTest {
-    TODO()
+    unmockkAll()
   }
 
   @Test
@@ -81,11 +80,11 @@ class DownloadRoomDaoTest {
 
       downloadRoomDao.saveDownload(entity1)
       val item1 = awaitItem()
-      assertEquals(1L, item1[0].downloadId)
+      assertEquals(entity1.downloadId, item1[0].downloadId)
 
       downloadRoomDao.saveDownload(entity2)
       val item2 = awaitItem()
-      assertEquals(2L, item2[1].downloadId)
+      assertEquals(entity2.downloadId, item2[1].downloadId)
 
       assertEquals(2, item2.size)
 
@@ -94,8 +93,20 @@ class DownloadRoomDaoTest {
   }
 
   @Test
-  fun `savesDownloads addIfDoesNotExist`() = runTest {
-    TODO()
+  fun `addIfDoesNotExist saves download when it does not already exist`() = runTest {
+    val book = LibkiwixBook(_id = "new_book")
+    val downloadRequester = mockk<DownloadRequester>()
+    coEvery { downloadRequester.enqueue(any()) } returns 123L
+
+    // Add first time
+    downloadRoomDao.addIfDoesNotExist("url", book, downloadRequester)
+    assertEquals(1, downloadRoomDao.count("new_book"))
+    assertEquals(123L, downloadRoomDao.getEntityForDownloadId(123)?.downloadId)
+
+    // Adding again should not call enqueue or save again
+    downloadRoomDao.addIfDoesNotExist("url", book, downloadRequester)
+    coVerify(exactly = 1) { downloadRequester.enqueue(any()) }
+    assertEquals(1, downloadRoomDao.count("new_book"))
   }
 
   @Test
@@ -120,12 +131,17 @@ class DownloadRoomDaoTest {
     val entity1 = downloadRoomEntity(downloadId = 1, bookId = "book1")
     val entity2 = downloadRoomEntity(downloadId = 2, bookId = "book2")
 
-    val entities = saveTestDownloads(listOf(entity1, entity2))
+    val savedDownloadList = saveTestDownloads(listOf(entity1, entity2))
 
-    downloadRoomDao.deleteDownloadsList(entities)
+    // Before Deletion
+    val getDownloadList = downloadRoomDao.getAllDownloads().first()
+    assertEquals(savedDownloadList.size, getDownloadList.size)
 
-    val downloads = downloadRoomDao.getAllDownloads().first()
-    assertEquals(0, downloads.size)
+    downloadRoomDao.deleteDownloadsList(getDownloadList)
+
+    // After Deletion
+    val currentList = downloadRoomDao.getAllDownloads().first()
+    assertEquals(0, currentList.size)
   }
 
   @Test
@@ -144,13 +160,16 @@ class DownloadRoomDaoTest {
 
   @Test
   fun `getEntityForDownloadId returns the correct entity`() = runTest {
-    val entity = downloadRoomEntity(downloadId = 22)
-    downloadRoomDao.saveDownload(entity)
+    val entity1 = downloadRoomEntity(downloadId = 22, bookId = "book1")
+    val entity2 = downloadRoomEntity(downloadId = 23, bookId = "book2")
+
+    saveTestDownloads(listOf(entity1, entity2))
 
     val result = downloadRoomDao.getEntityForDownloadId(22)
 
     assertNotNull(result)
-    assertEquals(123L, result!!.downloadId)
+    assertEquals(entity1.downloadId, result!!.downloadId)
+    assertEquals(entity1.bookId, result.bookId)
   }
 
   @Test
@@ -177,13 +196,30 @@ class DownloadRoomDaoTest {
   }
 
   @Test
-  fun getDownloadsPausedByService() = runTest {
-    TODO()
+  fun `getDownloadsPausedByService returns correctly filtered downloads`() = runTest {
+    val entity1 = downloadRoomEntity(downloadId = 1, pauseReason = PauseReason.SERVICE)
+    val entity2 = downloadRoomEntity(downloadId = 2, pauseReason = PauseReason.USER)
+
+    saveTestDownloads(listOf(entity1, entity2))
+
+    val pausedByService = downloadRoomDao.getDownloadsPausedByService()
+    assertEquals(1, pausedByService.size)
+    assertEquals(1, pausedByService[0].downloadId)
   }
 
   @Test
-  fun getOngoingDownloads() = runTest {
-    TODO()
+  fun `getOngoingDownloads returns only ongoing downloads`() = runTest {
+    val queued = downloadRoomEntity(downloadId = 1, status = Status.QUEUED)
+    val completed = downloadRoomEntity(downloadId = 2, status = Status.COMPLETED)
+    val failed = downloadRoomEntity(downloadId = 3, status = Status.FAILED)
+    val downloading = downloadRoomEntity(downloadId = 4, status = Status.DOWNLOADING)
+
+    saveTestDownloads(listOf(queued, completed, failed, downloading))
+
+    val ongoing = downloadRoomDao.getOngoingDownloads()
+    assertEquals(2, ongoing.size)
+    val ids = ongoing.map { it.downloadId }
+    assertThat(ids).containsExactlyInAnyOrder(1, 4)
   }
 
   private fun downloadRoomEntity(
