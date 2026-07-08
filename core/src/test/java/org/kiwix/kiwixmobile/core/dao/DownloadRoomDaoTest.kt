@@ -27,7 +27,6 @@ import com.tonyodev.fetch2.Status
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.unmockkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -67,7 +66,6 @@ class DownloadRoomDaoTest {
   @After
   fun tearDown() {
     kiwixRoomDatabase.close()
-    unmockkAll()
   }
 
   @Test
