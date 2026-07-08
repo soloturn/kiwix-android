@@ -518,7 +518,7 @@ class KiwixMainActivity : CoreMainActivity() {
 
   override fun setIsBrandedApp() {
     lifecycleScope.launch {
-      kiwixDataStore.setIsBrandedApp(true)
+      kiwixDataStore.setIsBrandedApp(false)
     }
   }
 }

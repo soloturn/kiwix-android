@@ -96,7 +96,6 @@ class FindInPageManager @Inject constructor() {
       setFindListener(null)
     }
     webView = null
-    findListener = null
     _uiState.value = FindInPageUiState()
   }
 }
