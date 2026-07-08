@@ -152,7 +152,6 @@ class BrandedReaderViewModel @Inject constructor(
       // Setup bookmark for current book
       // See https://github.com/kiwix/kiwix-android/issues/3541
       zimReaderContainer.zimFileReader?.let(::observeBookmarks)
-      selectTab(readerWebViewManager.currentWebViewIndex)
     } else {
       isWebViewHistoryRestoring = true
       if (isZimFileAlreadyOpenedInReader()) {

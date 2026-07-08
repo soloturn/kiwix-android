@@ -977,9 +977,4 @@ fun getTabCardSize(toolbarHeightDp: Dp): Pair<Dp, Dp> {
   return cardWidth to cardHeight
 }
 
-interface TabClickListener {
-  fun onSelectTab(position: Int)
-  fun onCloseTab(position: Int)
-}
-
 data class DocumentSection(var title: String, var id: String, var level: Int)

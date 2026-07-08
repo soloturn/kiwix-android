@@ -55,7 +55,7 @@ import org.robolectric.annotation.Config
  * Behavior-driven UI tests for ReaderScreen.
  *
  * All tests render through the top-level [ReaderScreen] composable,
- * using [ReaderScreenState] to drive different UI states.
+ * using [CoreReaderViewModel.ReaderUiState] to drive different UI states.
  * This ensures we test real user-visible behavior, not internal
  * composable implementation details.
  */

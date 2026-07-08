@@ -1793,6 +1793,11 @@ abstract class CoreReaderViewModel(
     super.onCleared()
   }
 
+  @VisibleForTesting
+  fun onClearedExposed() {
+    onCleared()
+  }
+
   protected fun mainDispatcherImmediate() = mainDispatcher.immediate
 }
 

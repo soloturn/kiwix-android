@@ -24,11 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.safelyConsumeObservable
@@ -80,6 +82,15 @@ fun ReaderScreenRoute(
     }
   } else {
     null
+  }
+  DisposableEffect(Unit) {
+    onDispose {
+      runCatching {
+        viewModel.viewModelScope.launch {
+          viewModel.readerWebViewManager.destroyAllTabs()
+        }
+      }
+    }
   }
   CollectFileSearched(navHostController, viewModel)
   HandleFullScreenMode(uiState.shouldShowFullScreen, activity)
