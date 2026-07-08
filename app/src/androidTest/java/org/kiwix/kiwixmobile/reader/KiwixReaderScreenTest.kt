@@ -22,13 +22,13 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.provider.MediaStore
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.core.net.toUri
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.NavOptions
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.apps.common.testing.accessibility.framework.AccessibilityCheckResultUtils.matchesCheck
@@ -47,10 +47,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Assertions
 import org.kiwix.kiwixmobile.BaseActivityTest
-import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationResultOnCurrent
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
-import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
@@ -426,19 +424,20 @@ class KiwixReaderScreenTest : BaseActivityTest() {
   }
 
   private fun openKiwixReaderFragmentWithFile(zimFile: File) {
-    UiThreadStatement.runOnUiThread {
-      val navOptions = NavOptions.Builder()
-        .setPopUpTo(KiwixDestination.Reader.route, false)
-        .build()
-      kiwixMainActivity.apply {
-        kiwixMainActivity.navigate(KiwixDestination.Reader.route, navOptions)
-        setNavigationResultOnCurrent(zimFile.toUri().toString(), ZIM_FILE_URI_KEY)
-      }
+    composeTestRule.runOnUiThread {
+      kiwixMainActivity.openZimFromFilePath(zimFile.absolutePath)
     }
+    composeTestRule.waitForIdle()
   }
 
   @After
   fun finish() {
     TestUtils.deleteTemporaryFilesOfTestCases(context)
   }
+}
+
+fun SemanticsNodeInteraction.getText(): String {
+  return fetchSemanticsNode()
+    .config[SemanticsProperties.Text]
+    .joinToString("") { it.text }
 }

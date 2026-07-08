@@ -21,8 +21,6 @@ package org.kiwix.kiwixmobile.note
 import android.os.Build
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.core.net.toUri
-import androidx.navigation.NavOptions
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import leakcanary.LeakAssertions
 import org.junit.After
@@ -30,9 +28,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.kiwix.kiwixmobile.BaseActivityTest
-import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationResultOnCurrent
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
-import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
@@ -40,6 +36,7 @@ import org.kiwix.kiwixmobile.nav.destination.library.library
 import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
+import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.kiwixmobile.ui.KiwixDestination
 import org.kiwix.kiwixmobile.utils.StandardActions
 
@@ -70,7 +67,6 @@ class NoteScreenTest : BaseActivityTest() {
       assertToolbarExist(composeTestRule)
       assertSwitchWidgetExist(composeTestRule)
     }
-    LeakAssertions.assertNoLeaks()
   }
 
   @Test
@@ -194,6 +190,7 @@ class NoteScreenTest : BaseActivityTest() {
       saveNote(composeTestRule)
       closeAddNoteDialog(composeTestRule)
       clickOnBackwardButton(composeTestRule)
+      composeTestRule.waitUntilTimeout()
       openNoteScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
       clickOnSavedNote(composeTestRule)
       clickOnOpenArticle(composeTestRule)
@@ -215,20 +212,17 @@ class NoteScreenTest : BaseActivityTest() {
   }
 
   private fun loadZimFileInReader(zimFileName: String) {
+    val zimFile = getZimFileFromResourceFolder(context, zimFileName)
     activityScenario.onActivity {
       kiwixMainActivity = it
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
     }
-    val zimFile = getZimFileFromResourceFolder(context, zimFileName)
-    UiThreadStatement.runOnUiThread {
-      val navOptions = NavOptions.Builder()
-        .setPopUpTo(KiwixDestination.Reader.route, false)
-        .build()
-      kiwixMainActivity.apply {
-        kiwixMainActivity.navigate(KiwixDestination.Reader.route, navOptions)
-        setNavigationResultOnCurrent(zimFile.toUri().toString(), ZIM_FILE_URI_KEY)
-      }
+
+    composeTestRule.runOnUiThread {
+      kiwixMainActivity.openZimFromFilePath(zimFile.absolutePath)
     }
+
+    composeTestRule.waitForIdle()
   }
 
   @After

@@ -39,8 +39,10 @@ import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.page.bookmark.models.LibkiwixBookmarkItem
 import org.kiwix.kiwixmobile.core.ui.components.NAVIGATION_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
+import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.main.topLevel
+import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SNACKBAR
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
@@ -50,9 +52,9 @@ import org.kiwix.libkiwix.Book
 import org.kiwix.libkiwix.Bookmark
 
 class LibkiwixBookmarkTest : BaseActivityTest() {
-  // @Rule(order = RETRY_RULE_ORDER)
-  // @JvmField
-  // val retryRule = RetryRule()
+  @Rule(order = RETRY_RULE_ORDER)
+  @JvmField
+  val retryRule = RetryRule()
 
   @Rule(order = COMPOSE_TEST_RULE_ORDER)
   @JvmField

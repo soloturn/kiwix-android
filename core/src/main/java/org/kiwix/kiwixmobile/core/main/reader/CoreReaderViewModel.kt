@@ -1153,8 +1153,15 @@ abstract class CoreReaderViewModel(
   }
 
   protected fun observeBookmarks(zimFileReader: ZimFileReader) {
-    bookmarkManager.observeBookmarks(viewModelScope, zimFileReader.id, webUrlsFlow)
-    updateUrlFlow()
+    runCatching {
+      bookmarkManager.observeBookmarks(viewModelScope, zimFileReader.id, webUrlsFlow)
+      updateUrlFlow()
+    }.onFailure {
+      Log.e(
+        TAG_KIWIX,
+        "Could not set up the bookmark flow. Original exception $it"
+      )
+    }
   }
 
   protected suspend fun manageExternalLaunchAndRestoringViewState(

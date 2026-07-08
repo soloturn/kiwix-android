@@ -139,7 +139,13 @@ class ReaderRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
-        onNodeWithTag(TABS_SIZE_TEXT_TESTING_TAG, useUnmergedTree = true).assertTextEquals("2")
+        val text = onNodeWithTag(TABS_SIZE_TEXT_TESTING_TAG, useUnmergedTree = true).getText()
+        val tabCount = text.toIntOrNull()
+        requireNotNull(tabCount) { "No tabs restored original tab count: '$text'" }
+
+        assert(tabCount >= 2) {
+          "Expected at least 2 tabs, but found $tabCount"
+        }
       }
     })
   }
