@@ -22,6 +22,7 @@ import android.Manifest.permission.POST_NOTIFICATIONS
 import android.app.Application
 import app.cash.turbine.test
 import io.mockk.clearAllMocks
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.spyk
@@ -135,6 +136,8 @@ internal class CoreReaderViewModelTest {
     // Mock zimReaderContainer - set zimFileReader to null to skip onAddToHomeScreenMenuClicked logic
     every { zimReaderContainer.zimFileReader } returns null
 
+    coEvery { readerArticleManager.getRandomArticle() } returns ReaderArticleManager.GetRandomArticleResult.NoZimFileLoaded
+
     viewModel = TestCoreReaderViewModel(
       context = context,
       kiwixDataStore = kiwixDataStore,
@@ -154,7 +157,7 @@ internal class CoreReaderViewModelTest {
       readAloudManager = readAloudManager,
       donationDialogHandler = donationDialogHandler,
       findInPageManager = findInPageManager,
-      mainDispatcher = mainDispatcherRule.dispatcher
+      mainDispatcher = Dispatchers.Main
     )
   }
 

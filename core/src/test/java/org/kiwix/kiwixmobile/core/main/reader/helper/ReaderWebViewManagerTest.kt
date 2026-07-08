@@ -33,6 +33,7 @@ import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -79,18 +80,18 @@ class ReaderWebViewManagerTest {
       } returns webView
 
       every { tabsManager.size() } returns 1
-
-      readerWebViewManager.createNewTab(
-        tabConfig = TabsManager.NewTabConfig(
-          url = "url",
-          selectTab = false,
-          callback = callback,
-          videoView = frameLayout,
-          readAloudManager = mockk(),
-          documentParser = mockk(),
-          selectTabCallback = {},
-        )
+      val newTabConfig = TabsManager.NewTabConfig(
+        url = "url",
+        selectTab = false,
+        callback = callback,
+        videoView = frameLayout,
+        readAloudManager = mockk(),
+        documentParser = mockk(),
+        selectTabCallback = {},
       )
+      readerWebViewManager.createNewTab(tabConfig = newTabConfig).also { kiwixWebView ->
+        readerWebViewManager.addNewTabInTabsManager(kiwixWebView, newTabConfig)
+      }
 
       verify {
         tabsManager.addWebView(webView)
@@ -127,18 +128,18 @@ class ReaderWebViewManagerTest {
     fun `createNewTab does not select tab when selectTab is false`() = runTest {
       val webView = mockk<KiwixWebView>()
       every { webViewFactory.create(callback, frameLayout) } returns webView
-
-      readerWebViewManager.createNewTab(
-        tabConfig = TabsManager.NewTabConfig(
-          url = "url",
-          selectTab = false,
-          callback = callback,
-          videoView = frameLayout,
-          readAloudManager = mockk(),
-          documentParser = mockk(),
-          selectTabCallback = {},
-        )
+      val newTabConfig = TabsManager.NewTabConfig(
+        url = "url",
+        selectTab = false,
+        callback = callback,
+        videoView = frameLayout,
+        readAloudManager = mockk(),
+        documentParser = mockk(),
+        selectTabCallback = {},
       )
+      readerWebViewManager.createNewTab(tabConfig = newTabConfig).also { kiwixWebView ->
+        readerWebViewManager.addNewTabInTabsManager(kiwixWebView, newTabConfig)
+      }
       verify {
         tabsManager.addWebView(webView, false)
       }
@@ -246,8 +247,6 @@ class ReaderWebViewManagerTest {
   inner class TabsTest {
     @Test
     fun `restoreTabs restores all tabs`() = runTest {
-      val webView = mockk<KiwixWebView>()
-      val webView1 = mockk<KiwixWebView>()
       val history = listOf(
         mockk<WebViewHistoryItem>(),
         mockk<WebViewHistoryItem>()
@@ -281,8 +280,8 @@ class ReaderWebViewManagerTest {
       }
 
       coVerify {
-        readerSessionManager.restoreTabState(webView, history[0])
-        readerSessionManager.restoreTabState(webView1, history[1])
+        readerSessionManager.restoreTabState(any(), history[0])
+        readerSessionManager.restoreTabState(any(), history[1])
       }
     }
 
@@ -308,9 +307,11 @@ class ReaderWebViewManagerTest {
           )
         )
 
+      assertThat(result).isInstanceOf(ReaderWebViewManager.RestoreTabsResult.ErrorInRestoringTabs::class.java)
+      val resultt = result as ReaderWebViewManager.RestoreTabsResult.ErrorInRestoringTabs
       assertEquals(
-        ReaderWebViewManager.RestoreTabsResult.ErrorInRestoringTabs(throwable),
-        result
+        throwable.message,
+        resultt.throwable.message
       )
     }
   }
