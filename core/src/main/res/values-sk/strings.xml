@@ -5,6 +5,7 @@
 * McDutchie
 * Mikulas1
 * MohitMali
+* Wizzard
 * Yardom78
 -->
 <resources>
@@ -17,11 +18,19 @@
   <string name="menu_read_aloud">Čítať nahlas</string>
   <string name="menu_read_aloud_stop">Zastaviť čítanie nahlas</string>
   <string name="menu_support_kiwix">Podporiť Kiwix</string>
+  <string name="menu_support_kiwix_for_custom_apps">Podporte %s</string>
+  <string name="menu_about_app">O aplikácii %s</string>
+  <string name="external_redirect_message">Teraz budete presmerovaní na našu %s.</string>
+  <string name="support_donation_platform">platformu na darovanie</string>
+  <string name="about_app_page">stránku o aplikácii</string>
   <string name="menu_wifi_hotspot">WiFi hotspot</string>
   <string name="save_media">Uložiť médiá</string>
   <string name="save_media_error">Pri ukladaní došlo k chybe!</string>
+  <string name="invalid_media_source">Vybrané médium sa nenašlo.</string>
   <string name="save_media_saved">Médiá boli uložené do %s</string>
   <string name="search_label">Hľadať</string>
+  <string name="searched_list">Prehľadaný zoznam</string>
+  <string name="more_options">Ďalšie možnosti</string>
   <string name="choose_file">Vyberte súbor (*.zim)</string>
   <string name="open_in_new_tab">Otvoriť odkaz na novej karte?</string>
   <string name="hotspot_service_channel_name">Servisný kanál hotspot</string>
@@ -48,37 +57,56 @@
   <string name="hotspot_notification_content_title">Kiwix Hotspot</string>
   <string name="start_server_label">Spustiť server</string>
   <string name="stop_server_label">Zastaviť server</string>
-  <string name="server_started_message" fuzzy="true">Zadajte túto ip adresu to vášho prehliadača pre prístup na server %s</string>
+  <string name="error_server_already_running">Server už beží. Vypnite ho prosím a skúste to znova.</string>
+  <string name="error_ip_address_not_found">Nepodarilo sa nájsť IP adresu.</string>
+  <string name="server_started_message">Na prístup k serveru zadajte túto IP adresu do svojho prehliadača %s</string>
+  <string name="qr_code">Vykreslený QR kód</string>
   <string name="share_host_address">Zdieľať URL cez iné aplikácie</string>
   <string name="error_file_not_found">Chyba: Vybraný súbor ZIM sa nenašiel. %s</string>
-  <string name="unable_to_read_zim_file" fuzzy="true">Nepodarilo sa prečítať súbor zim!</string>
-  <string name="zim_not_opened" fuzzy="true">Nepodarilo sa otvoriť súbor zim</string>
-  <string name="error_file_invalid" fuzzy="true">Chyba: Vybraný súbor nie je platný ZIM súbor. %s</string>
+  <string name="unable_to_read_zim_file">Tento súbor ZIM sa nedá prečítať!</string>
+  <string name="zim_not_opened">Nepodarilo sa otvoriť súbor ZIM</string>
+  <string name="error_file_invalid">Chyba: Vybraný súbor nie je platný súbor ZIM. %s</string>
   <string name="error_article_url_not_found">Chyba: Načítavanie článku (Url: %1$s) sa nepodarilo.</string>
+  <string name="error_loading_random_article_zim_not_loaded">Nepodarilo sa načítať článok. Súbor ZIM nie je správne načítaný.</string>
+  <string name="could_not_find_random_article">Nepodarilo sa nájsť náhodný článok. Skúste to prosím neskôr.</string>
   <string name="pref_display_title">Zobrazenie</string>
   <string name="pref_info_title">Informácie</string>
   <string name="pref_info_version">Verzia</string>
+  <string name="pref_theme">Téma</string>
+  <string name="theme_system">Systémová</string>
+  <string name="theme_light">Svetlá</string>
+  <string name="theme_dark">Tmavá</string>
   <string name="pref_back_to_top">Späť na začiatok</string>
   <string name="pref_back_to_top_summary">Zobraziť tlačidlo na konci stránky pre prechod na začiatok.</string>
   <string name="pref_language_title">Jazyk</string>
   <string name="pref_language_chooser">Zvoliť jazyk</string>
   <string name="pref_credits">Prispievatelia a licencie</string>
   <string name="pref_credits_title">Zásluhy</string>
-  <string name="tts_lang_not_supported" fuzzy="true">Jazyk tejto stránky buď nie je podporovaný, alebo neboli nainštalované príslušné jazykové balíčky. Článok nemusí byť správne prečítaný.</string>
+  <string name="tts_lang_not_supported">Jazyk tejto stránky nie je podporovaný. Článok sa nemusí prečítať správne.</string>
   <string name="no_reader_application_installed">Nebola nájdená nainštalovaná aplikácia pre tento typ súboru</string>
+  <string name="no_email_application_installed">Nainštalujte si prosím e-mailového klienta</string>
+  <string name="no_app_found_to_select_bookmark_file">Nenašla sa žiadna aplikácia na výber súboru so záložkami</string>
   <string name="no_section_info">Neboli nájdené hlavičky obsahu</string>
   <string name="request_storage">Na prístup k offline obsahu potrebujeme prístup k vášmu úložisku</string>
-  <string name="request_write_storage" fuzzy="true">Pre stiahnutie súboru zim potrebujeme oprávnenie na zapisovanie do vášho úložného priestoru</string>
+  <string name="request_write_storage">Na sťahovanie súborov ZIM potrebujeme prístup na zápis do vášho úložiska</string>
   <string name="clear_recent_and_tabs_history_dialog">Ste si istý/á, že chcete vymazať históriu vyhľadávania a vynulovať všetky svoje aktívne karty?</string>
   <string name="delete_recent_search_item">Zmazať túto položku?</string>
   <string name="pref_clear_all_history_title">Vymazať históriu</string>
   <string name="pref_clear_all_history_summary">Vymazať nedávne vyhľadávanie a históriu kariet</string>
   <string name="pref_notes">Poznámky</string>
   <string name="pref_permission">Povolenia</string>
+  <string name="pref_import_bookmark_title">Importovať záložky</string>
+  <string name="pref_import_bookmark_summary">Importovať uložené záložky</string>
+  <string name="pref_export_bookmark_title">Exportovať záložky</string>
+  <string name="pref_export_bookmark_summary">Exportovať všetky uložené záložky</string>
+  <string name="export_bookmark_saved">Záložky sú exportované v súbore %s</string>
   <string name="all_history_cleared">Celá história vymazaná</string>
   <string name="pref_clear_all_bookmarks_title">Vymazať záložky</string>
   <string name="clear_all_history_dialog_title">Vymazať celú históriu?</string>
   <string name="share">Zdieľať</string>
+  <string name="share_article">Zdieľať článok</string>
+  <string name="unable_to_share_article">Nepodarilo sa zdieľať článok</string>
+  <string name="please_wait_for_page_to_load">Počkajte prosím, kým sa stránka úplne načíta</string>
   <string name="selected_file_cab_app_chooser_title">Zdieľať súbory ZIM s:</string>
   <string name="delete">Vymazať</string>
   <string name="cancel">Zrušiť</string>
@@ -88,8 +116,10 @@
   <string name="did_you_know">Vedeli ste?</string>
   <string name="undo">Vrátiť</string>
   <string name="tab_closed">Karta zatvorená</string>
+  <string name="tabs_closed">Karty zatvorené</string>
   <string name="bookmark_added">Záložka bola pridaná</string>
   <string name="rate_dialog_title">Prosím, ohodnoťte nás</string>
+  <string name="rate_dialog_msg">Ak vás baví používať %s, venujte prosím chvíľu jeho ohodnoteniu. Ďakujeme za vašu podporu!</string>
   <string name="rate_dialog_positive">Ohodnotiť!</string>
   <string name="no_thanks">Nie, vďaka</string>
   <string name="rate_dialog_neutral">Neskôr</string>
@@ -105,12 +135,15 @@
   <string name="local_zims">Zariadenie</string>
   <string name="remote_zims">Online</string>
   <string name="library">Knižnica</string>
-  <string name="delete_zim_body" fuzzy="true">Nasledovné súbory zim budú vymazané:\n\n%s</string>
+  <string name="delete_zim_body">Nasledujúce súbory ZIM budú zmazané:\n\n%s</string>
   <string name="delete_zims_toast">Súbory úspešne vymazané</string>
   <string name="no_files_here">Nie sú tu žiadne súbory</string>
   <string name="download_no_space">Nedostatočný priestor na stiahnutie.</string>
   <string name="download">Stiahnuť</string>
+  <string name="download_notification_channel_name">Názov kanála oznámení o sťahovaní</string>
+  <string name="download_notification_channel_description">Sťahujú sa súbory ZIM…</string>
   <string name="space_available">Dostupné miesto:</string>
+  <string name="move_no_space">Nedostatok miesta na presun/kopírovanie.</string>
   <string name="zim_simple">Jednoduché</string>
   <string name="zim_no_pic">Žiadne obrázky</string>
   <string name="zim_no_vid">Žiadne videá</string>
@@ -123,23 +156,30 @@
   <string name="help_7">Obsah je dostupný v súboroch vo formáte ZIM, ktorých je mnoho:</string>
   <string name="help_8">• Wikipédia je dostupná pre každý jazyk zvlášť</string>
   <string name="help_9">• Ostatný obsah ako Wikileaks alebo Wikisource sú taktiež dostupné</string>
-  <string name="help_10" fuzzy="true">Buď si súbory ZIM stiahnete v aplikácii, alebo si ich stiahnete na počítač a presuniete na Vašu SD kartu.</string>
+  <string name="help_10">Vybrané súbory ZIM si môžete buď stiahnuť priamo v aplikácii, alebo starostlivo vybrať tie, ktoré chcete, a stiahnuť ich zo stolového počítača a potom preniesť súbory ZIM na svoju SD kartu.</string>
   <string name="help_11">Súbory ZIM stiahnuté v aplikácii sa nachádzajú v adresári externého úložiska nazvanom Kiwix.</string>
+  <string name="fetching_storage_info">Načítavajú sa podrobnosti o úložisku…</string>
   <string name="pref_storage">Úložisko</string>
   <string name="pref_current_folder">Aktuálny adresár</string>
+  <string name="pref_storage_used">%s použitých</string>
+  <string name="pref_free_storage">%s voľných</string>
+  <string name="choose_storage_to_download_book">Vyberte úložisko na stiahnutie knihy</string>
   <string name="delete_zim_failed">Prepáčte nepodarilo sa vymazať nejaké súbory. Skúste použiť manažér súborov.</string>
   <string name="tts_pause">pozastaviť</string>
   <string name="tts_resume">pokračovať</string>
   <string name="stop">zastaviť</string>
+  <string name="notification_pause_button_text">Pozastaviť</string>
+  <string name="notification_resume_button_text">Pokračovať</string>
   <string name="internal_storage">Interné</string>
   <string name="external_storage">Externé</string>
   <string name="yes">Áno</string>
   <string name="no">Nie</string>
   <string name="confirm_stop_download_title">Zastaviť sťahovanie?</string>
   <string name="confirm_stop_download_msg">Naozaj chcete zastaviť toto sťahovanie?</string>
-  <string name="tts_not_enabled" fuzzy="true">Prevod textu na reč nie je pre tento ZIM súbor povolený</string>
-  <string name="texttospeech_initialization_failed" fuzzy="true">Inicializácia prevodu textu na reč zlyhala. Prosím skúste znovu.</string>
-  <string name="texttospeech_error" fuzzy="true">Neočakávaná chyba v prevode textu na reč. Prosím skúste znovu.</string>
+  <string name="change_storage">Zmeniť</string>
+  <string name="tts_not_enabled">Čítanie nahlas nie je pre tento súbor ZIM zapnuté</string>
+  <string name="texttospeech_initialization_failed">Inicializácia čítania nahlas zlyhala. Skúste to prosím znova</string>
+  <string name="texttospeech_error">Neočakávaná chyba pri čítaní nahlas. Skúste to prosím znova</string>
   <string name="next">Ďalej</string>
   <string name="previous">Späť</string>
   <string name="wifi_only_title">Povoliť sťahovanie obsahu cez mobilné pripojenie?</string>
@@ -155,15 +195,17 @@
   <string name="pref_external_link_popup_title">Upozorniť pri vstupe na externé odkazy</string>
   <string name="pref_external_link_popup_summary">Zobraziť upozornenia pri dodatočných nákladoch alebo pri nemožnosti fungovania odkazov offline.</string>
   <string name="external_link_popup_dialog_title">Vstupovanie na externý odkaz!</string>
-  <string name="external_link_popup_dialog_message" fuzzy="true">Vstupujete na externý odkaz. Toto môže viesť k dodatočným nákladom za spotrebu dát alebo k tomu, že nebude fungovať keď budete offline. Chcete pokračovať?</string>
+  <string name="external_link_popup_dialog_message">Prechádzate na externý odkaz. Môže to viesť k dodatočným nákladom za prenos dát alebo to jednoducho nebude fungovať, keď ste offline.\nChcete pokračovať?</string>
   <string name="do_not_ask_anymore">Už sa nepýtať</string>
   <string name="your_languages">Vybrané jazyky:</string>
+  <string name="your_language">Vybraný jazyk: %s</string>
   <string name="other_languages">Iné jazyky:</string>
+  <string name="downloading">Sťahovanie</string>
   <string name="no_items_msg">Žiadne dostupné položky</string>
   <string name="crash_title">Hm…Toto je trápne</string>
-  <string name="crash_description" fuzzy="true">Vyzerá to tak, že sme aplikácia zlyhala.\n\nNevadilo by Vám pomôcť nám opraviť tento problém tým, že nám zašlete nasledovné informácie?</string>
+  <string name="crash_description">Zdá sa, že aplikácia spadla.\n\nNepomohli by ste nám vyriešiť tento problém odoslaním hlásenia o páde?</string>
   <string name="crash_checkbox_language">Vaše jazykové nastavenia</string>
-  <string name="crash_checkbox_zimfiles" fuzzy="true">Zoznam Vašich súborov ZIM</string>
+  <string name="crash_checkbox_zimfiles">Zoznam vašich súborov ZIM</string>
   <string name="crash_checkbox_exception">Detaily o zlyhaní</string>
   <string name="crash_checkbox_logs">Denník aplikácie</string>
   <string name="crash_checkbox_device">Informácie o zariadení</string>
@@ -179,28 +221,40 @@
   <string name="welcome_to_the_family">Vitajte v rodine</string>
   <string name="save_books_offline">Uložiť knihy offline</string>
   <string name="download_books_message">Stiahnuť knihy a čítať ich nech ste kdekoľvek.</string>
+  <string name="save_books_in_desired_storage">Ukladať knihy do požadovaného úložiska</string>
+  <string name="storage_location_hint">V obrazovke Nastavenia si môžete vybrať preferované umiestnenie úložiska, buď SD kartu alebo interné úložisko, na sťahovanie súborov ZIM.</string>
   <string name="unable_to_add_to_bookmarks">Nepodarilo sa pridať do záložiek</string>
   <string name="go_to_previous_page">Prejsť na prechádzajúcu stránku</string>
   <string name="go_to_next_page">Prejsť na nasledovnú stránku</string>
   <string name="table_of_contents">Obsah</string>
+  <string name="select_language">Vyberte jazyk</string>
   <string name="save_languages">Uložiť jazyky</string>
+  <string name="all_languages">Všetky jazyky</string>
+  <string name="no_language_available">Nie sú dostupné žiadne jazyky</string>
   <string name="expand">Rozbaliť</string>
   <string name="history">História</string>
   <string name="history_from_current_book">Zobraziť históriu zo všetkých kníh</string>
-  <string name="search_history" fuzzy="true">Hľadať v histórii</string>
+  <string name="search_history">História vyhľadávania</string>
   <string name="selected_items">%1$d vybrané</string>
   <string name="bookmarks_from_current_book">Zobraziť záložky zo všetkých kníh</string>
   <string name="search_bookmarks">Hľadať záložky</string>
   <string name="switch_tabs">Prepnúť karty</string>
   <string name="close_all_tabs">Zavrieť všetky karty</string>
+  <string name="close_tab">Zatvoriť kartu</string>
+  <string name="could_not_restore_tabs">Nepodarilo sa obnoviť karty.</string>
   <string name="pending_state">Čakajúce</string>
   <string name="running_state">Rozpracované</string>
   <string name="complete">Dokončené</string>
   <string name="paused_state">Pozastavené</string>
   <string name="failed_state">Zlyhalo: %s</string>
+  <string name="custom_download_error_message_for_authentication_failed">Súbor ZIM sa nepodarilo stiahnuť. Skúste prosím preinštalovať aplikáciu z obchodu Play.</string>
   <string name="save">Uložiť</string>
   <string name="note">Poznámka</string>
+  <string name="take_notes">Robiť si poznámky</string>
   <string name="wiki_article_title">Názov wiki článku</string>
+  <string name="ext_storage_permission_rationale_export_bookmark">Na export záložiek sa vyžaduje prístup k úložisku</string>
+  <string name="ext_storage_write_permission_denied_export_bookmark">Záložky nemožno exportovať bez prístupu k úložisku</string>
+  <string name="export_bookmark_error">Pri pokuse o export záložiek sa vyskytla chyba!</string>
   <string name="ext_storage_permission_rationale_add_note">Pre poznámky je vyžadovaný prístup na úložisko</string>
   <string name="ext_storage_write_permission_denied_add_note">Poznámky nemôžu byť použité bez prístupu na úložisko</string>
   <string name="note_save_unsuccessful">Poznámka nebola uložená</string>
@@ -221,8 +275,9 @@
   <string name="severe_loss_error">Závažná chyba! Skúste vypnúť/zapnúť WiFi P2P</string>
   <string name="connection_failed">Spojenie zlyhalo</string>
   <string name="permission_rationale_location">Aby aplikácia mohla objavovať zariadenia v okolí, systém Android vyžaduje povolenie k polohe</string>
+  <string name="permission_rationale_nearby">Systém Android vyžaduje povolenie pre zariadenia v okolí, aby aplikácia mohla rozpoznať partnerské zariadenia</string>
   <string name="permission_refused_location">Bez prístupu k polohe nie je možné lokalizovať zariadenia v okolí</string>
-  <string name="permission_refused_storage" fuzzy="true">Bez prístupu na úložisko nie je možný prístup k súborom zim</string>
+  <string name="permission_refused_storage">Bez povolenia k úložisku nemožno pristupovať k súborom ZIM</string>
   <string name="request_enable_location">Pre zistenie zariadení v okolí povoľte prístup k polohe</string>
   <string name="discovery_needs_location">Bez povolenia k polohe nie je možné vyhľadať zariadenia v okolí</string>
   <string name="request_enable_wifi">Zapnite WiFi P2P v systémových nastaveniach</string>
@@ -235,14 +290,16 @@
   <string name="get_content_from_nearby_device">Získať obsah z blízkeho zariadenia</string>
   <string name="search_for_peers">Hľadať zariadenia</string>
   <string name="your_device">Vaše zariadenie:</string>
+  <string name="device_name">Názov zariadenia</string>
   <string name="nearby_devices">BLÍZKE ZARIADENIA</string>
   <string name="no_devices_found">Nenašli sa žiadne zariadenia. Kliknite na tlačítko hľadania a skúste znova.</string>
   <string name="files_for_transfer">SÚBORY NA PRENOS</string>
-  <string name="preparing_files" fuzzy="true">Pripravovanie súborov na prenos…</string>
-  <string name="performing_handshake" fuzzy="true">Prebieha párovanie…</string>
+  <string name="preparing_files">Pripravujú sa súbory na prenos…</string>
+  <string name="performing_handshake">Nadväzuje sa spojenie…</string>
   <string name="status">Stav</string>
   <string name="pref_clear_all_notes_summary">Vymazať všetky poznámky na všetkých článkoch</string>
   <string name="pref_clear_all_notes_title">Vymazať všetky poznámky</string>
+  <string name="pref_clear_notes">Vymazať poznámky</string>
   <string name="pref_allow_to_read_or_write_zim_files_on_sd_card">Povoliť čítať a zapisovať súbory ZIM na SD kartu</string>
   <string name="pref_text_zoom_summary">Zväčšiť text o 25%.</string>
   <string name="tag_pic">Obrázok</string>
@@ -260,10 +317,15 @@
   <string name="delete_selected_history">Vymazať vybranú históriu?</string>
   <string name="delete_bookmarks">Vymazať všetky záložky?</string>
   <string name="delete_selected_bookmarks">Vymazať vybrané záložky?</string>
+  <string name="import_bookmarks_dialog_title">Importovať záložky?</string>
+  <string name="export_all_bookmarks_dialog_title">Exportovať všetky záložky?</string>
+  <string name="export_all_bookmarks_dialog_message">Exportovaním sa vygeneruje súbor bookmark.xml v priečinku \n%s.</string>
+  <string name="bookmark_imported_message">Všetky záložky boli importované.</string>
+  <string name="error_invalid_bookmark_file">Chyba: Vybraný súbor nie je platný súbor so záložkami.</string>
   <string name="send_report">Odoslať diagnostické hlásenie</string>
   <string name="crash_checkbox_file_system">Podrobnosti systémového súbora</string>
   <string name="diagnostic_report">Diagnostické hlásenie</string>
-  <string name="diagnostic_report_message" fuzzy="true">Prosím odošlite všetky nasledovné detaily, aby sme mohli problém diagnostikovať</string>
+  <string name="diagnostic_report_message">Aby sme mohli problém diagnostikovať, najprv problém zreprodukujte a potom odošlite diagnostickú správu.</string>
   <string name="percentage">%d%%</string>
   <string name="pref_text_zoom_title">Priblíženie textu</string>
   <string name="search_open_in_new_tab">Otvoriť na novej karte</string>
@@ -271,17 +333,39 @@
   <string name="no_open_book">Žiadna otvorená kniha</string>
   <string name="open_library">Otvoriť knižnicu</string>
   <string name="tab_restored">Karta bola obnovená</string>
+  <string name="tabs_restored">Karty obnovené</string>
   <string name="open_drawer">Otvoriť zásuvku</string>
   <string name="close_drawer">Zavrieť zásuvku</string>
+  <string name="preparing_file_for_copy">Pripravuje sa na kopírovanie/presun</string>
+  <string name="action_copy">Kopírovať</string>
+  <string name="move">Presunúť</string>
+  <string name="copying_zim_file">Kopíruje sa súbor ZIM %s…</string>
+  <string name="moving_zim_file">Presúva sa súbor ZIM %s…</string>
+  <string name="copy_move_files_dialog_description">Kiwix vyžaduje, aby bol súbor ZIM vo svojom vlastnom dátovom adresári.\nChcete ho tam skopírovať alebo presunúť?</string>
+  <string name="copy_move_multiple_files_dialog_description">Kiwix vyžaduje, aby boli súbory ZIM vo svojom vlastnom dátovom adresári.\nChcete ich tam skopírovať alebo presunúť?</string>
+  <string name="copy_file_error_message">Chyba pri kopírovaní súboru ZIM: %s.</string>
+  <string name="verify_zim_chunk_dialog_title">Buďte opatrní: Uistite sa, že všetky časti ZIM boli správne presunuté/skopírované!</string>
+  <string name="verify_zim_chunks_dialog_message">Môžete ich overiť v priečinku „Android/media/org.kiwix…/“.\nPo dokončení obnovte obrazovku knižnice potiahnutím nadol. Rozdelený súbor ZIM sa potom zobrazí vo vašej knižnici.</string>
+  <string name="why_copy_move_files_to_app_directory">Prečo kopírovať/presúvať súbory do verejného adresára aplikácie?</string>
+  <string name="copy_move_files_to_app_directory_description">Kvôli zásadám Google Play v systéme Android 11 a novšom už naša aplikácia nemôže priamo pristupovať k súborom uloženým inde vo vašom zariadení. Aby sme vám umožnili zobraziť vybrané súbory, potrebujeme ich presunúť alebo skopírovať do osobitného priečinka v adresári našej aplikácie. To nám umožní k súborom pristupovať a otvárať ich.</string>
+  <string name="choose_storage_to_copy_move_zim_file">Vyberte úložisko na skopírovanie/presun súboru ZIM</string>
+  <string name="move_file_error_message">Chyba pri presúvaní súboru ZIM: %s.</string>
+  <string name="file_copy_move_error_dialog_message">%s \nChcete pokračovať s ostatnými súbormi ZIM?</string>
+  <string name="your_selected_files_added_to_library">Vaše vybrané súbory ZIM boli pridané do knižnice.</string>
   <string name="how_to_update_content">Ako aktualizovať obsah?</string>
-  <string name="update_content_description" fuzzy="true">Pre aktualizovanie obsahu (súbor zim) je potrebné stiahnuť najnovšiu verziu tohto obsahu. Môžete tak urobiť prostredníctvom sekcie pre sťahovanie.</string>
+  <string name="update_content_description">Na aktualizáciu obsahu (súboru ZIM) potrebujete stiahnuť úplnú najnovšiu verziu toho istého obsahu. Môžete to urobiť prostredníctvom sekcie sťahovania.</string>
   <string name="all_files_permission_needed">Potrebné povolenie pre všetky súbory</string>
-  <string name="all_files_permission_needed_message" fuzzy="true">Pre prístup do súborov ZIM potrebujeme mať zapnuté Povolenie pre všetky súbory</string>
+  <string name="all_files_permission_needed_message">Aby sme mohli pristupovať ku všetkým súborom ZIM v zariadení, potrebujeme mať povolenie k všetkým súborom</string>
   <string name="allowed">Povolené</string>
   <string name="not_allowed">Nie je povolené</string>
   <string name="denied_internet_permission_message">Pre stiahnutie obsahu zapnite wifi</string>
   <string name="system_unable_to_grant_permission_message">Systému sa nedarí udeliť povolenie!</string>
   <string name="allow">Povoliť</string>
+  <string name="swipe_down_for_library">Potiahnutím nadol zobrazíte knižnicu</string>
+  <string name="reaching_remote_library">Pripája sa k vzdialenej knižnici</string>
+  <string name="parsing_remote_library">Spracúva sa vzdialená knižnica</string>
+  <string name="starting_downloading_remote_library">Spúšťa sa sťahovanie online knižnice</string>
+  <string name="downloading_library">Sťahuje sa knižnica \n%s</string>
   <string name="no_notes">Žiadne poznámky</string>
   <string name="notes_from_all_books">Zobraziť poznámky zo všetkých kníh</string>
   <string name="search_notes">Hľadať v poznámkach</string>
@@ -290,4 +374,48 @@
   <string name="open_article">Otvoriť článok</string>
   <string name="delete_note_dialog_message">Poznámka: Poznámky z vášho úložiska nie sú vymazané</string>
   <string name="delete_selected_notes">Odstrániť vybraté poznámky?</string>
+  <string name="download_tts_language_title">Stiahnuť tento jazyk pre funkciu čítania nahlas</string>
+  <string name="download_tts_language_message">Kliknite prosím na tlačidlo Stiahnuť. Automaticky sa stiahne požadovaný jazyk.</string>
+  <string name="external_link_copied_message">Externý odkaz skopírovaný do schránky</string>
+  <string name="read_aloud_service_channel_name">Kanál služby čítania nahlas</string>
+  <string name="read_aloud_channel_description">Ovládanie čítania nahlas.</string>
+  <string name="read_aloud_running">Prebieha čítanie nahlas</string>
+  <string name="backward_history">História dozadu</string>
+  <string name="forward_history">História dopredu</string>
+  <string name="clear_all_navigation_history_message">Vymaže celú navigačnú históriu (dozadu aj dopredu)</string>
+  <string name="navigation_history_cleared">Navigačná história vymazaná</string>
+  <string name="go_to_settings_label">Prejsť na Nastavenia</string>
+  <string name="request_notification_permission_message">Na vykonanie tejto akcie udeľte prosím prístup k oznámeniam</string>
+  <string name="click_nearby_devices_message">Kliknutím sem vyhľadáte zariadenia v okolí.</string>
+  <string name="your_device_name_message">Tu sa zobrazí názov vášho zariadenia.</string>
+  <string name="nearby_devices_list_message">Tu nájdete zoznam zariadení v okolí. Klepnutím na názov zariadenia spustíte prenos súborov.</string>
+  <string name="transfer_zim_files_list_message">Tu nájdete zoznam súborov ZIM dostupných na prenos.</string>
+  <string name="storage_selection_dialog_accessibility_description">Vyberte úložisko na sťahovanie súborov ZIM.</string>
+  <string name="zim_file_content_description">Súbor ZIM, ktorý obsahuje obsah na čítanie</string>
+  <string name="select_language_content_description">Výberom tohto jazyka sa uprednostní zobrazovanie stiahnuteľných kníh v danom jazyku navrchu.</string>
+  <string name="toolbar_back_button_content_description">Prejsť na predchádzajúcu obrazovku</string>
+  <string name="save_or_open_unsupported_files_dialog_title">Uložiť alebo otvoriť tento súbor?</string>
+  <string name="save_or_open_unsupported_files_dialog_message">Voľbou Otvoriť sa tento súbor otvorí v externej čítacej aplikácii.</string>
+  <string name="donation_dialog_title">Darujte dnes</string>
+  <string name="donation_dialog_description">%s potrebuje vašu pomoc.</string>
+  <string name="make_donation">Darovať</string>
+  <string name="resuming_state">Pokračuje sa</string>
+  <string name="downloading_state">Sťahovanie</string>
+  <string name="download_failed_state">Zlyhalo</string>
+  <string name="searchview_description_clear">Vymazať dopyt</string>
+  <string name="do_you_mean">Mysleli ste:</string>
+  <string name="suggested_search_icon_description">Klepnutím použijete tento návrh a automaticky opravíte svoje vyhľadávanie</string>
+  <string name="file_system_scan_dialog_title">Prehľadať úložisko a nájsť knihy?</string>
+  <string name="file_system_scan_dialog_message">Kiwix prehľadá úložisko vášho zariadenia a tu vypíše dostupné knihy.</string>
+  <string name="download_timeout_resume_message">Sťahovanie na pozadí v systéme Android prekročilo časový limit. Chcete pokračovať?</string>
+  <string name="validate_zim_files">Overiť súbory ZIM</string>
+  <string name="confirmation_validate_zim_files">Naozaj chcete overiť nasledujúce súbory ZIM?\n\n%s</string>
+  <string name="validating_zim_file">Overuje sa súbor ZIM…</string>
+  <string name="validating_zim_files">Overujú sa súbory ZIM…</string>
+  <string name="menu_add_to_homescreen">Pridať na domovskú obrazovku</string>
+  <string name="added_to_homescreen">Odkaz pridaný na domovskú obrazovku</string>
+  <string name="add_shortcut_title">Pridať odkaz</string>
+  <string name="shortcut_name_label">Názov odkazu</string>
+  <string name="open_xiaomi_settings">Otvoriť Nastavenia</string>
+  <string name="xiaomi_permission_required">Toto zariadenie vyžaduje pred pridaním odkazu na domovskú obrazovku udelenie povolenia pre odkazy. Udeľte prosím toto povolenie v nastaveniach.</string>
 </resources>

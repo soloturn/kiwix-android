@@ -1,12 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Authors:
+* Wizzard
 * Yardom78
 -->
 <resources>
   <string name="file_system_does_not_support_4gb">Váš súborový systém nepodporuje súbory väčšie než 4GB</string>
   <string name="detecting_file_system">Zisťovanie či súborový systém môže vytvoriť súbory veľké 4GB</string>
-  <string name="cannot_open_file" fuzzy="true">Nepodarilo sa otvoriť súbor\nProsím skúste tento súbor nájsť na karte zariadenia vo vašej knižnici</string>
+  <string name="cannot_open_file">Súbor sa nepodarilo otvoriť\nSkúste ho prosím vyhľadať vo svojej Knižnici</string>
   <string name="send_files_title">Poslať súbory</string>
   <string name="receive_files_title">Prijať súbory</string>
-  <string name="no_app_found_to_open" fuzzy="true">Nepodarilo sa nájsť aplikáciu pre výber súboru zim!</string>
+  <string name="no_app_found_to_open">Nenašla sa žiadna aplikácia na výber súboru ZIM!</string>
+  <string name="select_zim_file">Vyberte súbor ZIM na čítanie</string>
+  <string name="swipe_down_to_scan_storage">Potiahnutím nadol prehľadáte zariadenie a nájdete nové knihy…</string>
+  <string name="auto_detect_books">Automaticky rozpoznať vaše knihy</string>
+  <string name="auto_detect_books_description">Pri prvom spustení sa vás aplikácia opýta, či môže prehľadať vaše úložisko. Ak to povolíte, automaticky rozpoznáme vaše súbory ZIM bez toho, aby ste ich museli pridávať ručne.</string>
+  <string name="select_category">Vyberte kategóriu</string>
+  <string name="no_category_available">Nie sú dostupné žiadne kategórie</string>
+  <string name="your_selected_category">Vybraná kategória:</string>
+  <string name="other_categories">Ostatné kategórie:</string>
+  <string name="all_categories">Všetky kategórie</string>
+  <string name="select_category_content_description">Výberom tejto kategórie sa uprednostní zobrazovanie stiahnuteľných kníh v danom jazyku navrchu.</string>
 </resources>
