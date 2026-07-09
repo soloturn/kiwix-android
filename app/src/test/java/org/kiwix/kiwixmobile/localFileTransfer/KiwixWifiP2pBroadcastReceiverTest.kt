@@ -18,21 +18,19 @@
 
 package org.kiwix.kiwixmobile.localFileTransfer
 
-import android.content.Context
 import android.content.Intent
 import android.net.NetworkInfo
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION
 import android.os.Build
-import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.kiwix.kiwixmobile.localFileTransfer.KiwixWifiP2pBroadcastReceiver.P2pEventListener
 import org.kiwix.sharedFunctions.TestApplication
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -42,18 +40,13 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.TIRAMISU], application = TestApplication::class)
 class KiwixWifiP2pBroadcastReceiverTest {
-  private val p2pEventListener: KiwixWifiP2pBroadcastReceiver.P2pEventListener = mockk()
+  private val p2pEventListener: P2pEventListener = mockk(relaxed = true)
   private lateinit var receiver: KiwixWifiP2pBroadcastReceiver
-  private val context: Context get() = RuntimeEnvironment.getApplication()
+  private val context = RuntimeEnvironment.getApplication()
 
   @Before
   fun setUp() {
     receiver = KiwixWifiP2pBroadcastReceiver(p2pEventListener)
-  }
-
-  @After
-  fun clean() {
-    clearAllMocks()
   }
 
   @Test
@@ -68,7 +61,7 @@ class KiwixWifiP2pBroadcastReceiverTest {
   @Test
   fun onReceive_whenWifiP2pDisabled_notifiesListener() {
     val intent = Intent(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION).apply {
-      putExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1)
+      putExtra(WifiP2pManager.EXTRA_WIFI_STATE, WifiP2pManager.WIFI_P2P_STATE_DISABLED)
     }
 
     receiver.onReceive(context, intent)
@@ -141,6 +134,18 @@ class KiwixWifiP2pBroadcastReceiverTest {
 
     verify(exactly = 1) {
       p2pEventListener.onDeviceChanged(device)
+    }
+  }
+
+  @Test
+  fun onReceive_whenDeviceMissing_notifiesListenerWithNull() {
+    val intent = Intent(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
+
+    // Here we don't pass the Device intent i.e- null
+    receiver.onReceive(context, intent)
+
+    verify(exactly = 1) {
+      p2pEventListener.onDeviceChanged(null)
     }
   }
 }
