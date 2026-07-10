@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Authors:
+* Wizzard
 * Yardom78
 -->
 <resources>
   <string name="retry">Skúsiť znova</string>
-  <string name="invalid_installation" fuzzy="true">Neplatná inštalácia. Prosím stiahnite zim.\nUistite sa, že WiFi je zapnuté a že máte dostatok voľného priestoru</string>
+  <string name="invalid_installation">Neplatná inštalácia. Stiahnite prosím súbor ZIM.\n Uistite sa, že máte zapnutú Wi-Fi a dostatok úložného priestoru</string>
 </resources>
