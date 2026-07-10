@@ -16,7 +16,7 @@
  *
  */
 
-package org.kiwix.kiwixmobile.core.roomDao
+package org.kiwix.kiwixmobile.core.dao
 
 import android.content.Context
 import android.os.Build
@@ -30,7 +30,6 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.kiwix.kiwixmobile.core.dao.WebViewHistoryRoomDao
 import org.kiwix.kiwixmobile.core.dao.entities.WebViewHistoryEntity
 import org.kiwix.kiwixmobile.core.data.KiwixRoomDatabase
 import org.kiwix.kiwixmobile.core.data.RoomDowngradeBackupHelper

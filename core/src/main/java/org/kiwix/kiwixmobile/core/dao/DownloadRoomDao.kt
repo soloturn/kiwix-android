@@ -63,8 +63,6 @@ abstract class DownloadRoomDao {
       .map { it.map(::DownloadModel) }
 
   fun allDownloads() = getAllDownloads().map { it.map(::DownloadModel) }
-
-  @Suppress("InjectDispatcher")
   private suspend fun moveCompletedToBooksOnDiskDao(downloadEntities: List<DownloadRoomEntity>) {
     downloadEntities.filter { it.status == COMPLETED }
       .takeIf(List<DownloadRoomEntity>::isNotEmpty)

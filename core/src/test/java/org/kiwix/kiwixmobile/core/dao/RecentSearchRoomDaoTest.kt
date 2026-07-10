@@ -16,7 +16,7 @@
  *
  */
 
-package org.kiwix.kiwixmobile.core.roomDao
+package org.kiwix.kiwixmobile.core.dao
 
 import android.content.Context
 import android.os.Build
@@ -30,7 +30,6 @@ import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.sharedFunctions.TestApplication
-import org.kiwix.kiwixmobile.core.dao.RecentSearchRoomDao
 import org.kiwix.kiwixmobile.core.data.KiwixRoomDatabase
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
