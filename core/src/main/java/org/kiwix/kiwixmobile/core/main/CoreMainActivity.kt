@@ -636,7 +636,6 @@ abstract class CoreMainActivity : BaseActivity() {
     }
   }
 
-
   abstract suspend fun createApplicationShortcuts()
   abstract fun hideBottomAppBar()
   abstract fun showBottomAppBar()

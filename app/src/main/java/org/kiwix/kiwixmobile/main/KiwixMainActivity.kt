@@ -439,7 +439,6 @@ class KiwixMainActivity : CoreMainActivity() {
     navigate(KiwixDestination.ZimHost.route)
   }
 
-
   override suspend fun createApplicationShortcuts() {
     // Remove previously added dynamic shortcuts for old ids if any found.
     removeOutdatedIdShortcuts()
