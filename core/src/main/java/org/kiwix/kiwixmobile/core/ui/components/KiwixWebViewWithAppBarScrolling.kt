@@ -88,13 +88,19 @@ fun KiwixWebViewWithAppBarScrolling(
 
     AndroidView(
       factory = { context ->
-        FrameLayout(context).apply {
+        FrameLayout(context)
+      },
+      update = { frameLayout ->
+        if (kiwixWebView.parent != frameLayout) {
           (kiwixWebView.parent as? ViewGroup)?.removeView(kiwixWebView)
-          kiwixWebView.layoutParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
+          frameLayout.removeAllViews()
+          frameLayout.addView(
+            kiwixWebView,
+            FrameLayout.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT,
+              ViewGroup.LayoutParams.MATCH_PARENT
+            )
           )
-          addView(kiwixWebView)
         }
       },
       modifier = Modifier.fillMaxSize()

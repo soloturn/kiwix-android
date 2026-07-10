@@ -21,7 +21,6 @@ package org.kiwix.kiwixmobile.core.page.viewmodel.effects
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.page.PageImpl
@@ -33,11 +32,6 @@ internal class OpenPageTest {
   private val page = PageImpl(zimReaderSource = zimReaderSource)
   private val zimReaderContainer: ZimReaderContainer = mockk()
   val activity: CoreMainActivity = mockk()
-
-  @BeforeEach
-  internal fun setUp() {
-    every { activity.navController.popBackStack() } returns true
-  }
 
   @Test
   fun `invokeWith navigates to page with historyUrl`() {

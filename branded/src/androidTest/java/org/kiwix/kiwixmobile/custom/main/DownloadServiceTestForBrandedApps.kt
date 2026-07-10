@@ -21,7 +21,6 @@ package org.kiwix.kiwixmobile.custom.main
 import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
-import android.content.res.AssetFileDescriptor
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -37,7 +36,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import okhttp3.ResponseBody
 import org.junit.After
@@ -47,7 +45,6 @@ import org.junit.Test
 import org.junit.jupiter.api.Assertions
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorService
-import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
@@ -150,7 +147,7 @@ class DownloadServiceTestForBrandedApps {
       UiThreadStatement.runOnUiThread {
         brandedMainActivity.navigate(brandedMainActivity.readerScreenRoute)
       }
-      openZimFileInReader(zimFile = downloadingZimFile)
+      openZimFileInReader(zimFile = downloadingZimFile!!)
       // press the home button so that application goes into background
       InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(
         AccessibilityService.GLOBAL_ACTION_HOME
@@ -162,29 +159,13 @@ class DownloadServiceTestForBrandedApps {
     }
   }
 
-  private fun openZimFileInReader(
-    assetFileDescriptor: AssetFileDescriptor? = null,
-    zimFile: File? = null
-  ) {
+  private fun openZimFileInReader(zimFile: File) {
     UiThreadStatement.runOnUiThread {
-      val brandedReaderFragment =
-        brandedMainActivity.supportFragmentManager.fragments
-          .filterIsInstance<BrandedReaderFragment>()
-          .firstOrNull()
-      runBlocking {
-        assetFileDescriptor?.let {
-          brandedReaderFragment?.openZimFile(
-            ZimReaderSource(assetFileDescriptorList = listOf(assetFileDescriptor)),
-            true
-          )
-        } ?: run {
-          brandedReaderFragment?.openZimFile(
-            ZimReaderSource(zimFile),
-            true
-          )
-        }
-      }
+      brandedMainActivity.readerIntentManager.openZimFileFromPath(zimFile.path, "")
     }
+    // Wait a bit to properly load the ZIM file in reader.
+    composeTestRule.waitForIdle()
+    composeTestRule.waitUntilTimeout()
   }
 
   private fun writeZimFileData(responseBody: ResponseBody, file: File) {

@@ -60,9 +60,10 @@ class SearchRobot {
   ) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         val searchView = onNodeWithTag(SEARCH_FIELD_TESTING_TAG)
         searchView.performTextInput("")
+        waitForIdle()
         for (char in query) {
           searchView.performTextInput(char.toString())
           if (wait != 0L) {
@@ -114,6 +115,7 @@ class SearchRobot {
 
   fun searchAndClickOnArticle(searchString: String, composeTestRule: ComposeContentTestRule) {
     // wait a bit to properly load the ZIM file in the reader
+    composeTestRule.waitForIdle()
     composeTestRule.waitUntilTimeout()
     openSearchScreen(composeTestRule)
     // Wait a bit to properly visible the search screen.
@@ -123,10 +125,13 @@ class SearchRobot {
   }
 
   private fun clickOnSearchItemInSearchList(composeTestRule: ComposeContentTestRule) {
-    composeTestRule.apply {
-      waitUntilTimeout()
-      onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0].performClick()
-    }
+    testFlakyView({
+      composeTestRule.apply {
+        waitUntilTimeout()
+        waitForIdle()
+        onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0].performClick()
+      }
+    })
   }
 
   fun assertArticleLoaded() {

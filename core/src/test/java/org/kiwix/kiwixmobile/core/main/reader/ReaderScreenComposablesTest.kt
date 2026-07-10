@@ -20,12 +20,9 @@ package org.kiwix.kiwixmobile.core.main.reader
 
 import android.os.Build
 import android.widget.FrameLayout
-import io.mockk.every
-import io.mockk.mockk
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -35,14 +32,20 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.navigation.compose.rememberNavController
-import org.junit.Assert.assertTrue
+import io.mockk.every
+import io.mockk.mockk
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
+import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
+import org.kiwix.kiwixmobile.core.main.reader.helper.TabsManager
 import org.kiwix.kiwixmobile.core.ui.components.CONTENT_LOADING_PROGRESS_BAR_TESTING_TAG
+import org.kiwix.kiwixmobile.core.ui.components.FIND_IN_SEARCH_VIEW_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.models.IconItem
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -52,7 +55,7 @@ import org.robolectric.annotation.Config
  * Behavior-driven UI tests for ReaderScreen.
  *
  * All tests render through the top-level [ReaderScreen] composable,
- * using [ReaderScreenState] to drive different UI states.
+ * using [CoreReaderViewModel.ReaderUiState] to drive different UI states.
  * This ensures we test real user-visible behavior, not internal
  * composable implementation details.
  */
@@ -67,82 +70,72 @@ class ReaderScreenComposablesTest {
   private val context get() = RuntimeEnvironment.getApplication()
 
   /**
-   * Creates a minimal [ReaderScreenState] with sensible defaults for testing.
-   * Test-specific values can be overridden via named parameters.
+   * Creates a minimal [CoreReaderViewModel.ReaderUiState] with sensible defaults
+   * for testing. Test-specific values can be overridden via named parameters.
    */
   private fun createTestState(
-    isNoBookOpenInReader: Boolean = false,
+    appName: String = "Kiwix",
+    title: String = "Test Reader",
+    loading: Boolean = false,
+    progress: Int = 0,
+    tabsState: TabsManager.TabsState = createTabsState(),
+    videoView: FrameLayout? = null,
+    shouldShowFullScreen: Boolean = false,
     showBackToTopButton: Boolean = false,
     showTtsControls: Boolean = false,
-    pauseTtsButtonText: String = "Pause",
-    shouldShowDonationPopup: Boolean = false,
-    shouldShowBottomAppBar: Boolean = true,
     showTabSwitcher: Boolean = false,
-    onOpenLibraryButtonClicked: () -> Unit = {},
-    backToTopButtonClick: () -> Unit = {},
-    onPauseTtsClick: () -> Unit = {},
-    onStopTtsClick: () -> Unit = {},
-    onHomeButtonClick: () -> Unit = {},
-    onCloseAllTabs: () -> Unit = {},
-    donateButtonClick: () -> Unit = {},
-    laterButtonClick: () -> Unit = {},
-    bookmarkOnClick: () -> Unit = {},
-    bookmarkOnLongClick: () -> Unit = {},
-    previousPageOnClick: () -> Unit = {},
-    previousPageOnLongClick: () -> Unit = {},
-    previousPageEnabled: Boolean = true,
-    nextPageOnClick: () -> Unit = {},
-    nextPageOnLongClick: () -> Unit = {},
-    nextPageEnabled: Boolean = true,
-    tocEnabled: Boolean = true,
-    tocOnClick: () -> Unit = {},
-    appName: String = "Kiwix",
-    fullScreenItem: Pair<Boolean, FrameLayout?> = false to null
-  ): ReaderScreenState = ReaderScreenState(
-    snackBarHostState = SnackbarHostState(),
-    isNoBookOpenInReader = isNoBookOpenInReader,
-    onOpenLibraryButtonClicked = onOpenLibraryButtonClicked,
-    pageLoadingItem = false to 0,
-    shouldShowDonationPopup = shouldShowDonationPopup,
-    fullScreenItem = fullScreenItem,
-    showBackToTopButton = showBackToTopButton,
-    backToTopButtonClick = backToTopButtonClick,
-    showTtsControls = showTtsControls,
-    onPauseTtsClick = onPauseTtsClick,
-    pauseTtsButtonText = pauseTtsButtonText,
-    onStopTtsClick = onStopTtsClick,
-    currentWebViewPosition = 0,
-    kiwixWebViewList = emptyList(),
-    showTabSwitcher = showTabSwitcher,
-    selectedWebView = null,
-    bookmarkButtonItem = Triple(
-      bookmarkOnClick,
-      bookmarkOnLongClick,
-      IconItem.Drawable(R.drawable.ic_bookmark_border_24dp)
-    ),
-    previousPageButtonItem = Triple(
-      previousPageOnClick,
-      previousPageOnLongClick,
-      previousPageEnabled
-    ),
-    onHomeButtonClick = onHomeButtonClick,
-    nextPageButtonItem = Triple(nextPageOnClick, nextPageOnLongClick, nextPageEnabled),
-    tocButtonItem = tocEnabled to tocOnClick,
-    onCloseAllTabs = onCloseAllTabs,
-    shouldShowBottomAppBar = shouldShowBottomAppBar,
-    readerScreenTitle = "Test Reader",
-    onTabClickListener = object : TabClickListener {
-      override fun onSelectTab(position: Int) { // no-op
-      }
+    showBottomBar: Boolean = true,
+    bookmarkButtonItem: CoreReaderViewModel.BookmarkButtonItem =
+      CoreReaderViewModel.BookmarkButtonItem(
+        IconItem.Drawable(R.drawable.ic_bookmark_border_24dp),
+        false
+      ),
+    showNoBookOpenInReader: Boolean = false,
+    searchPlaceHolderItemForBrandedApps: Boolean = false,
+    isPreviousPageButtonEnable: Boolean = true,
+    isNextPageButtonEnable: Boolean = true,
+    pauseTtsButtonText: String = "Pause",
+    isTocButtonEnable: Boolean = true,
+    showTableOfContentDrawer: Boolean = false,
+    tableOfContentTitle: String = "Contents",
+    documentSections: List<DocumentSection> = emptyList(),
+    showDonationPopup: Boolean = false,
+    findInPageUiState: FindInPageManager.FindInPageUiState =
+      FindInPageManager.FindInPageUiState()
+  ): CoreReaderViewModel.ReaderUiState {
+    return CoreReaderViewModel.ReaderUiState(
+      appName = appName,
+      title = title,
+      loading = loading,
+      progress = progress,
+      tabsState = tabsState,
+      videoView = videoView,
+      shouldShowFullScreen = shouldShowFullScreen,
+      showBackToTopButton = showBackToTopButton,
+      showTtsControls = showTtsControls,
+      showTabSwitcher = showTabSwitcher,
+      showBottomBar = showBottomBar,
+      bookmarkButtonItem = bookmarkButtonItem,
+      showNoBookOpenInReader = showNoBookOpenInReader,
+      searchPlaceHolderItemForBrandedApps = searchPlaceHolderItemForBrandedApps,
+      isPreviousPageButtonEnable = isPreviousPageButtonEnable,
+      isNextPageButtonEnable = isNextPageButtonEnable,
+      pauseTtsButtonText = pauseTtsButtonText,
+      isTocButtonEnable = isTocButtonEnable,
+      showTableOfContentDrawer = showTableOfContentDrawer,
+      tableOfContentTitle = tableOfContentTitle,
+      documentSections = documentSections,
+      showDonationPopup = showDonationPopup,
+      findInPageUiState = findInPageUiState
+    )
+  }
 
-      override fun onCloseTab(position: Int) { // no-op
-      }
-    },
-    searchPlaceHolderItemForBrandedApps = false to {},
-    appName = appName,
-    donateButtonClick = donateButtonClick,
-    laterButtonClick = laterButtonClick,
-    tableOfContentTitle = "Contents"
+  private fun createTabsState(
+    webViews: List<KiwixWebView> = emptyList(),
+    selectedIndex: Int = 0
+  ) = TabsManager.TabsState(
+    webViews = webViews,
+    selectedIndex = selectedIndex
   )
 
   /**
@@ -150,17 +143,17 @@ class ReaderScreenComposablesTest {
    * providing minimal test doubles for required dependencies.
    */
   private fun renderReaderScreen(
-    state: ReaderScreenState,
-    showTocDrawer: MutableState<Boolean> = mutableStateOf(false),
-    documentSections: MutableList<DocumentSection>? = null
+    state: CoreReaderViewModel.ReaderUiState,
+    onReaderAction: (ReaderAction) -> Unit = {}
   ) {
     composeTestRule.setContent {
       val navController = rememberNavController()
+      val snackBarHostState = remember { SnackbarHostState() }
       ReaderScreen(
         state = state,
+        snackBarHost = snackBarHostState,
+        onReaderAction = onReaderAction,
         actionMenuItems = emptyList(),
-        showTableOfContentDrawer = showTocDrawer,
-        documentSections = documentSections,
         onUserBackPressed = { FragmentActivityExtensions.Super.ShouldCall },
         navHostController = navController,
         mainActivityBottomAppBarScrollBehaviour = null,
@@ -171,7 +164,7 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_bottomAppBar_displaysAllButtons() {
-    renderReaderScreen(createTestState(shouldShowBottomAppBar = true))
+    renderReaderScreen(createTestState(showBottomBar = true))
     composeTestRule
       .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
       .assertIsDisplayed()
@@ -191,98 +184,87 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_bottomAppBar_bookmarkClick_triggersCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        shouldShowBottomAppBar = true,
-        bookmarkOnClick = { clicked = true }
-      )
+      createTestState(showBottomBar = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
       .performClick()
-    assertTrue("Bookmark onClick callback should be triggered", clicked)
+    assertEquals(ReaderAction.BookmarkClicked, action)
   }
 
   @Test
   fun readerScreen_bottomAppBar_bookmarkLongClick_triggersCallback() {
-    var longClicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        shouldShowBottomAppBar = true,
-        bookmarkOnLongClick = { longClicked = true }
-      )
+      createTestState(showBottomBar = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
       .performTouchInput { longClick() }
-    assertTrue("Bookmark onLongClick callback should be triggered", longClicked)
+    assertEquals(ReaderAction.BookmarkLongClicked, action)
   }
 
   @Test
   fun readerScreen_bottomAppBar_homeClick_triggersCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        shouldShowBottomAppBar = true,
-        onHomeButtonClick = { clicked = true }
-      )
+      createTestState(showBottomBar = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithTag(READER_BOTTOM_BAR_HOME_BUTTON_TESTING_TAG)
       .performClick()
-    assertTrue("Home onClick callback should be triggered", clicked)
+    assertEquals(ReaderAction.HomeClicked, action)
   }
 
   @Test
   fun readerScreen_bottomAppBar_previousPageClick_triggersCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        shouldShowBottomAppBar = true,
-        previousPageOnClick = { clicked = true }
-      )
+      createTestState(showBottomBar = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithTag(READER_BOTTOM_BAR_PREVIOUS_SCREEN_BUTTON_TESTING_TAG)
       .performClick()
-    assertTrue("Previous page onClick callback should be triggered", clicked)
+    assertEquals(ReaderAction.PreviousClicked, action)
   }
 
   @Test
   fun readerScreen_bottomAppBar_nextPageClick_triggersCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        shouldShowBottomAppBar = true,
-        nextPageOnClick = { clicked = true }
-      )
+      createTestState(showBottomBar = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithTag(READER_BOTTOM_BAR_NEXT_SCREEN_BUTTON_TESTING_TAG)
       .performClick()
-    assertTrue("Next page onClick callback should be triggered", clicked)
+    assertEquals(ReaderAction.NextClicked, action)
   }
 
   @Test
   fun readerScreen_bottomAppBar_disabledButton_doesNotTriggerCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        shouldShowBottomAppBar = true,
-        previousPageOnClick = { clicked = true },
-        previousPageEnabled = false
-      )
+      createTestState(showBottomBar = true, isPreviousPageButtonEnable = false),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithTag(READER_BOTTOM_BAR_PREVIOUS_SCREEN_BUTTON_TESTING_TAG)
       .performClick()
-    assertTrue("Disabled button should not trigger callback", !clicked)
+    assertEquals(null, action)
   }
 
   @Test
   fun readerScreen_bottomAppBar_notShownWhenShouldShowIsFalse() {
-    renderReaderScreen(createTestState(shouldShowBottomAppBar = false))
+    renderReaderScreen(
+      createTestState(showBottomBar = false)
+    )
     composeTestRule
       .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
       .assertDoesNotExist()
@@ -317,33 +299,31 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_ttsControls_pauseButton_triggersCallback() {
-    var pauseClicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
       createTestState(
         showTtsControls = true,
-        pauseTtsButtonText = "Pause",
-        onPauseTtsClick = { pauseClicked = true }
-      )
+        pauseTtsButtonText = "Pause"
+      ),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithText("PAUSE")
       .performClick()
-    assertTrue("Pause TTS callback should be triggered", pauseClicked)
+    assertEquals(ReaderAction.PauseTts, action)
   }
 
   @Test
   fun readerScreen_ttsControls_stopButton_triggersCallback() {
-    var stopClicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        showTtsControls = true,
-        onStopTtsClick = { stopClicked = true }
-      )
+      createTestState(showTtsControls = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithTag(TTS_CONTROL_STOP_BUTTON_TESTING_TAG)
       .performClick()
-    assertTrue("Stop TTS callback should be triggered", stopClicked)
+    assertEquals(ReaderAction.StopTts, action)
   }
 
   @Test
@@ -364,22 +344,20 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_backToTopFab_click_triggersCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        showBackToTopButton = true,
-        backToTopButtonClick = { clicked = true }
-      )
+      createTestState(showBackToTopButton = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithContentDescription(context.getString(R.string.pref_back_to_top))
       .performClick()
-    assertTrue("BackToTop click callback should be triggered", clicked)
+    assertEquals(ReaderAction.BackToTopButtonClick, action)
   }
 
   @Test
   fun readerScreen_noBookOpenView_displaysNoOpenBookText() {
-    renderReaderScreen(createTestState(isNoBookOpenInReader = true))
+    renderReaderScreen(createTestState(showNoBookOpenInReader = true))
     composeTestRule
       .onNodeWithText(context.getString(R.string.no_open_book))
       .assertIsDisplayed()
@@ -387,7 +365,7 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_noBookOpenView_displaysOpenLibraryButton() {
-    renderReaderScreen(createTestState(isNoBookOpenInReader = true))
+    renderReaderScreen(createTestState(showNoBookOpenInReader = true))
     composeTestRule
       .onNodeWithText(context.getString(R.string.open_library).uppercase())
       .assertIsDisplayed()
@@ -395,24 +373,22 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_noBookOpenView_openLibraryClick_triggersCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        isNoBookOpenInReader = true,
-        onOpenLibraryButtonClicked = { clicked = true }
-      )
+      createTestState(showNoBookOpenInReader = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithText(context.getString(R.string.open_library).uppercase())
       .performClick()
-    assertTrue("Open Library callback should be triggered", clicked)
+    assertEquals(ReaderAction.OpenLibrary, action)
   }
 
   @Test
   fun readerScreen_donationLayout_visibleWhenShouldShow() {
     renderReaderScreen(
       createTestState(
-        shouldShowDonationPopup = true,
+        showDonationPopup = true,
         appName = "Kiwix"
       )
     )
@@ -423,7 +399,7 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_donationLayout_hiddenWhenShouldNotShow() {
-    renderReaderScreen(createTestState(shouldShowDonationPopup = false))
+    renderReaderScreen(createTestState(showDonationPopup = false))
     composeTestRule
       .onNodeWithTag(DONATION_LAYOUT_TESTING_TAG)
       .assertDoesNotExist()
@@ -431,32 +407,28 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_donationLayout_donateButton_triggersCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        shouldShowDonationPopup = true,
-        donateButtonClick = { clicked = true }
-      )
+      createTestState(showDonationPopup = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithText(context.getString(R.string.make_donation))
       .performClick()
-    assertTrue("Donate callback should be triggered", clicked)
+    assertEquals(ReaderAction.DonateButtonClick, action)
   }
 
   @Test
   fun readerScreen_donationLayout_laterButton_triggersCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        shouldShowDonationPopup = true,
-        laterButtonClick = { clicked = true }
-      )
+      createTestState(showDonationPopup = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithText(context.getString(R.string.rate_dialog_neutral))
       .performClick()
-    assertTrue("Later callback should be triggered", clicked)
+    assertEquals(ReaderAction.DonateLaterButtonClick, action)
   }
 
   @Test
@@ -470,24 +442,22 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_tabSwitcher_closeAllTabButton_triggersCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(
-        showTabSwitcher = true,
-        onCloseAllTabs = { clicked = true }
-      )
+      createTestState(showTabSwitcher = true),
+      onReaderAction = { action = it }
     )
     composeTestRule.waitForIdle()
     composeTestRule
       .onNodeWithTag(CLOSE_ALL_TABS_BUTTON_TESTING_TAG)
       .performClick()
-    assertTrue("onCloseAllTabs callback should be triggered", clicked)
+    assertEquals(ReaderAction.CloseAllTabs, action)
   }
 
   @Test
   fun readerScreen_topBar_hiddenInFullScreenMode() {
     renderReaderScreen(
-      createTestState(fullScreenItem = true to null)
+      createTestState(shouldShowFullScreen = true)
     )
     composeTestRule
       .onNodeWithText("Test Reader")
@@ -504,27 +474,32 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_searchPlaceholder_visibleAndClickable() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState().copy(
-        searchPlaceHolderItemForBrandedApps = true to {
-          clicked = true
-        }
-      )
+      createTestState(searchPlaceHolderItemForBrandedApps = true),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithText(context.getString(R.string.search_label))
       .assertIsDisplayed()
       .performClick()
-    assertTrue(clicked)
+    assertEquals(ReaderAction.OpenSearch(), action)
+  }
+
+  @Test
+  fun readerScreen_findInPageAppBar_visible() {
+    renderReaderScreen(
+      createTestState(findInPageUiState = FindInPageManager.FindInPageUiState(visible = true)),
+    )
+    composeTestRule
+      .onNodeWithTag(FIND_IN_SEARCH_VIEW_TESTING_TAG)
+      .assertIsDisplayed()
   }
 
   @Test
   fun readerScreen_progressBar_visibleWhenPageLoading() {
     renderReaderScreen(
-      createTestState().copy(
-        pageLoadingItem = true to 50
-      )
+      createTestState(loading = true, progress = 50)
     )
     composeTestRule
       .onNodeWithTag(CONTENT_LOADING_PROGRESS_BAR_TESTING_TAG)
@@ -532,28 +507,13 @@ class ReaderScreenComposablesTest {
   }
 
   @Test
-  fun readerScreen_progressBar_hiddenWhenNotLoading() {
-    renderReaderScreen(
-      createTestState().copy(
-        pageLoadingItem = false to 0
-      )
-    )
-    composeTestRule
-      .onNodeWithTag(CONTENT_LOADING_PROGRESS_BAR_TESTING_TAG)
-      .assertDoesNotExist()
-  }
-
-  @Test
   fun readerScreen_tableOfContentDrawer_visibleWhenOpen() {
-    val showTocDrawer = mutableStateOf(true)
     val sections = mutableListOf(
       DocumentSection("Section 1", "section1", 1),
       DocumentSection("Section 2", "section2", 2)
     )
     renderReaderScreen(
-      createTestState(),
-      showTocDrawer = showTocDrawer,
-      documentSections = sections
+      createTestState(showTableOfContentDrawer = true, documentSections = sections)
     )
     composeTestRule.waitForIdle()
     composeTestRule
@@ -581,51 +541,26 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_bottomAppBar_tocDisabled_doesNotTriggerCallback() {
-    var clicked = false
+    var action: ReaderAction? = null
     renderReaderScreen(
       createTestState(
-        shouldShowBottomAppBar = true,
-        tocEnabled = false,
-        tocOnClick = { clicked = true }
-      )
+        showBottomBar = true,
+        isTocButtonEnable = false,
+      ),
+      onReaderAction = { action = it }
     )
     composeTestRule
       .onNodeWithTag(READER_BOTTOM_BAR_TABLE_CONTENT_BUTTON_TESTING_TAG)
       .performClick()
-    assertTrue(!clicked)
+    assertEquals(null, action)
   }
 
   @Test
   fun readerScreen_fullScreenItem_notActive_showsTopBar() {
-    renderReaderScreen(createTestState(fullScreenItem = false to null))
+    renderReaderScreen(createTestState(shouldShowFullScreen = false))
     composeTestRule
       .onNodeWithText("Test Reader")
       .assertIsDisplayed()
-  }
-
-  @Test
-  fun readerScreen_tableOfContentDrawer_dismissedWhenStateIsFalse() {
-    val showTocDrawer = mutableStateOf(true)
-    val sections = mutableListOf(
-      DocumentSection("Section 1", "section1", 1)
-    )
-    renderReaderScreen(
-      createTestState(),
-      showTocDrawer = showTocDrawer,
-      documentSections = sections
-    )
-    composeTestRule.waitForIdle()
-    // Drawer content is visible when state is true.
-    composeTestRule
-      .onNodeWithText("Contents")
-      .assertIsDisplayed()
-    // Simulate dismissal by setting state to false.
-    showTocDrawer.value = false
-    composeTestRule.waitForIdle()
-    // Drawer content should no longer be visible.
-    composeTestRule
-      .onNodeWithText("Section 1")
-      .assertDoesNotExist()
   }
 
   @Test
@@ -634,7 +569,7 @@ class ReaderScreenComposablesTest {
       contentDescription = "video_view"
     }
     renderReaderScreen(
-      createTestState(fullScreenItem = true to videoView)
+      createTestState(shouldShowFullScreen = true, videoView = videoView)
     )
     // When fullScreenItem.first is true, the normal content should not be rendered.
     // Verify the no-book view is not shown (fullscreen path is taken instead).
@@ -649,7 +584,7 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_tabSwitcher_onCloseTab_triggersCallback() {
-    var closedIndex = -1
+    var action: ReaderAction? = null
     val webView = mockk<KiwixWebView>(relaxed = true)
     every { webView.parent } returns null
     every { webView.layoutParams } returns FrameLayout.LayoutParams(
@@ -658,19 +593,10 @@ class ReaderScreenComposablesTest {
     )
 
     val state = createTestState(
-      showTabSwitcher = true
-    ).copy(
-      kiwixWebViewList = listOf(webView),
-      onTabClickListener = object : TabClickListener {
-        override fun onSelectTab(position: Int) { // no-op
-        }
-
-        override fun onCloseTab(position: Int) {
-          closedIndex = position
-        }
-      }
+      showTabSwitcher = true,
+      tabsState = TabsManager.TabsState(listOf(webView))
     )
-    renderReaderScreen(state)
+    renderReaderScreen(state, onReaderAction = { action = it })
     composeTestRule.waitForIdle()
 
     composeTestRule
@@ -679,7 +605,6 @@ class ReaderScreenComposablesTest {
         useUnmergedTree = true
       )
       .performClick()
-
-    assertTrue("onCloseTab callback should be triggered with index 0", closedIndex == 0)
+    assertEquals(ReaderAction.CloseTab(0), action)
   }
 }

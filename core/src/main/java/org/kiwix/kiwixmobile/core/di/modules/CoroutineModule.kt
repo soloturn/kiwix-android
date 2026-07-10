@@ -22,8 +22,10 @@ import dagger.Module
 import dagger.Provides
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainCoroutineDispatcher
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
+import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
 
 @Module
 class CoroutineModule {
@@ -36,4 +38,9 @@ class CoroutineModule {
   @MainDispatcher
   @Suppress("InjectDispatcher")
   fun provideMainDispatcher(): CoroutineDispatcher = Dispatchers.Main
+
+  @Provides
+  @MainUiDispatcher
+  @Suppress("InjectDispatcher")
+  fun provideMainUiDispatcher(): MainCoroutineDispatcher = Dispatchers.Main
 }

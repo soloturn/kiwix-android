@@ -32,36 +32,45 @@ import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
 import javax.inject.Inject
 
 class ExternalLinkOpener @Inject constructor(
-  private val activity: Activity,
   private val kiwixDataStore: KiwixDataStore
 ) {
-  private lateinit var alertDialogShower: AlertDialogShower
+  private var alertDialogShower: AlertDialogShower? = null
+  private var activity: Activity? = null
 
-  fun setAlertDialogShower(alertDialogShower: AlertDialogShower) {
+  fun initialize(activity: Activity, alertDialogShower: AlertDialogShower) {
+    this.activity = activity
     this.alertDialogShower = alertDialogShower
+  }
+
+  private fun requireAlertDialogShower() = requireNotNull(alertDialogShower) {
+    "AlertDialogShower is not set. Call ExternalLinkOpener.initialize before using it"
+  }
+
+  private fun requireActivity() = requireNotNull(activity) {
+    "Activity is not not. Call ExternalLinkOpener.initialize before calling it"
   }
 
   suspend fun openExternalUrl(
     intent: Intent,
     lifecycleScope: CoroutineScope
   ) {
-    if (intent.resolveActivity(activity.packageManager) != null) {
+    if (intent.resolveActivity(requireActivity().packageManager) != null) {
       if (kiwixDataStore.externalLinkPopup.first()) {
         requestOpenLink(intent, lifecycleScope)
       } else {
         openLink(intent)
       }
     } else {
-      activity.toast(R.string.no_reader_application_installed)
+      requireActivity().toast(R.string.no_reader_application_installed)
     }
   }
 
   private fun openLink(intent: Intent) {
-    activity.startActivity(intent)
+    requireActivity().startActivity(intent)
   }
 
   private fun requestOpenLink(intent: Intent, lifecycleScope: CoroutineScope) {
-    alertDialogShower.show(
+    requireAlertDialogShower().show(
       KiwixDialog.ExternalLinkPopup,
       { openLink(intent) },
       { },
@@ -76,10 +85,10 @@ class ExternalLinkOpener @Inject constructor(
   }
 
   fun showTTSLanguageDownloadDialog() {
-    alertDialogShower.show(
+    requireAlertDialogShower().show(
       KiwixDialog.DownloadTTSLanguage,
       {
-        activity.startActivity(
+        requireActivity().startActivity(
           Intent().apply {
             action = ACTION_INSTALL_TTS_DATA
           }
@@ -92,15 +101,15 @@ class ExternalLinkOpener @Inject constructor(
     intent: Intent,
     destinationText: String
   ) {
-    if (intent.resolveActivity(activity.packageManager) == null) {
-      activity.toast(R.string.no_reader_application_installed)
+    if (intent.resolveActivity(requireActivity().packageManager) == null) {
+      requireActivity().toast(R.string.no_reader_application_installed)
       return
     }
 
-    alertDialogShower.show(
+    requireAlertDialogShower().show(
       KiwixDialog.ExternalRedirectDialog(destinationText),
       {
-        activity.startActivity(intent)
+        requireActivity().startActivity(intent)
       }
     )
   }

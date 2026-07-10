@@ -1,6 +1,6 @@
 /*
  * Kiwix Android
- * Copyright (c) 2019 Kiwix <android.kiwix.org>
+ * Copyright (c) 2026 Kiwix <android.kiwix.org>
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -16,20 +16,10 @@
  *
  */
 
-package org.kiwix.kiwixmobile.core.base
+package org.kiwix.kiwixmobile.core.di
 
-import android.content.Context
-import androidx.fragment.app.Fragment
+import javax.inject.Qualifier
 
-/**
- * All fragments should inherit from this fragment.
- */
-
-abstract class BaseFragment : Fragment() {
-  override fun onAttach(context: Context) {
-    super.onAttach(context)
-    inject(activity as BaseActivity)
-  }
-
-  abstract fun inject(baseActivity: BaseActivity)
-}
+@Qualifier
+@Retention(AnnotationRetention.RUNTIME)
+annotation class MainUiDispatcher

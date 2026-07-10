@@ -20,9 +20,7 @@ package org.kiwix.kiwixmobile.search
 import android.os.Build
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.core.net.toUri
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.NavOptions
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -34,8 +32,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.kiwix.kiwixmobile.BaseActivityTest
-import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationResultOnCurrent
-import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
+import org.kiwix.kiwixmobile.core.extensions.closeKeyboard
 import org.kiwix.kiwixmobile.core.search.viewmodel.Action
 import org.kiwix.kiwixmobile.core.search.viewmodel.SearchViewModel
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
@@ -112,7 +109,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       assertSearchSuccessful(searchUnitTestResult, composeTestRule)
       deleteSearchedQueryFrequently(searchUnitTestingQuery, uiDevice, 300, composeTestRule)
       // to close the keyboard
-      pressBack()
+      kiwixMainActivity.currentFocus?.closeKeyboard()
       // go to reader screen
       pressBack()
     }
@@ -285,14 +282,8 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
   }
 
   private fun openKiwixReaderFragmentWithFile(zimFile: File) {
-    UiThreadStatement.runOnUiThread {
-      val navOptions = NavOptions.Builder()
-        .setPopUpTo(KiwixDestination.Reader.route, false)
-        .build()
-      kiwixMainActivity.apply {
-        kiwixMainActivity.navigate(KiwixDestination.Reader.route, navOptions)
-        setNavigationResultOnCurrent(zimFile.toUri().toString(), ZIM_FILE_URI_KEY)
-      }
+    composeTestRule.runOnUiThread {
+      kiwixMainActivity.openZimFromFilePath(zimFile.absolutePath)
     }
   }
 
