@@ -21,7 +21,6 @@ package org.kiwix.kiwixmobile.core.main.reader
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,12 +43,11 @@ import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.page.SEARCH_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.models.ActionMenuItem
 import org.kiwix.kiwixmobile.core.ui.models.IconItem
+import org.kiwix.kiwixmobile.core.utils.ComposeDimens.EXTRA_SMALL_ROUND_SHAPE_SIZE
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.MATERIAL_MINIMUM_HEIGHT_AND_WIDTH
-import org.kiwix.kiwixmobile.core.utils.ComposeDimens.SIX_DP
-import org.kiwix.kiwixmobile.core.utils.ComposeDimens.TAB_SWITCHER_ICON_CORNER_RADIUS
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.TAB_SWITCHER_TEXT_SIZE
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.TWELVE_DP
-import org.kiwix.kiwixmobile.core.utils.ComposeDimens.TWENTY_DP
+import org.kiwix.kiwixmobile.core.utils.ComposeDimens.TWENTY_FOUR_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.TWO_DP
 
 const val READ_ALOUD_MENU_ITEM_TESTING_TAG = "readAloudMenuItemTestingTag"
@@ -226,16 +224,15 @@ class ReaderMenuState(
       contentAlignment = Alignment.Center
     ) {
       Box(
-        modifier = modifier
-          .clip(RoundedCornerShape(TAB_SWITCHER_ICON_CORNER_RADIUS))
+        modifier = Modifier
+          .clip(RoundedCornerShape(EXTRA_SMALL_ROUND_SHAPE_SIZE))
           .background(MaterialTheme.colorScheme.onPrimary)
           .border(
             TWO_DP,
             MaterialTheme.colorScheme.onBackground,
-            RoundedCornerShape(TAB_SWITCHER_ICON_CORNER_RADIUS)
+            RoundedCornerShape(EXTRA_SMALL_ROUND_SHAPE_SIZE)
           )
-          .padding(horizontal = SIX_DP, vertical = TWO_DP)
-          .defaultMinSize(minWidth = TWENTY_DP, minHeight = TWENTY_DP),
+          .size(TWENTY_FOUR_DP),
         contentAlignment = Alignment.Center
       ) {
         Text(
