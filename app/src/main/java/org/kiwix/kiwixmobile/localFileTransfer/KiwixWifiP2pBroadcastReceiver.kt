@@ -25,6 +25,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.NetworkInfo
 import android.net.wifi.p2p.WifiP2pDevice
+import android.net.wifi.p2p.WifiP2pManager
 import android.net.wifi.p2p.WifiP2pManager.EXTRA_NETWORK_INFO
 import android.net.wifi.p2p.WifiP2pManager.EXTRA_WIFI_P2P_DEVICE
 import android.net.wifi.p2p.WifiP2pManager.EXTRA_WIFI_STATE
@@ -49,7 +50,8 @@ class KiwixWifiP2pBroadcastReceiver(
   override fun onReceive(context: Context, intent: Intent) {
     when (intent.action) {
       WIFI_P2P_STATE_CHANGED_ACTION -> {
-        val wifiP2pState = intent.getIntExtra(EXTRA_WIFI_STATE, -1)
+        val wifiP2pState =
+          intent.getIntExtra(EXTRA_WIFI_STATE, WifiP2pManager.WIFI_P2P_STATE_DISABLED)
         p2pEventListener.onWifiP2pStateChanged(wifiP2pState == WIFI_P2P_STATE_ENABLED)
       }
 
