@@ -45,6 +45,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.downloader.ChunkUtils
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
@@ -123,36 +124,37 @@ object FileUtils {
   }
 
   @JvmStatic
-  suspend fun deleteZimFile(path: String, ioDispatcher: CoroutineDispatcher) {
-    fileOperationMutex.withLock {
-      var filePath = path
-      if (filePath.substring(filePath.length - ChunkUtils.PART.length) == ChunkUtils.PART) {
-        filePath = filePath.substring(0, filePath.length - ChunkUtils.PART.length)
-      }
-      val file = File(filePath)
-      if (file.path.substring(file.path.length - 3) != "zim") {
-        var alphabetFirst = 'a'
-        fileloop@ while (alphabetFirst <= 'z') {
-          var alphabetSecond = 'a'
-          while (alphabetSecond <= 'z') {
-            val chunkPath =
-              filePath.substring(0, filePath.length - 2) + alphabetFirst + alphabetSecond
-            val fileChunk = File(chunkPath)
-            if (fileChunk.isFileExist(ioDispatcher)) {
-              fileChunk.deleteFile(ioDispatcher)
-            } else if (!deleteZimFileParts(chunkPath, ioDispatcher)) {
-              break@fileloop
-            }
-            alphabetSecond++
-          }
-          alphabetFirst++
+  suspend fun deleteZimFile(path: String, ioDispatcher: CoroutineDispatcher) =
+    withContext(ioDispatcher) {
+      fileOperationMutex.withLock {
+        var filePath = path
+        if (filePath.substring(filePath.length - ChunkUtils.PART.length) == ChunkUtils.PART) {
+          filePath = filePath.substring(0, filePath.length - ChunkUtils.PART.length)
         }
-      } else {
-        file.deleteFile(ioDispatcher)
-        deleteZimFileParts(filePath, ioDispatcher)
+        val file = File(filePath)
+        if (file.path.substring(file.path.length - 3) != "zim") {
+          var alphabetFirst = 'a'
+          fileloop@ while (alphabetFirst <= 'z') {
+            var alphabetSecond = 'a'
+            while (alphabetSecond <= 'z') {
+              val chunkPath =
+                filePath.substring(0, filePath.length - 2) + alphabetFirst + alphabetSecond
+              val fileChunk = File(chunkPath)
+              if (fileChunk.isFileExist(ioDispatcher)) {
+                fileChunk.deleteFile(ioDispatcher)
+              } else if (!deleteZimFileParts(chunkPath, ioDispatcher)) {
+                break@fileloop
+              }
+              alphabetSecond++
+            }
+            alphabetFirst++
+          }
+        } else {
+          file.deleteFile(ioDispatcher)
+          deleteZimFileParts(filePath, ioDispatcher)
+        }
       }
     }
-  }
 
   @Suppress("ReturnCount")
   private suspend fun deleteZimFileParts(
@@ -178,7 +180,7 @@ object FileUtils {
     context: Context,
     uri: Uri,
     ioDispatcher: CoroutineDispatcher
-  ): String? {
+  ): String? = withContext(ioDispatcher) {
     Log.e(TAG_KIWIX, "Trying to get the ZIM file path for Uri = $uri")
     if (DocumentsContract.isDocumentUri(context, uri)) {
       if ("com.android.externalstorage.documents" == uri.authority) {
@@ -187,9 +189,9 @@ object FileUtils {
             .split(":")
 
         if (documentId[0] == "primary") {
-          return "${Environment.getExternalStorageDirectory()}/${documentId[1]}"
+          return@withContext "${Environment.getExternalStorageDirectory()}/${documentId[1]}"
         }
-        return try {
+        return@withContext try {
           val sdCardOrUsbMainPath =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
               getSDCardOrUSBMainPathForAndroid10AndAbove(context, documentId[0])
@@ -201,7 +203,7 @@ object FileUtils {
           null
         }
       } else if ("com.android.providers.downloads.documents" == uri.authority) {
-        return try {
+        return@withContext try {
           documentProviderContentQuery(context, uri, ioDispatcher = ioDispatcher)
         } catch (_: IllegalArgumentException) {
           null
@@ -209,15 +211,15 @@ object FileUtils {
       }
     } else if (uri.scheme != null) {
       if ("content".equals(uri.scheme, ignoreCase = true)) {
-        return getFilePathOfContentUri(context, uri, ioDispatcher)
+        return@withContext getFilePathOfContentUri(context, uri, ioDispatcher)
       } else if ("file".equals(uri.scheme, ignoreCase = true)) {
-        return uri.path
+        return@withContext uri.path
       }
     } else {
-      return uri.path
+      return@withContext uri.path
     }
 
-    return null
+    return@withContext null
   }
 
   /**
@@ -444,13 +446,13 @@ object FileUtils {
     uri: Uri,
     documentsContractWrapper: DocumentResolverWrapper = DocumentResolverWrapper(),
     ioDispatcher: CoroutineDispatcher
-  ): String? {
+  ): String? = withContext(ioDispatcher) {
     // Extracting the document ID from the URI.
     val documentId = extractDocumentId(uri, documentsContractWrapper)
 
     // Attempt to handle cases where the document ID is a direct path to a ZIM file.
     if (isValidZimFile(documentId)) {
-      return documentId.substringAfter("raw:")
+      return@withContext documentId.substringAfter("raw:")
     }
 
     // Try different content URI prefixes in some case download content prefix is different.
@@ -466,7 +468,7 @@ object FileUtils {
       } catch (_: NumberFormatException) {
         0L
       }
-    return queryForActualPath(
+    queryForActualPath(
       context,
       actualDocumentId,
       contentUriPrefixes,
@@ -568,7 +570,7 @@ object FileUtils {
   suspend fun getAllZimParts(
     book: LibkiwixBook,
     ioDispatcher: CoroutineDispatcher
-  ): List<File> {
+  ): List<File> = withContext(ioDispatcher) {
     val files = ArrayList<File>()
     book.file?.let {
       if (it.path.endsWith(".zim") || it.path.endsWith(".zim.part")) {
@@ -585,47 +587,50 @@ object FileUtils {
             when {
               File(path).isFileExist(ioDispatcher) -> files.add(File(path))
               File("$path.part").isFileExist(ioDispatcher) -> files.add(File("$path.part"))
-              else -> return@getAllZimParts files
+              else -> return@withContext files
             }
           }
         }
       }
     }
-    return files
+    files
   }
 
   @Suppress("ReturnCount")
   @JvmStatic
-  suspend fun hasPart(file: File, ioDispatcher: CoroutineDispatcher): Boolean {
-    var tempFile = file
-    tempFile = File(getFileName(tempFile.path, ioDispatcher))
-    if (tempFile.path.endsWith(".zim")) {
-      return false
-    }
-    if (tempFile.path.endsWith(".part")) {
-      return true
-    }
-    val path = tempFile.path
-    for (firstCharacter in 'a'..'z') {
-      for (secondCharacter in 'a'..'z') {
-        val chunkPath = path.substring(0, path.length - 2) + firstCharacter + secondCharacter
-        val fileChunk = File("$chunkPath.part")
-        if (fileChunk.isFileExist(ioDispatcher)) {
-          return true
-        } else if (!File(chunkPath).isFileExist(ioDispatcher)) {
-          return false
+  suspend fun hasPart(file: File, ioDispatcher: CoroutineDispatcher): Boolean =
+    withContext(ioDispatcher) {
+      var tempFile = file
+      tempFile = File(getFileName(tempFile.path, ioDispatcher))
+      if (tempFile.path.endsWith(".zim")) {
+        return@withContext false
+      }
+      if (tempFile.path.endsWith(".part")) {
+        return@withContext true
+      }
+      val path = tempFile.path
+      for (firstCharacter in 'a'..'z') {
+        for (secondCharacter in 'a'..'z') {
+          val chunkPath = path.substring(0, path.length - 2) + firstCharacter + secondCharacter
+          val fileChunk = File("$chunkPath.part")
+          if (fileChunk.isFileExist(ioDispatcher)) {
+            return@withContext true
+          } else if (!File(chunkPath).isFileExist(ioDispatcher)) {
+            return@withContext false
+          }
         }
       }
+      return@withContext false
     }
-    return false
-  }
 
   @JvmStatic
-  suspend fun getFileName(fileName: String, ioDispatcher: CoroutineDispatcher) =
-    when {
-      File(fileName).isFileExist(ioDispatcher) -> fileName
-      File("$fileName.part").isFileExist(ioDispatcher) -> "$fileName.part"
-      else -> "${fileName}aa"
+  suspend fun getFileName(fileName: String, ioDispatcher: CoroutineDispatcher): String =
+    withContext(ioDispatcher) {
+      when {
+        File(fileName).isFileExist(ioDispatcher) -> fileName
+        File("$fileName.part").isFileExist(ioDispatcher) -> "$fileName.part"
+        else -> "${fileName}aa"
+      }
     }
 
   @JvmStatic
@@ -776,7 +781,7 @@ object FileUtils {
 
     val (fileName, source) = getSafeFileNameAndSourceFromUrlOrSrc(url, src) ?: run {
       Log.w("MEDIA_SAVE", "Invalid media source: url=$url, src=$src")
-      return SaveResult.InvalidSource
+      return@downloadFileFromUrl SaveResult.InvalidSource
     }
 
     if (fileName.isNullOrEmpty() || source.isNullOrEmpty()) {
@@ -798,7 +803,7 @@ object FileUtils {
   ): SaveResult = runCatching {
     Log.d("MEDIA_SAVE", "Detected image: $fileName")
 
-    val bytes = loadBytes(source, zimReaderContainer) ?: return SaveResult.InvalidSource
+    val bytes = loadBytes(source, zimReaderContainer) ?: return@handleImage SaveResult.InvalidSource
 
     val mime = resolveMimeType(source) ?: "image/*"
 
@@ -807,7 +812,7 @@ object FileUtils {
       fileName,
       mime,
       bytes
-    ) ?: return SaveResult.Error("Image save failed")
+    ) ?: return@handleImage SaveResult.Error("Image save failed")
 
     Log.d("MEDIA_SAVE", "Image saved: $uri")
 
@@ -830,7 +835,7 @@ object FileUtils {
       source,
       fileName,
       zimReaderContainer
-    ) ?: return SaveResult.InvalidSource
+    ) ?: return@handleFile SaveResult.InvalidSource
 
     Log.d("MEDIA_SAVE", "File saved: ${file.absolutePath}")
 

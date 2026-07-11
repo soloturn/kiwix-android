@@ -23,9 +23,11 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
@@ -35,7 +37,8 @@ import java.io.File
 import javax.inject.Inject
 
 class UnsupportedMimeTypeHandler @Inject constructor(
-  private val zimReaderContainer: ZimReaderContainer
+  private val zimReaderContainer: ZimReaderContainer,
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
   private var alertDialogShower: AlertDialogShower? = null
   private var activity: Activity? = null
@@ -128,7 +131,7 @@ class UnsupportedMimeTypeHandler @Inject constructor(
   }
 
   private suspend fun openFile(savedFile: File, documentType: String?) {
-    if (!savedFile.isFileExist()) return
+    if (!savedFile.isFileExist(ioDispatcher)) return
     val uri =
       FileProvider.getUriForFile(
         requireActivity(),

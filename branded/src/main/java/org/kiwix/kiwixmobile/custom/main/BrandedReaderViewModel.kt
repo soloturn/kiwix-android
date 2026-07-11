@@ -29,12 +29,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavOptions
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R.drawable
 import org.kiwix.kiwixmobile.core.R.string
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
@@ -98,28 +100,29 @@ class BrandedReaderViewModel @Inject constructor(
   readAloudManager: ReadAloudManager,
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
-  @MainDispatcher mainDispatcher: MainCoroutineDispatcher
+  @MainDispatcher mainDispatcher: MainCoroutineDispatcher,
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CoreReaderViewModel(
-    context,
-    kiwixDataStore,
-    externalLinkOpener,
-    unsupportedMimeTypeHandler,
-    readerWebViewManager,
-    zimReaderContainer,
-    zimFileManager,
-    kiwixPermissionChecker,
-    repositoryActions,
-    bookmarkManager,
-    readerHistoryManager,
-    readerSessionManager,
-    readerIntentManager,
-    pendingSearchItemManager,
-    readerArticleManager,
-    readAloudManager,
-    donationDialogHandler,
-    findInPageManager,
-    mainDispatcher
-  ) {
+  context,
+  kiwixDataStore,
+  externalLinkOpener,
+  unsupportedMimeTypeHandler,
+  readerWebViewManager,
+  zimReaderContainer,
+  zimFileManager,
+  kiwixPermissionChecker,
+  repositoryActions,
+  bookmarkManager,
+  readerHistoryManager,
+  readerSessionManager,
+  readerIntentManager,
+  pendingSearchItemManager,
+  readerArticleManager,
+  readAloudManager,
+  donationDialogHandler,
+  findInPageManager,
+  mainDispatcher
+) {
   override suspend fun initialize(
     coreMainActivity: CoreMainActivity,
     alertDialogShower: AlertDialogShower
@@ -264,7 +267,7 @@ class BrandedReaderViewModel @Inject constructor(
   private suspend fun createDemoFile() {
     runCatching {
       File(getDemoFilePathForBrandedApp(context)).also {
-        if (!it.isFileExist()) it.createNewFile()
+        if (!it.isFileExist(ioDispatcher)) it.createNewFile()
       }
     }
   }
@@ -435,7 +438,7 @@ class BrandedReaderViewModel @Inject constructor(
    */
   private suspend fun isZimFileAlreadyOpenedInReader(): Boolean =
     zimReaderContainer.zimFileReader != null &&
-      zimReaderContainer.zimReaderSource?.exists() == true &&
+      zimReaderContainer.zimReaderSource?.exists(ioDispatcher) == true &&
       zimReaderContainer.zimReaderSource?.canOpenInLibkiwix() == true &&
       zimReaderContainer.zimFileReader?.jniKiwixReader != null
 

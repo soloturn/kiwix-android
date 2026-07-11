@@ -51,6 +51,7 @@ class UnsupportedMimeTypeHandlerTest {
   @Rule
   @JvmField
   val mainDispatcherRule = MainDispatcherRule()
+  private val testDispatcher = mainDispatcherRule.dispatcher
 
   private val activity: Activity = mockk(relaxed = true)
   private val zimReaderContainer: ZimReaderContainer = mockk(relaxed = true)
@@ -74,9 +75,9 @@ class UnsupportedMimeTypeHandlerTest {
     every { activity.toast(any<Int>()) } returns Unit
     every { activity.toast(any<String>()) } returns Unit
     every { FileProvider.getUriForFile(any(), any(), any()) } returns mockk()
-    coEvery { any<File>().isFileExist() } returns true
+    coEvery { any<File>().isFileExist(testDispatcher) } returns true
 
-    handler = UnsupportedMimeTypeHandler(zimReaderContainer)
+    handler = UnsupportedMimeTypeHandler(zimReaderContainer, testDispatcher)
     handler.initialize(activity, alertDialogShower)
     handler.intent = mockk(relaxed = true)
   }

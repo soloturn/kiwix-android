@@ -21,10 +21,12 @@ package org.kiwix.kiwixmobile.nav.destination.reader
 import android.app.Application
 import androidx.core.net.toUri
 import androidx.navigation.NavOptions
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import org.kiwix.kiwixmobile.core.R.string
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
@@ -86,28 +88,29 @@ class KiwixReaderViewModel @Inject constructor(
   readAloudManager: ReadAloudManager,
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
-  @MainDispatcher mainDispatcher: MainCoroutineDispatcher
+  @MainDispatcher mainDispatcher: MainCoroutineDispatcher,
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CoreReaderViewModel(
-    context,
-    kiwixDataStore,
-    externalLinkOpener,
-    unsupportedMimeTypeHandler,
-    readerWebViewManager,
-    zimReaderContainer,
-    zimFileManager,
-    kiwixPermissionChecker,
-    repositoryActions,
-    bookmarkManager,
-    readerHistoryManager,
-    readerSessionManager,
-    readerIntentManager,
-    pendingSearchItemManager,
-    readerArticleManager,
-    readAloudManager,
-    donationDialogHandler,
-    findInPageManager,
-    mainDispatcher
-  ) {
+  context,
+  kiwixDataStore,
+  externalLinkOpener,
+  unsupportedMimeTypeHandler,
+  readerWebViewManager,
+  zimReaderContainer,
+  zimFileManager,
+  kiwixPermissionChecker,
+  repositoryActions,
+  bookmarkManager,
+  readerHistoryManager,
+  readerSessionManager,
+  readerIntentManager,
+  pendingSearchItemManager,
+  readerArticleManager,
+  readAloudManager,
+  donationDialogHandler,
+  findInPageManager,
+  mainDispatcher
+) {
   override fun shouldShowSpellCheckedSuggestions(): Boolean = false
   override fun isBrandedApp(): Boolean = false
 
@@ -193,7 +196,7 @@ class KiwixReaderViewModel @Inject constructor(
     // when creating the new archive object.
     updateTitle()
     val filePath = FileUtils.getLocalFilePathByUri(context.applicationContext, zimFileUri.toUri())
-    if (filePath == null || !File(filePath).isFileExist()) {
+    if (filePath == null || !File(filePath).isFileExist(ioDispatcher)) {
       // Close the previously opened book in the reader. Since this file is not found,
       // it will not be set in the zimFileReader. The previously opened ZIM file
       // will be saved when we move between screens. If we return to the reader again,
