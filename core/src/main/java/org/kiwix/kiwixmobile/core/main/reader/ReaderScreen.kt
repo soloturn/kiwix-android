@@ -119,7 +119,7 @@ import androidx.navigation.NavHostController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.BookmarkButtonItem
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
@@ -207,7 +207,7 @@ fun ReaderScreen(
   snackBarHost: SnackbarHostState,
   onReaderAction: (ReaderAction) -> Unit,
   actionMenuItems: List<ActionMenuItem>,
-  onUserBackPressed: suspend () -> FragmentActivityExtensions.Super,
+  onUserBackPressed: suspend () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
   mainActivityBottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
   navigationIcon: @Composable () -> Unit
@@ -294,21 +294,21 @@ fun ReaderScreen(
 
 @Composable
 fun OnBackPressed(
-  onUserBackPressed: suspend () -> FragmentActivityExtensions.Super,
+  onUserBackPressed: suspend () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController
 ) {
-  // Tracks whether the fragment's BackHandler should be enabled.
+  // Tracks whether the back press handler should be enabled.
   var shouldEnableBackPress by rememberSaveable { mutableStateOf(true) }
   val coroutineScope = rememberCoroutineScope()
   BackHandler(enabled = shouldEnableBackPress) {
     coroutineScope.launch {
       val result = onUserBackPressed()
-      if (result == FragmentActivityExtensions.Super.ShouldCall) {
-        // Disable the fragment's BackHandler so that MainActivity's back handler can be triggered.
+      if (result == BackPressActivityExtensions.Super.ShouldCall) {
+        // Disable the back press handler so that MainActivity's back handler can be triggered.
         shouldEnableBackPress = false
         navHostController.popBackStack()
       } else {
-        // Keep the fragment's BackHandler active.
+        // Keep the back press handler active.
         shouldEnableBackPress = true
       }
     }

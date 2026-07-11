@@ -39,7 +39,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.R
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
 import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
@@ -154,7 +154,7 @@ class ReaderScreenComposablesTest {
         snackBarHost = snackBarHostState,
         onReaderAction = onReaderAction,
         actionMenuItems = emptyList(),
-        onUserBackPressed = { FragmentActivityExtensions.Super.ShouldCall },
+        onUserBackPressed = { BackPressActivityExtensions.Super.ShouldCall },
         navHostController = navController,
         mainActivityBottomAppBarScrollBehaviour = null,
         navigationIcon = {}

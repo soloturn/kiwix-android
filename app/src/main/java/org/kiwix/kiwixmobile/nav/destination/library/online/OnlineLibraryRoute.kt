@@ -46,7 +46,7 @@ import kotlinx.coroutines.CoroutineScope
 import org.kiwix.kiwixmobile.R.drawable
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.extensions.closeKeyboard
 import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
 import org.kiwix.kiwixmobile.core.extensions.navigateToSettings
@@ -307,10 +307,10 @@ private fun handleBackPress(
   activity: KiwixMainActivity,
   isSearchActive: Boolean,
   closeSearch: () -> Unit
-): FragmentActivityExtensions.Super {
+): BackPressActivityExtensions.Super {
   return if (activity.navigationDrawerIsOpen()) {
     activity.closeNavigationDrawer()
-    FragmentActivityExtensions.Super.ShouldNotCall
+    BackPressActivityExtensions.Super.ShouldNotCall
   } else {
     val decorView = activity.window.decorView
     val insets = ViewCompat.getRootWindowInsets(decorView)
@@ -319,9 +319,9 @@ private fun handleBackPress(
     if (isKeyboardVisible || isSearchActive) {
       activity.currentFocus?.closeKeyboard()
       closeSearch()
-      FragmentActivityExtensions.Super.ShouldNotCall
+      BackPressActivityExtensions.Super.ShouldNotCall
     } else {
-      FragmentActivityExtensions.Super.ShouldCall
+      BackPressActivityExtensions.Super.ShouldCall
     }
   }
 }

@@ -77,7 +77,7 @@ import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.R.drawable
 import org.kiwix.kiwixmobile.R.string
 import org.kiwix.kiwixmobile.core.R
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.main.reader.OnBackPressed
 import org.kiwix.kiwixmobile.core.ui.components.ContentLoadingProgressBar
@@ -125,7 +125,7 @@ fun LocalLibraryScreen(
   onLongClick: ((BookOnDisk) -> Unit)? = null,
   onMultiSelect: ((BookOnDisk) -> Unit)? = null,
   bottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
-  onUserBackPressed: () -> FragmentActivityExtensions.Super,
+  onUserBackPressed: () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
   snackbarHostState: SnackbarHostState,
   navigationIcon: @Composable () -> Unit
@@ -187,7 +187,7 @@ private fun LocalLibraryMainContent(
   state: LocalLibraryUiState,
   onRefresh: () -> Unit,
   contentPadding: PaddingValues,
-  onUserBackPressed: () -> FragmentActivityExtensions.Super,
+  onUserBackPressed: () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
   onDownloadButtonClick: () -> Unit,
   onClick: ((BookOnDisk) -> Unit)? = null,

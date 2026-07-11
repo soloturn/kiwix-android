@@ -56,7 +56,7 @@ class BrandedMainActivity : CoreMainActivity() {
   override val mainActivity: AppCompatActivity by lazy { this }
   override val appName: String by lazy { getString(R.string.app_name) }
 
-  override val searchFragmentRoute: String = CustomDestination.Search.route
+  override val searchRoute: String = CustomDestination.Search.route
   override val bookmarksScreenRoute: String = CustomDestination.Bookmarks.route
   override val settingsScreenRoute: String = CustomDestination.Settings.route
   override val readerScreenRoute: String = CustomDestination.Reader.route
@@ -125,7 +125,7 @@ class BrandedMainActivity : CoreMainActivity() {
         title = getString(string.menu_help),
         iconRes = drawable.ic_help_24px,
         visible = true,
-        onClick = { openHelpFragment() },
+        onClick = { openHelp() },
         testingTag = LEFT_DRAWER_HELP_ITEM_TESTING_TAG
       )
     }
@@ -218,7 +218,7 @@ class BrandedMainActivity : CoreMainActivity() {
         isOpenedFromTabView = isOpenedFromTabView,
         isVoice = isVoice
       ),
-      NavOptions.Builder().setPopUpTo(searchFragmentRoute, inclusive = true).build()
+      NavOptions.Builder().setPopUpTo(searchRoute, inclusive = true).build()
     )
   }
 

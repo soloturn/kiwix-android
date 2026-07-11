@@ -73,7 +73,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R.drawable
 import org.kiwix.kiwixmobile.core.R.string
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.extensions.hideKeyboardOnLazyColumnScroll
 import org.kiwix.kiwixmobile.core.main.reader.OnBackPressed
 import org.kiwix.kiwixmobile.core.ui.components.ContentLoadingProgressBar
@@ -123,7 +123,7 @@ fun OnlineLibraryScreen(
   listState: LazyListState,
   snackBarHostState: SnackbarHostState,
   bottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
-  onUserBackPressed: () -> FragmentActivityExtensions.Super,
+  onUserBackPressed: () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
   activity: KiwixMainActivity,
   navigationIcon: @Composable () -> Unit
@@ -175,7 +175,7 @@ private fun OnlineLibraryMainContent(
   uiState: OnlineLibraryUiState,
   onlineLibraryViewModel: OnlineLibraryViewModel,
   paddingValues: PaddingValues,
-  onUserBackPressed: () -> FragmentActivityExtensions.Super,
+  onUserBackPressed: () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
   listState: LazyListState,
   activity: KiwixMainActivity

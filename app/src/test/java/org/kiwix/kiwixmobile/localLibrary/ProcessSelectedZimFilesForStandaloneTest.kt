@@ -88,15 +88,15 @@ class ProcessSelectedZimFilesForStandaloneTest {
     }
 
   @Test
-  fun `processSelectedFiles should call navigateToReaderFragment for valid single file`() =
+  fun `processSelectedFiles should call navigateToReader for valid single file`() =
     runTest {
       val uri = createValidUri()
 
-      coEvery { selectedZimFileCallback.navigateToReaderFragment(any()) } just Runs
+      coEvery { selectedZimFileCallback.navigateToReader(any()) } just Runs
 
       processSelectedZimFiles.processSelectedFiles(listOf(uri))
 
-      coVerify { selectedZimFileCallback.navigateToReaderFragment(any()) }
+      coVerify { selectedZimFileCallback.navigateToReader(any()) }
     }
 
   @Test

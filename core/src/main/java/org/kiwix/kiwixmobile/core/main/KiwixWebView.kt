@@ -166,7 +166,7 @@ open class KiwixWebView constructor(
   }
 
   /**
-   * Breaks all reference chains from this WebView back to the fragment/callback.
+   * Breaks all reference chains from this WebView back to the callback.
    * Must be called before [destroy] to prevent memory leaks via
    * InputMethodManager or DecorView retention of this WebView.
    */

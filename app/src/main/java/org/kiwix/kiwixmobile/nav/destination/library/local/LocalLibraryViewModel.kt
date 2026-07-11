@@ -54,7 +54,7 @@ import org.kiwix.kiwixmobile.BuildConfig
 import org.kiwix.kiwixmobile.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.StorageObserver
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.base.SideEffect
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.data.DataSource
@@ -690,12 +690,12 @@ class LocalLibraryViewModel @Inject constructor(
     }
   }
 
-  fun handleUserBackPressed(): FragmentActivityExtensions.Super {
+  fun handleUserBackPressed(): BackPressActivityExtensions.Super {
     return if (uiState.value.fileSelectListState.selectionMode == MULTI) {
       finishMultiModeFinished()
-      FragmentActivityExtensions.Super.ShouldNotCall
+      BackPressActivityExtensions.Super.ShouldNotCall
     } else {
-      FragmentActivityExtensions.Super.ShouldCall
+      BackPressActivityExtensions.Super.ShouldCall
     }
   }
 
@@ -813,7 +813,7 @@ class LocalLibraryViewModel @Inject constructor(
     }
   }
 
-  override fun navigateToReaderFragment(file: File) {
+  override fun navigateToReader(file: File) {
     viewModelScope.launch {
       if (!file.canReadFile()) {
         context.toast(string.unable_to_read_zim_file)

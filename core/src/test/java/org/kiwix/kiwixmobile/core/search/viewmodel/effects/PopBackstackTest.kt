@@ -18,12 +18,17 @@
 
 package org.kiwix.kiwixmobile.core.search.viewmodel.effects
 
-import androidx.appcompat.app.AppCompatActivity
-import org.kiwix.kiwixmobile.core.base.SideEffect
+import io.mockk.mockk
+import io.mockk.verify
+import org.junit.jupiter.api.Test
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.popNavigationBackstack
+import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 
-object PopFragmentBackstack : SideEffect<Unit> {
-  override fun invokeWith(activity: AppCompatActivity) {
-    activity.popNavigationBackstack()
+internal class PopBackstackTest {
+  @Test
+  fun `invoke with pops activity backstack`() {
+    val activity = mockk<CoreMainActivity>(relaxed = true)
+    PopBackstack.invokeWith(activity)
+    verify { activity.popNavigationBackstack() }
   }
 }

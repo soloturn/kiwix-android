@@ -61,7 +61,7 @@ import org.kiwix.kiwixmobile.core.BuildConfig
 import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BaseActivity
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.components.CoreActivityComponent
@@ -125,7 +125,7 @@ const val LEFT_DRAWER_ABOUT_APP_ITEM_TESTING_TAG = "leftDrawerAboutAppItemTestin
 
 abstract class CoreMainActivity : BaseActivity() {
   @Inject lateinit var viewModelFactory: ViewModelProvider.Factory
-  abstract val searchFragmentRoute: String
+  abstract val searchRoute: String
 
   @Inject lateinit var alertDialogShower: AlertDialogShower
 
@@ -187,7 +187,7 @@ abstract class CoreMainActivity : BaseActivity() {
   /**
    * For managing the back press of compose screens.
    */
-  val customBackHandler = mutableStateOf<(() -> FragmentActivityExtensions.Super)?>(null)
+  val customBackHandler = mutableStateOf<(() -> BackPressActivityExtensions.Super)?>(null)
 
   /**
    * For managing the the showing/hiding the bottomAppBar when scrolling.
@@ -405,7 +405,7 @@ abstract class CoreMainActivity : BaseActivity() {
     enableLeftDrawer.value = false
   }
 
-  protected fun openHelpFragment() {
+  protected fun openHelp() {
     handleDrawerOnNavigation()
     navigate(helpScreenRoute)
   }

@@ -28,7 +28,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.StorageObserver
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.data.DataSource
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
@@ -613,7 +613,7 @@ class LocalLibraryViewModelTest {
   @Test
   fun `handleUserBackPressed returns ShouldCall in normal mode`() {
     assertEquals(
-      FragmentActivityExtensions.Super.ShouldCall,
+      BackPressActivityExtensions.Super.ShouldCall,
       viewModel.handleUserBackPressed()
     )
   }
@@ -644,7 +644,7 @@ class LocalLibraryViewModelTest {
     advanceUntilIdle()
 
     assertEquals(
-      FragmentActivityExtensions.Super.ShouldNotCall,
+      BackPressActivityExtensions.Super.ShouldNotCall,
       viewModel.handleUserBackPressed()
     )
   }
@@ -869,7 +869,7 @@ class LocalLibraryViewModelTest {
   }
 
   @Test
-  fun `navigateToReaderFragment does not navigate when file unreadable`() = runTest {
+  fun `navigateToReader does not navigate when file unreadable`() = runTest {
     val file = mockk<File>(relaxed = true)
 
     every { file.canRead() } returns false
@@ -880,7 +880,7 @@ class LocalLibraryViewModelTest {
       Toast.makeText(any(), any<Int>(), any())
     } returns toast
 
-    viewModel.navigateToReaderFragment(file)
+    viewModel.navigateToReader(file)
 
     advanceUntilIdle()
 
@@ -890,7 +890,7 @@ class LocalLibraryViewModelTest {
   }
 
   @Test
-  fun `navigateToReaderFragment saves book and navigates when file readable`() = runTest {
+  fun `navigateToReader saves book and navigates when file readable`() = runTest {
     val file = mockk<File>(relaxed = true)
     val zimFileReader = mockk<ZimFileReader>(relaxed = true)
     val archive = mockk<Archive>(relaxed = true)
@@ -903,7 +903,7 @@ class LocalLibraryViewModelTest {
     } returns zimFileReader
 
     viewModel.localLibraryUiActions.test {
-      viewModel.navigateToReaderFragment(file)
+      viewModel.navigateToReader(file)
 
       val action = awaitItem()
 
