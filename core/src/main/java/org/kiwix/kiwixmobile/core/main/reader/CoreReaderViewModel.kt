@@ -816,6 +816,7 @@ abstract class CoreReaderViewModel(
         currentWebView.title,
         zimFileManager.zimFileReader
       )
+      kiwixDataStore.incrementRateAppReadingCount()
       updateBottomToolbarVisibility()
       if (!isWebViewHistoryRestoring) {
         readerSessionManager.saveReaderSession()

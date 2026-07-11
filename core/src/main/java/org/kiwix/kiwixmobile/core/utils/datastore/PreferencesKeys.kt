@@ -83,4 +83,7 @@ object PreferencesKeys {
   val CACHED_ONLINE_CATEGORIES = stringPreferencesKey(KiwixDataStore.CACHED_ONLINE_CATEGORIES)
   val APP_NAME = stringPreferencesKey(KiwixDataStore.APP_NAME)
   val IS_BRANDED_APP = booleanPreferencesKey(KiwixDataStore.IS_BRANDED_APP)
+  val RATE_APP_COUNT = intPreferencesKey("rate_app_count")
+  val RATE_APP_DOWNLOAD_COMPLETED = booleanPreferencesKey("rate_app_download_completed")
+  val RATE_APP_READING_COUNT = intPreferencesKey("rate_app_reading_count")
 }

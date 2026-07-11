@@ -63,7 +63,6 @@ import org.kiwix.kiwixmobile.BuildConfig
 import org.kiwix.kiwixmobile.KiwixApp
 import org.kiwix.kiwixmobile.R
 import org.kiwix.kiwixmobile.core.R.drawable
-import org.kiwix.kiwixmobile.core.R.mipmap
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
@@ -439,8 +438,6 @@ class KiwixMainActivity : CoreMainActivity() {
     handleDrawerOnNavigation()
     navigate(KiwixDestination.ZimHost.route)
   }
-
-  override fun getIconResId() = mipmap.ic_launcher
 
   override suspend fun createApplicationShortcuts() {
     // Remove previously added dynamic shortcuts for old ids if any found.

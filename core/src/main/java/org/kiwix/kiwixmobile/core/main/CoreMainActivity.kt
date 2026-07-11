@@ -313,8 +313,7 @@ abstract class CoreMainActivity : BaseActivity() {
   override fun onStart() {
     super.onStart()
     externalLinkOpener.initialize(this, alertDialogShower)
-    rateDialogHandler.setAlertDialogShower(alertDialogShower)
-    rateDialogHandler.checkForRateDialog(getIconResId())
+    rateDialogHandler.checkForRateDialog()
   }
 
   override fun onResume() {
@@ -637,7 +636,6 @@ abstract class CoreMainActivity : BaseActivity() {
     }
   }
 
-  protected abstract fun getIconResId(): Int
   abstract suspend fun createApplicationShortcuts()
   abstract fun hideBottomAppBar()
   abstract fun showBottomAppBar()
