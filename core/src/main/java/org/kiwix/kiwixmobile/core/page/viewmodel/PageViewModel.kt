@@ -126,7 +126,7 @@ abstract class PageViewModel<T : Page, S : PageState<T>>(
 
   private fun reduce(action: Action, state: S): S =
     when (action) {
-      Exit -> exitFragment(state)
+      Exit -> exitScreen(state)
       ExitActionModeMenu -> deselectAllPages(state)
       UserClickedDeleteButton, UserClickedDeleteSelectedPages -> offerShowDeleteDialog(state)
       is UserClickedShowAllToggle -> offerUpdateToShowAllToggle(action, state)
@@ -173,7 +173,7 @@ abstract class PageViewModel<T : Page, S : PageState<T>>(
 
   abstract fun deselectAllPages(state: S): S
 
-  private fun exitFragment(state: S): S {
+  private fun exitScreen(state: S): S {
     effects.tryEmit(PopBackstack)
     return state
   }

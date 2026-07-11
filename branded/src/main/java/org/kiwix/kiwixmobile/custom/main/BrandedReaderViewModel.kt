@@ -171,7 +171,7 @@ class BrandedReaderViewModel @Inject constructor(
    *
    * - If a valid ZIM file is found:
    *   - It opens the ZIM file and creates a `ZimReaderSource` for it.
-   *   - Saves the book information in the database to be displayed in the `ZimHostFragment`.
+   *   - Saves the book information in the database to be displayed in the `ZimHostScreen`.
    *   - Manages the external launch and restores the view state if specified.
    *
    * - If both ZIM and OBB files are found:
@@ -179,7 +179,7 @@ class BrandedReaderViewModel @Inject constructor(
    *   - Manages the external launch and restores the view state if specified.
    *
    * If no valid files are found and the app is not in test mode, the user is navigated to
-   * the `BrandedDownloadFragment` to facilitate downloading the required files.
+   * the `BrandedDownloadScreen` to facilitate downloading the required files.
    *
    */
   private suspend fun openObbOrZim() {
@@ -241,14 +241,14 @@ class BrandedReaderViewModel @Inject constructor(
     launchInViewModelScope {
       zimReaderContainer.zimFileReader?.let { zimFileReader ->
         try {
-          // Save book in the database to display it in `ZimHostFragment`.
+          // Save book in the database to display it in `ZimHostScreen`.
           // Check if the file is not null. If the file is null,
           // it means we have created zimFileReader with a fileDescriptor,
-          // so we create a demo file to save it in the database for display on the `ZimHostFragment`.
+          // so we create a demo file to save it in the database for display on the `ZimHostScreen`.
           val file = zimFile ?: createDemoFile()
           // Wrapped in try-catch because if the reader scope is cancelled (for example,
           // when the user navigates to another screen), the scope and related variables
-          // may be cleared from the Fragment. Accessing them would then throw an error.
+          // may be cleared from the ViewModel. Accessing them would then throw an error.
           // The `Book.update()` method is not a suspend function, and coroutine
           // cancellation is only checked at suspension points. As a result, this
           // block may still execute even after the lifecycle scope has been cancelled.

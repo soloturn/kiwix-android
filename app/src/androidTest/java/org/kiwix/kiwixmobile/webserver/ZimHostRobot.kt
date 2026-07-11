@@ -73,7 +73,7 @@ class ZimHostRobot : BaseRobot() {
     })
   }
 
-  fun openZimHostFragment(
+  fun openZimHostScreen(
     coreMainActivity: CoreMainActivity,
     composeTestRule: ComposeContentTestRule
   ) {
@@ -142,7 +142,7 @@ class ZimHostRobot : BaseRobot() {
       // if "START SERVER" button is not visible it means server is started so close it.
       stopServer(composeTestRule)
       Log.i(
-        "ZIM_HOST_FRAGMENT",
+        "ZIM_HOST_SCREEN",
         "Stopped the server to perform our test case since it was already running"
       )
     }
@@ -157,7 +157,7 @@ class ZimHostRobot : BaseRobot() {
         selectZimFile(1, composeTestRule)
         selectZimFile(2, composeTestRule)
       } catch (_: AssertionFailedError) {
-        Log.i("ZIM_HOST_FRAGMENT", "Failed to select the zim file, probably it is already selected")
+        Log.i("ZIM_HOST_SCREEN", "Failed to select the zim file, probably it is already selected")
       }
     }
   }

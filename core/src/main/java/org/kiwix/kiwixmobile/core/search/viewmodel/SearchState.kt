@@ -84,7 +84,7 @@ data class SearchState(
 
     /**
      * Returns null if there are no suggestions left in the iterator.
-     * We check this in SearchFragment to avoid unnecessary data loading
+     * We check this in SearchScreen to avoid unnecessary data loading
      * while scrolling to the end of the list when there are no items available.
      */
     return results.ifEmpty { null }

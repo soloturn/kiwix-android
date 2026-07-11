@@ -180,7 +180,7 @@ class KiwixMainActivity : CoreMainActivity() {
           .filterNotNull()
           .collectLatest { intent ->
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-              // Wait until fragment manager is fully initialized and view hierarchy is ready
+              // Wait until Compose view hierarchy is ready
               delay(HUNDERED.toLong())
               handleAllIntents(intent)
               pendingIntentFlow.value = null
@@ -262,14 +262,14 @@ class KiwixMainActivity : CoreMainActivity() {
   }
 
   /**
-   * Fetches the storage device list once in the main activity and reuses it across all fragments.
+   * Fetches the storage device list once in the main activity and reuses it across all screens.
    * This is necessary because retrieving the storage device list, especially on devices with large SD cards,
-   * is a resource-intensive operation. Performing this operation repeatedly in fragments can negatively
+   * is a resource-intensive operation. Performing this operation repeatedly in screens can negatively
    * affect the user experience, as it takes time and can block the UI.
    *
-   * If a fragment is destroyed and we need to retrieve the device list again, performing the operation
+   * If a screen is destroyed and we need to retrieve the device list again, performing the operation
    * repeatedly leads to inefficiency. To optimize this, we fetch the storage device list once and reuse
-   * it in all fragments, thereby reducing redundant processing and improving performance.
+   * it in all screens, thereby reducing redundant processing and improving performance.
    */
   suspend fun getStorageDeviceList(): List<StorageDevice> {
     if (storageDeviceList.isEmpty()) {
@@ -490,7 +490,7 @@ class KiwixMainActivity : CoreMainActivity() {
         )
         .build()
 
-    // create a shortCut for opening the online fragment.
+    // create a shortCut for opening the online screen.
     val getContentShortcut =
       ShortcutInfoCompat.Builder(this, GET_CONTENT_SHORTCUT_ID)
         .setShortLabel(getString(string.get_content_shortcut_label))

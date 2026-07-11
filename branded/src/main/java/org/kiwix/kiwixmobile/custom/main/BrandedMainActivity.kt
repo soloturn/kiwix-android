@@ -102,7 +102,7 @@ class BrandedMainActivity : CoreMainActivity() {
   }
 
   /**
-   * Hide the 'ZimHostFragment' option from the navigation menu
+   * Hide the 'ZimHostScreen' option from the navigation menu
    * because we are now using fd (FileDescriptor)
    * to read the zim file from the asset folder. Currently,
    * 'KiwixServer' is unable to host zim files via fd.

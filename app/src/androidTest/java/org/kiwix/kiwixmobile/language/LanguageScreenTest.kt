@@ -59,7 +59,7 @@ class LanguageScreenTest : BaseActivityTest() {
   }
 
   @Test
-  fun testLanguageFragment() {
+  fun testLanguageScreen() {
     StandardActions.closeDrawer(kiwixMainActivity as CoreMainActivity) // close the drawer if open before running the test cases.
     downloadRobot {
       clickDownloadOnBottomNav(composeTestRule)

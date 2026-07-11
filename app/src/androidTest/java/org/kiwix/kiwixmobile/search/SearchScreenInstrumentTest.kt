@@ -78,7 +78,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
     }
     testZimFile = getZimFileFromResourceFolder(context, "testzim.zim")
-    openKiwixReaderFragmentWithFile(testZimFile)
+    openKiwixReaderScreenWithFile(testZimFile)
     search { checkZimFileSearchSuccessful(composeTestRule) }
     openSearchWithQuery("Android", testZimFile)
     search {
@@ -131,7 +131,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
         }
       }
     })
-    openKiwixReaderFragmentWithFile(downloadingZimFile)
+    openKiwixReaderScreenWithFile(downloadingZimFile)
     search { checkZimFileSearchSuccessful(composeTestRule) }
     openSearchWithQuery(zimFile = downloadingZimFile)
     search {
@@ -220,7 +220,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
           }
         }
       })
-      openKiwixReaderFragmentWithFile(downloadingZimFile)
+      openKiwixReaderScreenWithFile(downloadingZimFile)
       composeTestRule.waitForIdle()
       search { checkZimFileSearchSuccessful(composeTestRule) }
       openSearchWithQuery(searchTerms[0], downloadingZimFile)
@@ -263,7 +263,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
     }
     testZimFile = getZimFileFromResourceFolder(context, "testzim.zim")
-    openKiwixReaderFragmentWithFile(testZimFile)
+    openKiwixReaderScreenWithFile(testZimFile)
     search { checkZimFileSearchSuccessful(composeTestRule) }
     openSearchWithQuery("Android ", testZimFile)
     search {
@@ -281,7 +281,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
     testZimFile.delete()
   }
 
-  private fun openKiwixReaderFragmentWithFile(zimFile: File) {
+  private fun openKiwixReaderScreenWithFile(zimFile: File) {
     composeTestRule.runOnUiThread {
       kiwixMainActivity.openZimFromFilePath(zimFile.absolutePath)
     }

@@ -85,7 +85,7 @@ class ZimFileReaderWithSplittedZimFileTest : BaseActivityTest() {
       composeTestRule.waitForIdle()
       navigationHistory {
         checkZimFileLoadedSuccessful(composeTestRule)
-        clickOnReaderFragment(composeTestRule) // activate the accessibility check to check the issues.
+        clickOnReaderScreen(composeTestRule) // activate the accessibility check to check the issues.
         assertZimFileLoaded(composeTestRule) // check if the zim file successfully loaded
         clickOnAndroidArticle(composeTestRule)
       }

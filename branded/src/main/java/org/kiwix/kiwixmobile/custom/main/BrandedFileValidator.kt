@@ -134,7 +134,7 @@ class BrandedFileValidator @Inject constructor(
       ?.forEach { directoryList.add(it) }
     return scanDirs(directoryList.toTypedArray(), "zim").filterNot {
       // Excluding the demo.zim file from the list as it is used for demonstration purposes
-      // on the ZimHostFragment for hosting the ZIM file on the server.
+      // on the ZimHostScreen for hosting the ZIM file on the server.
       // Since we are now using the "asset delivery mode", in this we are using the
       // assetFileDescriptor instead of a regular file.
       it.name.equals("demo.zim", ignoreCase = true)

@@ -94,7 +94,7 @@ const val NEW_TAB_SHORTCUT_ID = "new_tab_shortcut"
 private const val ADAPTIVE_ICON_SIZE_DP = 108
 private const val ADAPTIVE_ICON_INSET_DP = 36
 
-// Fragments names for compose based navigation.
+// Screen names for compose based navigation.
 const val READER_SCREEN = "readerScreen"
 const val LOCAL_LIBRARY_SCREEN = "localLibraryScreen"
 const val DOWNLOAD_SCREEN = "downloadsScreen"
@@ -109,7 +109,7 @@ const val SETTINGS_SCREEN = "settingsScreen"
 const val SEARCH_SCREEN = "searchScreen"
 const val LOCAL_FILE_TRANSFER_SCREEN = "localFileTransferScreen"
 
-// Zim host deep link for opening the ZimHost fragment from notification.
+// Zim host deep link for opening the ZimHost screen from notification.
 const val ZIM_HOST_DEEP_LINK_SCHEME = "kiwix"
 const val ZIM_HOST_NAV_DEEP_LINK = "$ZIM_HOST_DEEP_LINK_SCHEME://zimhost"
 

@@ -105,7 +105,7 @@ class ZimHostScreenInstrumentTest : BaseActivityTest() {
       zimHost {
         refreshLibraryList(composeTestRule)
         assertZimFilesLoaded(composeTestRule)
-        openZimHostFragment(kiwixMainActivity as CoreMainActivity, composeTestRule)
+        openZimHostScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
 
         // Check if server is already started
         stopServerIfAlreadyStarted(composeTestRule)
@@ -182,11 +182,11 @@ class ZimHostScreenInstrumentTest : BaseActivityTest() {
     zimHost {
       refreshLibraryList(composeTestRule)
       assertZimFilesLoaded(composeTestRule)
-      openZimHostFragment(kiwixMainActivity as CoreMainActivity, composeTestRule)
+      openZimHostScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
       assertZimFilesLoaded(composeTestRule)
       composeTestRule.onNodeWithTag(NAVIGATION_ICON_TESTING_TAG).performClick()
       composeTestRule.mainClock.advanceTimeByFrame()
-      openZimHostFragment(kiwixMainActivity as CoreMainActivity, composeTestRule)
+      openZimHostScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
       assertZimFilesLoaded(composeTestRule)
     }
   }

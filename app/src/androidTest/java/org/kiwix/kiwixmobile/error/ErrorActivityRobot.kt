@@ -37,7 +37,7 @@ fun errorActivity(func: ErrorActivityRobot.() -> Unit) = ErrorActivityRobot().ap
 
 class ErrorActivityRobot : BaseRobot() {
   fun assertSendDiagnosticReportDisplayed(composeTestRule: ComposeContentTestRule) {
-    // Wait a bit for properly visible the HelpFragment.
+    // Wait a bit for properly visible the HelpScreen.
     BaristaSleepInteractions.sleep(TestUtils.TEST_PAUSE_MS.toLong())
     composeTestRule.apply {
       waitForIdle()
