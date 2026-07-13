@@ -813,7 +813,7 @@ class LocalLibraryViewModel @Inject constructor(
     }
   }
 
-  override fun navigateToReader(file: File) {
+  override fun navigateToReaderScreen(file: File) {
     viewModelScope.launch {
       if (!file.canReadFile()) {
         context.toast(string.unable_to_read_zim_file)

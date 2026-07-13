@@ -225,7 +225,6 @@ class AllProjectConfigurer {
       kapt(Libs.dagger_compiler)
       kapt(Libs.dagger_android_processor)
       implementation(Libs.core_ktx)
-      implementation(Libs.fragment_ktx)
       implementation(Libs.collection_ktx)
       implementation(Libs.preference_ktx)
       implementation(Libs.roomKtx)

@@ -158,7 +158,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       searchWithFrequentlyTypedWords(searchQueryForDownloadedZimFile, 300, composeTestRule)
       assertSearchSuccessful(searchResultForDownloadedZimFile, composeTestRule)
       deleteSearchedQueryFrequently(searchQueryForDownloadedZimFile, uiDevice, 300, composeTestRule)
-      // open the reader fragment for next text case.
+      // open the reader screen for next test case.
       clickOnNavigationIcon(composeTestRule)
     }
 
@@ -224,7 +224,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       composeTestRule.waitForIdle()
       search { checkZimFileSearchSuccessful(composeTestRule) }
       openSearchWithQuery(searchTerms[0], downloadingZimFile)
-      // wait for searchFragment become visible on screen.
+      // wait for searchScreen to become visible on screen.
       delay(2000)
       val searchViewModel = ViewModelProvider(
         kiwixMainActivity,

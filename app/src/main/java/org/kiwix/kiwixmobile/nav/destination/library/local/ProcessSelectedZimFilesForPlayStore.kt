@@ -335,7 +335,7 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
         if (isSplittedZimFile(file.path)) {
           showWarningDialogForSplittedZimFile()
         } else {
-          selectedZimFileCallback?.navigateToReader(file = file)
+          selectedZimFileCallback?.navigateToReaderScreen(file = file)
         }
         multipleFilesProcessAction = null
       }

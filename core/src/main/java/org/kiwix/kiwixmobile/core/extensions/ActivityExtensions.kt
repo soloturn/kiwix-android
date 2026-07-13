@@ -20,12 +20,11 @@ package org.kiwix.kiwixmobile.core.extensions
 
 import android.app.Activity
 import android.content.Intent
-import androidx.fragment.app.FragmentActivity
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelProviders
 import androidx.navigation.NavOptions
 import org.kiwix.kiwixmobile.core.di.components.CoreActivityComponent
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -44,11 +43,10 @@ object ActivityExtensions {
   ) =
     Intent(this, T::class.java).apply { intentFunc?.invoke(this) }
 
-  inline fun <reified T : ViewModel> FragmentActivity.viewModel(
+  inline fun <reified T : ViewModel> ComponentActivity.viewModel(
     viewModelFactory: ViewModelProvider.Factory
   ) =
-    ViewModelProviders.of(this, viewModelFactory)
-      .get(T::class.java)
+    ViewModelProvider(this, viewModelFactory)[T::class.java]
 
   val Activity.cachedComponent: CoreActivityComponent
     get() = coreMainActivity.cachedComponent

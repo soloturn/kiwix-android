@@ -97,7 +97,7 @@ const val GET_CONTENT_SHORTCUT_ID = "get_content_shortcut"
 class KiwixMainActivity : CoreMainActivity() {
   private var actionMode: ActionMode? = null
   override val cachedComponent by lazy { kiwixActivityComponent }
-  override val searchRoute: String = KiwixDestination.Search.route
+  override val searchScreenRoute: String = KiwixDestination.Search.route
 
   @Inject lateinit var libkiwixBookOnDisk: LibkiwixBookOnDisk
 
@@ -403,7 +403,7 @@ class KiwixMainActivity : CoreMainActivity() {
       title = getString(string.menu_wifi_hotspot),
       iconRes = drawable.ic_mobile_screen_share_24px,
       visible = true,
-      onClick = { openZimHost() },
+      onClick = { openZimHostScreen() },
       testingTag = LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG
     )
   }
@@ -413,7 +413,7 @@ class KiwixMainActivity : CoreMainActivity() {
       title = getString(string.menu_help),
       iconRes = drawable.ic_help_24px,
       visible = true,
-      onClick = { openHelp() },
+      onClick = { openHelpScreen() },
       testingTag = LEFT_DRAWER_HELP_ITEM_TESTING_TAG
     )
   }
@@ -433,7 +433,7 @@ class KiwixMainActivity : CoreMainActivity() {
    */
   override val aboutAppDrawerMenuItem: DrawerMenuItem? = null
 
-  private fun openZimHost() {
+  private fun openZimHostScreen() {
     disableLeftDrawer()
     handleDrawerOnNavigation()
     navigate(KiwixDestination.ZimHost.route)
@@ -453,7 +453,7 @@ class KiwixMainActivity : CoreMainActivity() {
         isOpenedFromTabView = isOpenedFromTabView,
         isVoice = isVoice
       ),
-      NavOptions.Builder().setPopUpTo(searchRoute, inclusive = true).build()
+      NavOptions.Builder().setPopUpTo(searchScreenRoute, inclusive = true).build()
     )
   }
 

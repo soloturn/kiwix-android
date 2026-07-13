@@ -73,7 +73,7 @@ fun KiwixAppBar(
   navigationIcon: @Composable () -> Unit,
   actionMenuItems: List<ActionMenuItem> = emptyList(),
   topAppBarScrollBehavior: TopAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
-  // Optional search bar, used in fragments that require it
+  // Optional search bar, used in screens that require it
   searchBar: (@Composable () -> Unit)? = null
 ) {
   KiwixTheme {

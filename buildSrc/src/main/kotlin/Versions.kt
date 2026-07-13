@@ -62,7 +62,6 @@ object Versions {
 
   const val core_testing: String = "2.2.0"
 
-  const val fragment_ktx: String = "1.8.5"
 
   const val testing_ktx: String = "1.3.0"
 

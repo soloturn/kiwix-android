@@ -869,7 +869,7 @@ class LocalLibraryViewModelTest {
   }
 
   @Test
-  fun `navigateToReader does not navigate when file unreadable`() = runTest {
+  fun `navigateToReaderScreen does not navigate when file unreadable`() = runTest {
     val file = mockk<File>(relaxed = true)
 
     every { file.canRead() } returns false
@@ -880,7 +880,7 @@ class LocalLibraryViewModelTest {
       Toast.makeText(any(), any<Int>(), any())
     } returns toast
 
-    viewModel.navigateToReader(file)
+    viewModel.navigateToReaderScreen(file)
 
     advanceUntilIdle()
 
@@ -890,7 +890,7 @@ class LocalLibraryViewModelTest {
   }
 
   @Test
-  fun `navigateToReader saves book and navigates when file readable`() = runTest {
+  fun `navigateToReaderScreen saves book and navigates when file readable`() = runTest {
     val file = mockk<File>(relaxed = true)
     val zimFileReader = mockk<ZimFileReader>(relaxed = true)
     val archive = mockk<Archive>(relaxed = true)
@@ -903,7 +903,7 @@ class LocalLibraryViewModelTest {
     } returns zimFileReader
 
     viewModel.localLibraryUiActions.test {
-      viewModel.navigateToReader(file)
+      viewModel.navigateToReaderScreen(file)
 
       val action = awaitItem()
 

@@ -92,11 +92,11 @@ class ProcessSelectedZimFilesForStandaloneTest {
     runTest {
       val uri = createValidUri()
 
-      coEvery { selectedZimFileCallback.navigateToReader(any()) } just Runs
+      coEvery { selectedZimFileCallback.navigateToReaderScreen(any()) } just Runs
 
       processSelectedZimFiles.processSelectedFiles(listOf(uri))
 
-      coVerify { selectedZimFileCallback.navigateToReader(any()) }
+      coVerify { selectedZimFileCallback.navigateToReaderScreen(any()) }
     }
 
   @Test

@@ -125,7 +125,7 @@ const val LEFT_DRAWER_ABOUT_APP_ITEM_TESTING_TAG = "leftDrawerAboutAppItemTestin
 
 abstract class CoreMainActivity : BaseActivity() {
   @Inject lateinit var viewModelFactory: ViewModelProvider.Factory
-  abstract val searchRoute: String
+  abstract val searchScreenRoute: String
 
   @Inject lateinit var alertDialogShower: AlertDialogShower
 
@@ -405,7 +405,7 @@ abstract class CoreMainActivity : BaseActivity() {
     enableLeftDrawer.value = false
   }
 
-  protected fun openHelp() {
+  protected fun openHelpScreen() {
     handleDrawerOnNavigation()
     navigate(helpScreenRoute)
   }

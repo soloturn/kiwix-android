@@ -233,10 +233,6 @@ object Libs {
    */
   const val core_testing: String = "androidx.arch.core:core-testing:" + Versions.core_testing
 
-  /**
-   * https://developer.android.com/jetpack/androidx
-   */
-  const val fragment_ktx: String = "androidx.fragment:fragment-ktx:" + Versions.fragment_ktx
 
   /**
    * https://github.com/jraska/livedata-testing
