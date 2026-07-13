@@ -57,7 +57,7 @@ open class CoreWebViewClient(
       // Allow javascript for HTML functions and code execution (EX: night mode)
       return true
     }
-    if (url.startsWith(ZimFileReader.UI_URI.toString())) {
+    if (url.startsWith(ZimFileReader.UI_URI_STRING)) {
       Log.e("KiwixWebViewClient", "UI Url $url not supported.")
       // Document this code - what's a UI_URL?
       return true

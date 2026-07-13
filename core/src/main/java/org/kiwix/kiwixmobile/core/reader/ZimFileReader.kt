@@ -464,8 +464,7 @@ class ZimFileReader(
      * these uris aren't actually nullable but unit tests fail to compile as
      * Uri.parse returns null without android dependencies loaded
      */
-    @JvmField
-    val UI_URI: Uri = "content://org.kiwix.ui/".toUri()
+    const val UI_URI_STRING = "content://org.kiwix.ui/"
 
     const val CONTENT_PREFIX = "https://kiwix.app/"
     private val assetExtensions =
