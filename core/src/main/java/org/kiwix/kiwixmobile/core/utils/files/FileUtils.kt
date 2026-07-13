@@ -124,7 +124,7 @@ object FileUtils {
   }
 
   @JvmStatic
-  suspend fun deleteZimFile(path: String, ioDispatcher: CoroutineDispatcher) =
+  suspend fun deleteZimFile(path: String, ioDispatcher: CoroutineDispatcher) {
     withContext(ioDispatcher) {
       fileOperationMutex.withLock {
         var filePath = path
@@ -155,6 +155,7 @@ object FileUtils {
         }
       }
     }
+  }
 
   @Suppress("ReturnCount")
   private suspend fun deleteZimFileParts(
