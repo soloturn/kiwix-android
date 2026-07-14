@@ -84,7 +84,8 @@ fun KiwixMainActivityScreen(
 ) {
   val navBackStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = navBackStackEntry?.destination?.route
-  val shouldShowBottomBar = currentRoute in topLevelDestinationsRoute && shouldShowBottomAppBar
+  val shouldShowBottomBar = currentRoute in topLevelDestinationsRoute &&
+    (currentRoute != KiwixDestination.Reader.route || shouldShowBottomAppBar)
   OnUserBackPressed(leftDrawerState, uiCoroutineScope, currentRoute, navController)
   KiwixTheme {
     ModalNavigationDrawer(
