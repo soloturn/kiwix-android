@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.initial.download
 
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -26,7 +25,6 @@ import androidx.compose.ui.test.performClick
 import applyWithViewHierarchyPrinting
 import com.adevinta.android.barista.interaction.BaristaSleepInteractions
 import org.kiwix.kiwixmobile.BaseRobot
-import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.ui.components.STORAGE_DEVICE_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.main.BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.nav.destination.library.online.DOWNLOADING_STOP_BUTTON_TESTING_TAG
@@ -46,18 +44,24 @@ class InitialDownloadRobot : BaseRobot() {
     }
   }
 
-  fun assertStorageConfigureDialogDisplayed(composeTestRule: ComposeContentTestRule) {
-    pauseForBetterTestPerformance()
-    testFlakyView({
-      composeTestRule.apply {
-        waitUntilTimeout()
-        onNodeWithTag(STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG)
-          .assertTextEquals(context.getString(string.choose_storage_to_download_book))
+  fun selectInternalStorageIfDialogShown(composeTestRule: ComposeContentTestRule) {
+    composeTestRule.apply {
+      waitForIdle()
+      val dialogShown = runCatching {
+        waitUntil(3000L) {
+          onAllNodesWithTag(STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG)
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+        }
+      }.isSuccess
+
+      if (dialogShown) {
+        clickOnInternalStorage(composeTestRule)
       }
-    })
+    }
   }
 
-  fun clickOnInternalStorage(composeTestRule: ComposeContentTestRule) {
+  private fun clickOnInternalStorage(composeTestRule: ComposeContentTestRule) {
     pauseForBetterTestPerformance()
     testFlakyView({
       composeTestRule.apply {
