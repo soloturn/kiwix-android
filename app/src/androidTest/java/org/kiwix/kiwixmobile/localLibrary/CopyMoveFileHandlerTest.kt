@@ -90,13 +90,13 @@ class CopyMoveFileHandlerTest : BaseActivityTest() {
       }
       // test with first launch
       updateKiwixDataStore { setShowStorageSelectionDialogOnCopyMove(true) }
+      composeTestRule.waitForIdle()
       showMoveFileToPublicDirectoryDialog(listOf(Uri.fromFile(selectedFile)))
       // should show the permission dialog.
       copyMoveFileHandler {
         assertCopyMoveDialogDisplayed(composeTestRule)
         clickOnCopy(composeTestRule)
-        assertStorageSelectionDialogDisplayed(composeTestRule)
-        clickOnInternalStorage(composeTestRule)
+        selectInternalStorageIfDialogShown(composeTestRule)
         assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
       }
       assertZimFileAddedInTheLocalLibrary()
@@ -157,13 +157,13 @@ class CopyMoveFileHandlerTest : BaseActivityTest() {
       }
       // test with first launch
       updateKiwixDataStore { setShowStorageSelectionDialogOnCopyMove(true) }
+      composeTestRule.waitForIdle()
       showMoveFileToPublicDirectoryDialog(listOf(Uri.fromFile(selectedFile)))
       // should show the permission dialog.
       copyMoveFileHandler {
         assertCopyMoveDialogDisplayed(composeTestRule)
         clickOnMove(composeTestRule)
-        assertStorageSelectionDialogDisplayed(composeTestRule)
-        clickOnInternalStorage(composeTestRule)
+        selectInternalStorageIfDialogShown(composeTestRule)
         assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
       }
       assertZimFileAddedInTheLocalLibrary()
