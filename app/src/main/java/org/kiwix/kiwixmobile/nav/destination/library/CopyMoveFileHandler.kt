@@ -23,6 +23,7 @@ import android.net.Uri
 import androidx.annotation.VisibleForTesting
 import androidx.documentfile.provider.DocumentFile
 import eu.mhutti1.utils.storage.StorageDevice
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainCoroutineDispatcher
@@ -63,7 +64,7 @@ class CopyMoveFileHandler @Inject constructor(
   private val fat32Checker: Fat32Checker,
   private val fileOperationHandler: FileOperationHandler,
   private val copyMoveProgressBarController: CopyMoveProgressBarController,
-  @MainDispatcher private val mainDispatcher: CoroutineDispatcher,
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
   private var fileCopyMoveCallback: FileCopyMoveCallback? = null

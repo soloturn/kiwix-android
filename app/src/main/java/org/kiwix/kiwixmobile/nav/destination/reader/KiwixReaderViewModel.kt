@@ -91,26 +91,26 @@ class KiwixReaderViewModel @Inject constructor(
   @MainDispatcher mainDispatcher: MainCoroutineDispatcher,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CoreReaderViewModel(
-  context,
-  kiwixDataStore,
-  externalLinkOpener,
-  unsupportedMimeTypeHandler,
-  readerWebViewManager,
-  zimReaderContainer,
-  zimFileManager,
-  kiwixPermissionChecker,
-  repositoryActions,
-  bookmarkManager,
-  readerHistoryManager,
-  readerSessionManager,
-  readerIntentManager,
-  pendingSearchItemManager,
-  readerArticleManager,
-  readAloudManager,
-  donationDialogHandler,
-  findInPageManager,
-  mainDispatcher
-) {
+    context,
+    kiwixDataStore,
+    externalLinkOpener,
+    unsupportedMimeTypeHandler,
+    readerWebViewManager,
+    zimReaderContainer,
+    zimFileManager,
+    kiwixPermissionChecker,
+    repositoryActions,
+    bookmarkManager,
+    readerHistoryManager,
+    readerSessionManager,
+    readerIntentManager,
+    pendingSearchItemManager,
+    readerArticleManager,
+    readAloudManager,
+    donationDialogHandler,
+    findInPageManager,
+    mainDispatcher
+  ) {
   override fun shouldShowSpellCheckedSuggestions(): Boolean = false
   override fun isBrandedApp(): Boolean = false
 
@@ -195,7 +195,8 @@ class KiwixReaderViewModel @Inject constructor(
     // Update the reader screen title to prevent showing the previously set title
     // when creating the new archive object.
     updateTitle()
-    val filePath = FileUtils.getLocalFilePathByUri(context.applicationContext, zimFileUri.toUri())
+    val filePath =
+      FileUtils.getLocalFilePathByUri(context.applicationContext, zimFileUri.toUri(), ioDispatcher)
     if (filePath == null || !File(filePath).isFileExist(ioDispatcher)) {
       // Close the previously opened book in the reader. Since this file is not found,
       // it will not be set in the zimFileReader. The previously opened ZIM file
@@ -220,7 +221,7 @@ class KiwixReaderViewModel @Inject constructor(
     when (restoreOrigin) {
       FromExternalLaunch -> {
         val zimReaderSource = fromDatabaseValue(currentZimFile)
-        if (zimReaderSource?.canOpenInLibkiwix() == true) {
+        if (zimReaderSource?.canOpenInLibkiwix(ioDispatcher) == true) {
           if (zimReaderContainer.zimReaderSource == null) {
             openZimFile(zimReaderSource)
             Log.d(

@@ -103,26 +103,26 @@ class BrandedReaderViewModel @Inject constructor(
   @MainDispatcher mainDispatcher: MainCoroutineDispatcher,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CoreReaderViewModel(
-  context,
-  kiwixDataStore,
-  externalLinkOpener,
-  unsupportedMimeTypeHandler,
-  readerWebViewManager,
-  zimReaderContainer,
-  zimFileManager,
-  kiwixPermissionChecker,
-  repositoryActions,
-  bookmarkManager,
-  readerHistoryManager,
-  readerSessionManager,
-  readerIntentManager,
-  pendingSearchItemManager,
-  readerArticleManager,
-  readAloudManager,
-  donationDialogHandler,
-  findInPageManager,
-  mainDispatcher
-) {
+    context,
+    kiwixDataStore,
+    externalLinkOpener,
+    unsupportedMimeTypeHandler,
+    readerWebViewManager,
+    zimReaderContainer,
+    zimFileManager,
+    kiwixPermissionChecker,
+    repositoryActions,
+    bookmarkManager,
+    readerHistoryManager,
+    readerSessionManager,
+    readerIntentManager,
+    pendingSearchItemManager,
+    readerArticleManager,
+    readAloudManager,
+    donationDialogHandler,
+    findInPageManager,
+    mainDispatcher
+  ) {
   override suspend fun initialize(
     coreMainActivity: CoreMainActivity,
     alertDialogShower: AlertDialogShower
@@ -439,7 +439,7 @@ class BrandedReaderViewModel @Inject constructor(
   private suspend fun isZimFileAlreadyOpenedInReader(): Boolean =
     zimReaderContainer.zimFileReader != null &&
       zimReaderContainer.zimReaderSource?.exists(ioDispatcher) == true &&
-      zimReaderContainer.zimReaderSource?.canOpenInLibkiwix() == true &&
+      zimReaderContainer.zimReaderSource?.canOpenInLibkiwix(ioDispatcher) == true &&
       zimReaderContainer.zimFileReader?.jniKiwixReader != null
 
   /**

@@ -80,7 +80,6 @@ class CopyMoveFileHandlerTest {
   @RegisterExtension
   @JvmField
   val mainDispatcherRule = MainDispatcherRule()
-  private val testDispatcher = mainDispatcherRule.dispatcher
 
   private lateinit var fileHandler: CopyMoveFileHandler
 
@@ -101,8 +100,8 @@ class CopyMoveFileHandlerTest {
       fat32Checker = fat32Checker,
       fileOperationHandler = fileOperationHandler,
       copyMoveProgressBarController = copyMoveProgressBarController,
-      mainDispatcher = testDispatcher,
-      ioDispatcher = testDispatcher
+      mainDispatcher = mainDispatcherRule.mainDispatcher,
+      ioDispatcher = mainDispatcherRule.dispatcher
     )
 
     fileHandler.setStorageFileForUnitTest(storageFile)
@@ -1206,7 +1205,7 @@ class CopyMoveFileHandlerTest {
       val archive = mockk<ArchiveWrapper>()
       every { file.name } returns "test.zim"
       every { FileUtils.isSplittedZimFile("test.zim") } returns false
-      coEvery { anyConstructed<ZimReaderSource>().createArchive(testDispatcher) } returns archive
+      coEvery { anyConstructed<ZimReaderSource>().createArchive(mainDispatcherRule.dispatcher) } returns archive
       every { archive.hasMainEntry() } returns true
 
       assertTrue(fileHandler.isValidZimFile(file))
@@ -1225,7 +1224,7 @@ class CopyMoveFileHandlerTest {
       val archive = mockk<ArchiveWrapper>()
       every { file.name } returns "test.zim"
       every { FileUtils.isSplittedZimFile("test.zim") } returns false
-      coEvery { anyConstructed<ZimReaderSource>().createArchive(testDispatcher) } returns archive
+      coEvery { anyConstructed<ZimReaderSource>().createArchive(mainDispatcherRule.dispatcher) } returns archive
       every { archive.hasMainEntry() } returns false
 
       assertFalse(fileHandler.isValidZimFile(file))
@@ -1243,7 +1242,7 @@ class CopyMoveFileHandlerTest {
       val file = mockk<File>()
       every { file.name } returns "test.zim"
       every { FileUtils.isSplittedZimFile("test.zim") } returns false
-      coEvery { anyConstructed<ZimReaderSource>().createArchive(testDispatcher) } throws RuntimeException()
+      coEvery { anyConstructed<ZimReaderSource>().createArchive(mainDispatcherRule.dispatcher) } throws RuntimeException()
 
       assertFalse(fileHandler.isValidZimFile(file))
     }
@@ -1258,7 +1257,7 @@ class CopyMoveFileHandlerTest {
 
       every { file.name } returns "test.zim"
       every { FileUtils.isSplittedZimFile("test.zim") } returns false
-      coEvery { anyConstructed<ZimReaderSource>().createArchive(testDispatcher) } returns archive
+      coEvery { anyConstructed<ZimReaderSource>().createArchive(mainDispatcherRule.dispatcher) } returns archive
       every { archive.hasMainEntry() } throws RuntimeException()
       assertFalse(fileHandler.isValidZimFile(file))
 
