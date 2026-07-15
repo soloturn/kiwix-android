@@ -50,7 +50,7 @@ class ThemeConfigTest {
   fun setUp() {
     kiwixDataStore = mockk()
     context = mockk()
-    themeConfig = ThemeConfig(kiwixDataStore, context, dispatcherRule.dispatcher)
+    themeConfig = ThemeConfig(kiwixDataStore, context, dispatcherRule.mainDispatcher)
   }
 
   @Test

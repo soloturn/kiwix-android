@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R.drawable
 import org.kiwix.kiwixmobile.core.R.string
-import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
@@ -98,7 +98,7 @@ class BrandedReaderViewModel @Inject constructor(
   readAloudManager: ReadAloudManager,
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
-  @MainUiDispatcher mainDispatcher: MainCoroutineDispatcher
+  @MainDispatcher mainDispatcher: MainCoroutineDispatcher
 ) : CoreReaderViewModel(
     context,
     kiwixDataStore,

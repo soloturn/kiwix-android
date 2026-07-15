@@ -67,7 +67,7 @@ class ReaderSessionManagerTest {
       mainRepositoryActions,
       zimReaderContainer,
       mainDispatcherRule.dispatcher,
-      mainDispatcherRule.dispatcher
+      mainDispatcherRule.mainDispatcher
     )
   }
 

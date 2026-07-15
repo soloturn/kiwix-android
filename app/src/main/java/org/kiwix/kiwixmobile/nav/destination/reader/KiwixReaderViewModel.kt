@@ -25,7 +25,7 @@ import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import org.kiwix.kiwixmobile.core.R.string
-import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -86,7 +86,7 @@ class KiwixReaderViewModel @Inject constructor(
   readAloudManager: ReadAloudManager,
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
-  @MainUiDispatcher mainDispatcher: MainCoroutineDispatcher
+  @MainDispatcher mainDispatcher: MainCoroutineDispatcher
 ) : CoreReaderViewModel(
     context,
     kiwixDataStore,

@@ -157,7 +157,7 @@ internal class CoreReaderViewModelTest {
       readAloudManager = readAloudManager,
       donationDialogHandler = donationDialogHandler,
       findInPageManager = findInPageManager,
-      mainDispatcher = Dispatchers.Main
+      mainDispatcher = mainDispatcherRule.mainDispatcher
     )
   }
 

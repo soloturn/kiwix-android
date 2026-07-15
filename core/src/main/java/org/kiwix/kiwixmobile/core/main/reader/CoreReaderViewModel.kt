@@ -64,7 +64,7 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
-import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -160,7 +160,7 @@ abstract class CoreReaderViewModel(
   private val readAloudManager: ReadAloudManager,
   private val donationDialogHandler: DonationDialogHandler,
   private val findInPageManager: FindInPageManager,
-  @MainUiDispatcher private val mainDispatcher: MainCoroutineDispatcher
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) : ViewModel(),
   WebViewCallback,
   ReaderMenuState.MenuClickListener,

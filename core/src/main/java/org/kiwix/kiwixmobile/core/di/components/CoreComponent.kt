@@ -42,7 +42,6 @@ import org.kiwix.kiwixmobile.core.data.DataSource
 import org.kiwix.kiwixmobile.core.data.remote.KiwixService
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
-import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
 import org.kiwix.kiwixmobile.core.di.OPDSKiwixService
 import org.kiwix.kiwixmobile.core.di.modules.ApplicationModule
 import org.kiwix.kiwixmobile.core.di.modules.CoreViewModelModule
@@ -123,10 +122,7 @@ interface CoreComponent {
   fun provideIoDispatcher(): CoroutineDispatcher
 
   @MainDispatcher
-  fun provideMainDispatcher(): CoroutineDispatcher
-
-  @MainUiDispatcher
-  fun provideMainUiDispatcher(): MainCoroutineDispatcher
+  fun provideMainDispatcher(): MainCoroutineDispatcher
   fun providePdfPrinter(): PdfPrint
   fun provideTabsManager(): TabsManager
   fun provideReaderIntentManager(): ReaderIntentManager

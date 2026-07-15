@@ -25,7 +25,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainCoroutineDispatcher
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
-import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
 
 @Module
 class CoroutineModule {
@@ -37,10 +36,5 @@ class CoroutineModule {
   @Provides
   @MainDispatcher
   @Suppress("InjectDispatcher")
-  fun provideMainDispatcher(): CoroutineDispatcher = Dispatchers.Main
-
-  @Provides
-  @MainUiDispatcher
-  @Suppress("InjectDispatcher")
-  fun provideMainUiDispatcher(): MainCoroutineDispatcher = Dispatchers.Main
+  fun provideMainDispatcher(): MainCoroutineDispatcher = Dispatchers.Main
 }

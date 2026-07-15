@@ -24,6 +24,7 @@ import android.os.IBinder
 import android.widget.Toast
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -64,7 +65,7 @@ class HotspotService :
 
   @Inject
   @MainDispatcher
-  lateinit var mainDispatcher: CoroutineDispatcher
+  lateinit var mainDispatcher: MainCoroutineDispatcher
 
   private lateinit var serviceScope: CoroutineScope
 
