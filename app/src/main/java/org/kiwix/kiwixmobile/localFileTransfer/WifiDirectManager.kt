@@ -40,6 +40,7 @@ import android.os.Looper.getMainLooper
 import android.widget.Toast
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
@@ -67,7 +68,7 @@ class WifiDirectManager @Inject constructor(
   private val kiwixDataStore: KiwixDataStore,
   private val manager: WifiP2pManager?,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-  @MainDispatcher private val mainDispatcher: CoroutineDispatcher
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) : ChannelListener, PeerListListener, ConnectionInfoListener, P2pEventListener {
   var callbacks: Callbacks? = null
 

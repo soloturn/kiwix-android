@@ -22,7 +22,7 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
-import org.kiwix.kiwixmobile.core.di.MainUiDispatcher
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderWebViewManager.WebViewNavigationHistoryResult.HistoryFound
 import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderWebViewManager.WebViewNavigationHistoryResult.NoHistoryFound
@@ -37,7 +37,7 @@ class ReaderWebViewManager @Inject constructor(
   private val tabsManager: TabsManager,
   private val readerSessionManager: ReaderSessionManager,
   private val webViewFactory: WebViewFactory,
-  @MainUiDispatcher private val mainDispatcher: MainCoroutineDispatcher
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) {
   sealed interface WebViewNavigationHistoryResult {
     data class HistoryFound(

@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -55,7 +56,7 @@ class WebServerHelper @Inject constructor(
   private val kiwixServerFactory: KiwixServer.Factory,
   private val ipAddressCallbacks: IpAddressCallbacks,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-  @MainDispatcher private val mainDispatcher: CoroutineDispatcher
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) {
   private var kiwixServer: KiwixServer? = null
   private var isServerStarted = false

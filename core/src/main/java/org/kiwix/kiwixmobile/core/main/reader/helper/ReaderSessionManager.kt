@@ -21,6 +21,7 @@ package org.kiwix.kiwixmobile.core.main.reader.helper
 import android.os.Bundle
 import androidx.core.net.toUri
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -48,7 +49,7 @@ class ReaderSessionManager @Inject constructor(
   private val mainRepositoryActions: MainRepositoryActions,
   val zimReaderContainer: ZimReaderContainer,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-  @MainDispatcher private val mainDispatcher: CoroutineDispatcher
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) {
   sealed interface RestoreSessionResult {
     data class Valid(

@@ -35,6 +35,7 @@ import io.mockk.slot
 import io.mockk.spyk
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -100,7 +101,7 @@ class CopyMoveFileHandlerTest {
       fat32Checker = fat32Checker,
       fileOperationHandler = fileOperationHandler,
       copyMoveProgressBarController = copyMoveProgressBarController,
-      mainDispatcher = mainDispatcherRule.dispatcher
+      mainDispatcher = Dispatchers.Main
     )
 
     fileHandler.setStorageFileForUnitTest(storageFile)

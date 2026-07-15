@@ -50,8 +50,8 @@ import androidx.navigation.NavOptions
 import androidx.navigation.compose.rememberNavController
 import eu.mhutti1.utils.storage.StorageDevice
 import eu.mhutti1.utils.storage.StorageDeviceUtils
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -105,7 +105,7 @@ class KiwixMainActivity : CoreMainActivity() {
 
   @Inject
   @MainDispatcher
-  lateinit var mainDispatcher: CoroutineDispatcher
+  lateinit var mainDispatcher: MainCoroutineDispatcher
   override val mainActivity: AppCompatActivity by lazy { this }
   override val appName: String by lazy { getString(R.string.app_name) }
 

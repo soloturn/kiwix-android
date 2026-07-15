@@ -31,6 +31,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -74,7 +75,7 @@ open class KiwixWebView constructor(
 
   @Inject
   @MainDispatcher
-  lateinit var mainDispatcher: CoroutineDispatcher
+  lateinit var mainDispatcher: MainCoroutineDispatcher
 
   private var kiwixWebChromeClient: KiwixWebChromeClient? = null
   private var textZoomJob: Job? = null
@@ -184,7 +185,7 @@ open class KiwixWebView constructor(
 
   class SaveHandler(
     private val zimReaderContainer: ZimReaderContainer,
-    private val mainDispatcher: CoroutineDispatcher,
+    private val mainDispatcher: MainCoroutineDispatcher,
     private val ioDispatcher: CoroutineDispatcher
   ) : Handler(Looper.getMainLooper()) {
     override fun handleMessage(msg: Message) {

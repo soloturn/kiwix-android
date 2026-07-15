@@ -19,6 +19,7 @@ package org.kiwix.kiwixmobile.localFileTransfer
 
 import android.content.Context
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -50,7 +51,7 @@ internal class SenderDevice(
   private val wifiDirectManager: WifiDirectManager,
   private val fileReceiverDeviceAddress: InetAddress,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-  @MainDispatcher private val mainDispatcher: CoroutineDispatcher
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) {
   suspend fun send(fileItems: List<FileItem?>) =
     withContext(ioDispatcher) {
