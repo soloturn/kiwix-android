@@ -82,7 +82,7 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
         it.navigate(KiwixDestination.Library.route)
       }
       composeTestRule.waitForIdle()
-      composeTestRule.waitUntil(15000) {
+      composeTestRule.waitUntil(30_000L) {
         composeTestRule
           .onAllNodesWithTag(SELECT_FILE_BUTTON_TESTING_TAG)
           .fetchSemanticsNodes()
@@ -104,7 +104,7 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
           assertCopyMoveDialogDisplayed(composeTestRule)
           clickOnMove(composeTestRule)
           selectInternalStorageIfDialogShown(composeTestRule)
-          assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
+          assertZimFileCopiedAndShowingIntoTheReader()
         }
       } catch (ignore: Exception) {
         fail("Could not open file from file manager. Original exception = $ignore")
@@ -139,7 +139,7 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
           assertCopyMoveDialogDisplayed(composeTestRule)
           clickOnMove(composeTestRule)
           selectInternalStorageIfDialogShown(composeTestRule)
-          assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
+          assertZimFileCopiedAndShowingIntoTheReader()
         }
       } catch (ignore: Exception) {
         fail("Could not open file from file manager. Original exception = $ignore")

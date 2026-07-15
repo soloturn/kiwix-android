@@ -81,7 +81,7 @@ class ProcessSelectedZimFilesForStandaloneTest : BaseActivityTest() {
     prepareLocalLibraryForTest()
     var validZimFile1 = getZimFileFromResourceFolder(context, "testzim.zim")
     triggerProcessSelectedZimFiles(listOf(Uri.fromFile(validZimFile1)))
-    copyMoveFileHandler { assertZimFileCopiedAndShowingIntoTheReader(composeTestRule) }
+    copyMoveFileHandler { assertZimFileCopiedAndShowingIntoTheReader() }
 
     // Test multiple ZIM valid ZIM files.
     prepareLocalLibraryForTest()

@@ -97,7 +97,7 @@ class CopyMoveFileHandlerTest : BaseActivityTest() {
         assertCopyMoveDialogDisplayed(composeTestRule)
         clickOnCopy(composeTestRule)
         selectInternalStorageIfDialogShown(composeTestRule)
-        assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
+        assertZimFileCopiedAndShowingIntoTheReader()
       }
       assertZimFileAddedInTheLocalLibrary()
 
@@ -110,7 +110,7 @@ class CopyMoveFileHandlerTest : BaseActivityTest() {
       copyMoveFileHandler {
         assertCopyMoveDialogDisplayed(composeTestRule)
         clickOnCopy(composeTestRule)
-        assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
+        assertZimFileCopiedAndShowingIntoTheReader()
       }
       assertZimFileAddedInTheLocalLibrary()
       deleteAllFilesInDirectory(parentFile)
@@ -164,7 +164,7 @@ class CopyMoveFileHandlerTest : BaseActivityTest() {
         assertCopyMoveDialogDisplayed(composeTestRule)
         clickOnMove(composeTestRule)
         selectInternalStorageIfDialogShown(composeTestRule)
-        assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
+        assertZimFileCopiedAndShowingIntoTheReader()
       }
       assertZimFileAddedInTheLocalLibrary()
       // Test with second launch, this time permission dialog should not show.
@@ -177,7 +177,7 @@ class CopyMoveFileHandlerTest : BaseActivityTest() {
       copyMoveFileHandler {
         assertCopyMoveDialogDisplayed(composeTestRule)
         clickOnMove(composeTestRule)
-        assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
+        assertZimFileCopiedAndShowingIntoTheReader()
       }
       assertZimFileAddedInTheLocalLibrary()
       deleteAllFilesInDirectory(parentFile)
