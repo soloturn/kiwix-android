@@ -23,7 +23,6 @@ import android.content.res.Configuration
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.spyk
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -51,7 +50,7 @@ class ThemeConfigTest {
   fun setUp() {
     kiwixDataStore = mockk()
     context = mockk()
-    themeConfig = ThemeConfig(kiwixDataStore, context, Dispatchers.Main)
+    themeConfig = ThemeConfig(kiwixDataStore, context, dispatcherRule.mainDispatcher)
   }
 
   @Test

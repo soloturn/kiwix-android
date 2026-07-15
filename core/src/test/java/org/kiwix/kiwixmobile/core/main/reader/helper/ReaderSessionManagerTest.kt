@@ -29,7 +29,6 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -68,7 +67,7 @@ class ReaderSessionManagerTest {
       mainRepositoryActions,
       zimReaderContainer,
       mainDispatcherRule.dispatcher,
-      Dispatchers.Main
+      mainDispatcherRule.mainDispatcher
     )
   }
 

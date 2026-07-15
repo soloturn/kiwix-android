@@ -20,6 +20,7 @@ package org.kiwix.sharedFunctions
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -35,6 +36,9 @@ class MainDispatcherRule(
   val dispatcher: TestDispatcher = StandardTestDispatcher()
 ) :
   TestWatcher(), BeforeEachCallback, AfterEachCallback {
+  val mainDispatcher: MainCoroutineDispatcher
+    get() = Dispatchers.Main
+
   override fun starting(description: Description?) {
     Dispatchers.setMain(dispatcher)
   }

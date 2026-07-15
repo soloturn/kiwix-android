@@ -30,7 +30,6 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.spyk
 import io.mockk.verify
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
@@ -59,15 +58,18 @@ class ReaderWebViewManagerTest {
   private val callback = mockk<WebViewCallback>()
   private val frameLayout = mockk<FrameLayout>()
   private val historyList = mockk<WebBackForwardList>()
-  private val mainDispatcher = Dispatchers.Main
 
   @BeforeEach
   fun setup() {
     clearAllMocks()
     tabsState = MutableStateFlow(TabsManager.TabsState())
     every { tabsManager.tabState } returns tabsState
-    readerWebViewManager =
-      ReaderWebViewManager(tabsManager, readerSessionManager, webViewFactory, mainDispatcher)
+    readerWebViewManager = ReaderWebViewManager(
+      tabsManager,
+      readerSessionManager,
+      webViewFactory,
+      mainDispatcherRule.mainDispatcher
+    )
   }
 
   @Nested

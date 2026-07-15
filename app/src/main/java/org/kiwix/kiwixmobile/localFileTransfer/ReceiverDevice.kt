@@ -18,8 +18,11 @@
 package org.kiwix.kiwixmobile.localFileTransfer
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.utils.files.Log
 import org.kiwix.kiwixmobile.localFileTransfer.WifiDirectManager.Companion.copyToOutputStream
 import java.io.File
@@ -39,8 +42,8 @@ import java.net.ServerSocket
  */
 internal class ReceiverDevice(
   private val wifiDirectManager: WifiDirectManager,
-  val ioDispatcher: CoroutineDispatcher,
-  private val mainDispatcher: CoroutineDispatcher
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) {
   suspend fun receive(): Boolean {
     return try {
