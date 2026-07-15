@@ -104,7 +104,7 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
           assertCopyMoveDialogDisplayed(composeTestRule)
           clickOnMove(composeTestRule)
           selectInternalStorageIfDialogShown(composeTestRule)
-          assertZimFileCopiedAndShowingIntoTheReader()
+          assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
         }
       } catch (ignore: Exception) {
         fail("Could not open file from file manager. Original exception = $ignore")
@@ -139,7 +139,7 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
           assertCopyMoveDialogDisplayed(composeTestRule)
           clickOnMove(composeTestRule)
           selectInternalStorageIfDialogShown(composeTestRule)
-          assertZimFileCopiedAndShowingIntoTheReader()
+          assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
         }
       } catch (ignore: Exception) {
         fail("Could not open file from file manager. Original exception = $ignore")
