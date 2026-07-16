@@ -253,7 +253,7 @@ class NoteRobot : BaseRobot() {
             "//*[contains(text(), 'Android_(operating_system)')]"
           )
         )
-    })
+    }, 20)
   }
 
   fun clickOnAndroidArticle(composeTestRule: ComposeContentTestRule) {

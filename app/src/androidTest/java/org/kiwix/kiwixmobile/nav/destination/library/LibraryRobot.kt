@@ -76,7 +76,7 @@ class LibraryRobot : BaseRobot() {
     func: LocalFileTransferRobot.() -> Unit
   ) {
     composeTestRule.apply {
-      waitForIdle()
+      waitUntilTimeout()
       onNodeWithTag(LOCAL_FILE_TRANSFER_MENU_BUTTON_TESTING_TAG).performClick()
     }
     localFileTransfer(func)
