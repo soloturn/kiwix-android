@@ -111,7 +111,7 @@ class ReaderRobot : BaseRobot() {
           )
         )
         .perform(webClick())
-    })
+    }, 10)
   }
 
   fun assertArticleLoaded(articlePageContent: String) {
@@ -123,7 +123,7 @@ class ReaderRobot : BaseRobot() {
             "//*[contains(text(), '$articlePageContent')]"
           )
         )
-    })
+    }, 10)
   }
 
   fun openAndroidArticleInNewTab(composeTestRule: ComposeContentTestRule) {
@@ -136,6 +136,11 @@ class ReaderRobot : BaseRobot() {
   }
 
   fun assertTabsRestored(composeTestRule: ComposeContentTestRule) {
+    composeTestRule.waitUntil(5000L) {
+      composeTestRule.onAllNodesWithTag(TABS_SIZE_TEXT_TESTING_TAG, useUnmergedTree = true)
+        .fetchSemanticsNodes().isNotEmpty()
+    }
+
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
