@@ -42,6 +42,7 @@ import org.kiwix.kiwixmobile.core.main.reader.TTS_CONTROL_STOP_BUTTON_TESTING_TA
 import org.kiwix.kiwixmobile.core.page.PAGE_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.OPEN_ITEM_IN_NEW_TAB_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.components.OVERFLOW_MENU_BUTTON_TESTING_TAG
+import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FIVE_SECOND_DELAY
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.main.BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils
@@ -136,7 +137,7 @@ class ReaderRobot : BaseRobot() {
   }
 
   fun assertTabsRestored(composeTestRule: ComposeContentTestRule) {
-    composeTestRule.waitUntil(5000L) {
+    composeTestRule.waitUntil(FIVE_SECOND_DELAY) {
       composeTestRule.onAllNodesWithTag(TABS_SIZE_TEXT_TESTING_TAG, useUnmergedTree = true)
         .fetchSemanticsNodes().isNotEmpty()
     }

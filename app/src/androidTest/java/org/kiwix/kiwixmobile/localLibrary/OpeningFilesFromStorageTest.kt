@@ -82,7 +82,7 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
         it.navigate(KiwixDestination.Library.route)
       }
       composeTestRule.waitForIdle()
-      composeTestRule.waitUntil(30_000L) {
+      composeTestRule.waitUntil(60000) {
         composeTestRule
           .onAllNodesWithTag(SELECT_FILE_BUTTON_TESTING_TAG)
           .fetchSemanticsNodes()

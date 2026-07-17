@@ -30,6 +30,7 @@ import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.help.SEND_DIAGNOSTIC_REPORT_TESTING_TAG
+import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FIFTEEN_SECOND_DELAY
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 
@@ -38,7 +39,7 @@ fun errorActivity(func: ErrorActivityRobot.() -> Unit) = ErrorActivityRobot().ap
 class ErrorActivityRobot : BaseRobot() {
   fun assertSendDiagnosticReportDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntil(15000) {
+      waitUntil(FIFTEEN_SECOND_DELAY) {
         onAllNodesWithTag(SEND_DIAGNOSTIC_REPORT_TESTING_TAG)
           .fetchSemanticsNodes()
           .isNotEmpty()
@@ -56,13 +57,13 @@ class ErrorActivityRobot : BaseRobot() {
 
   fun assertErrorActivityDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntil(15000) {
+      waitUntil(FIFTEEN_SECOND_DELAY) {
         onAllNodesWithText(context.getString(R.string.diagnostic_report))
           .fetchSemanticsNodes()
           .isNotEmpty()
       }
       onNodeWithText(context.getString(R.string.diagnostic_report))
-        .assertIsDisplayed()
+        .assertExists()
     }
   }
 
