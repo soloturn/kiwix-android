@@ -80,7 +80,7 @@ class ErrorActivityTest : BaseActivityTest() {
       activityScenario = ActivityScenario.launch(KiwixMainActivity::class.java).onActivity {
         it.navigate(KiwixDestination.Help.route)
       }
-      // Assert HelpFragment is visible or not after clicking on the "No, Thanks" button.
+      // Assert HelpScreen is visible or not after clicking on the "No, Thanks" button.
       assertSendDiagnosticReportDisplayed(composeTestRule)
       // Again click on "Send diagnostic report" button to open the ErrorActivity.
       clickOnSendDiagnosticReport(composeTestRule)

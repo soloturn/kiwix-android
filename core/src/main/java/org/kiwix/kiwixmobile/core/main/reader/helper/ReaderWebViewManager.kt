@@ -215,7 +215,7 @@ class ReaderWebViewManager @Inject constructor(
             webView.clearCache(true)
             // Pause any ongoing activity in the WebView to prevent resource usage
             webView.onPause()
-            // Break the reference chain from WebView → Fragment (via callback)
+            // Break the reference chain from WebView → Callback
             // to prevent memory leaks through InputMethodManager/DecorView retention.
             webView.dispose()
             // Forcefully destroy the WebView before setting the new ZIM file

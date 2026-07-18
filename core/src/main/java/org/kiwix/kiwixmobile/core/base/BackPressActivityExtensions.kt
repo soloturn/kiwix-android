@@ -16,19 +16,11 @@
  *
  */
 
-package org.kiwix.kiwixmobile.core.search.viewmodel.effects
+package org.kiwix.kiwixmobile.core.base
 
-import io.mockk.mockk
-import io.mockk.verify
-import org.junit.jupiter.api.Test
-import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.popNavigationBackstack
-import org.kiwix.kiwixmobile.core.main.CoreMainActivity
-
-internal class PopFragmentBackstackTest {
-  @Test
-  fun `invoke with pops activity backstack`() {
-    val activity = mockk<CoreMainActivity>(relaxed = true)
-    PopFragmentBackstack.invokeWith(activity)
-    verify { activity.popNavigationBackstack() }
+interface BackPressActivityExtensions {
+  enum class Super {
+    ShouldCall,
+    ShouldNotCall
   }
 }

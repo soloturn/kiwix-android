@@ -61,7 +61,7 @@ class DonationDialogTest : BaseActivityTest() {
       setLastDonationPopupShownInMilliSeconds(0L)
       setLaterClickedMilliSeconds(0L)
     }
-    openReaderFragment()
+    openReaderScreen()
     donation { assertDonationDialogDisplayed(composeTestRule) }
   }
 
@@ -73,7 +73,7 @@ class DonationDialogTest : BaseActivityTest() {
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
     }
     deleteAllZIMFilesFromApplication()
-    openReaderFragment()
+    openReaderScreen()
     donation { assertDonationDialogIsNotDisplayed(composeTestRule) }
   }
 
@@ -85,7 +85,7 @@ class DonationDialogTest : BaseActivityTest() {
       )
     }
     loadZIMFileInApplication()
-    openReaderFragment()
+    openReaderScreen()
     donation { assertDonationDialogIsNotDisplayed(composeTestRule) }
   }
 
@@ -97,7 +97,7 @@ class DonationDialogTest : BaseActivityTest() {
       )
     }
     loadZIMFileInApplication()
-    openReaderFragment()
+    openReaderScreen()
     donation { assertDonationDialogDisplayed(composeTestRule) }
   }
 
@@ -108,7 +108,7 @@ class DonationDialogTest : BaseActivityTest() {
       setLaterClickedMilliSeconds(System.currentTimeMillis() - (THREE_MONTHS_IN_MILLISECONDS + 1000))
     }
     loadZIMFileInApplication()
-    openReaderFragment()
+    openReaderScreen()
     donation { assertDonationDialogDisplayed(composeTestRule) }
   }
 
@@ -119,11 +119,11 @@ class DonationDialogTest : BaseActivityTest() {
       setLaterClickedMilliSeconds(System.currentTimeMillis() - 10000L)
     }
     loadZIMFileInApplication()
-    openReaderFragment()
+    openReaderScreen()
     donation { assertDonationDialogIsNotDisplayed(composeTestRule) }
   }
 
-  private fun openReaderFragment() {
+  private fun openReaderScreen() {
     UiThreadStatement.runOnUiThread {
       kiwixMainActivity.navigate(kiwixMainActivity.readerScreenRoute)
     }

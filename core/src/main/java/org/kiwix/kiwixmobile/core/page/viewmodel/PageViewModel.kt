@@ -48,7 +48,7 @@ import org.kiwix.kiwixmobile.core.page.viewmodel.Action.UserClickedDeleteSelecte
 import org.kiwix.kiwixmobile.core.page.viewmodel.Action.UserClickedShowAllToggle
 import org.kiwix.kiwixmobile.core.page.viewmodel.effects.OpenPage
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
-import org.kiwix.kiwixmobile.core.search.viewmodel.effects.PopFragmentBackstack
+import org.kiwix.kiwixmobile.core.search.viewmodel.effects.PopBackstack
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 
@@ -126,7 +126,7 @@ abstract class PageViewModel<T : Page, S : PageState<T>>(
 
   private fun reduce(action: Action, state: S): S =
     when (action) {
-      Exit -> exitFragment(state)
+      Exit -> exitScreen(state)
       ExitActionModeMenu -> deselectAllPages(state)
       UserClickedDeleteButton, UserClickedDeleteSelectedPages -> offerShowDeleteDialog(state)
       is UserClickedShowAllToggle -> offerUpdateToShowAllToggle(action, state)
@@ -173,8 +173,8 @@ abstract class PageViewModel<T : Page, S : PageState<T>>(
 
   abstract fun deselectAllPages(state: S): S
 
-  private fun exitFragment(state: S): S {
-    effects.tryEmit(PopFragmentBackstack)
+  private fun exitScreen(state: S): S {
+    effects.tryEmit(PopBackstack)
     return state
   }
 

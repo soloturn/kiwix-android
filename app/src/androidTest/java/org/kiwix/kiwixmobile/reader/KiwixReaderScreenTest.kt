@@ -109,7 +109,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     }
     composeTestRule.waitForIdle()
     val zimFile = getZimFileFromResourceFolder(context, "testzim.zim")
-    openKiwixReaderFragmentWithFile(zimFile)
+    openKiwixReaderScreenWithFile(zimFile)
     reader {
       checkZimFileLoadedSuccessful(composeTestRule)
       // open a new tab
@@ -135,7 +135,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     }
     composeTestRule.waitForIdle()
     val zimFile = getZimFileFromResourceFolder(context, "testzim.zim")
-    openKiwixReaderFragmentWithFile(zimFile)
+    openKiwixReaderScreenWithFile(zimFile)
     reader {
       checkZimFileLoadedSuccessful(composeTestRule)
       // open a new tab
@@ -158,7 +158,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
     }
     composeTestRule.waitForIdle()
-    openKiwixReaderFragmentWithFile(getZimFileFromResourceFolder(context, "testzim.zim"))
+    openKiwixReaderScreenWithFile(getZimFileFromResourceFolder(context, "testzim.zim"))
     composeTestRule.waitForIdle()
     reader {
       checkZimFileLoadedSuccessful(composeTestRule)
@@ -198,7 +198,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
         }
       }
     })
-    openKiwixReaderFragmentWithFile(downloadingZimFile!!)
+    openKiwixReaderScreenWithFile(downloadingZimFile!!)
     composeTestRule.waitForIdle()
     reader {
       checkZimFileLoadedSuccessful(composeTestRule)
@@ -280,7 +280,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
             }
           }
       })
-      openKiwixReaderFragmentWithFile(downloadingZimFile!!)
+      openKiwixReaderScreenWithFile(downloadingZimFile!!)
       composeTestRule.waitForIdle()
       reader {
         startReadAloudFeature(composeTestRule)
@@ -304,7 +304,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     }
     composeTestRule.waitForIdle()
     val zimFile = getZimFileFromResourceFolder(context, "testzim.zim")
-    openKiwixReaderFragmentWithFile(zimFile)
+    openKiwixReaderScreenWithFile(zimFile)
     composeTestRule.waitForIdle()
     reader {
       checkZimFileLoadedSuccessful(composeTestRule)
@@ -423,7 +423,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     }
   }
 
-  private fun openKiwixReaderFragmentWithFile(zimFile: File) {
+  private fun openKiwixReaderScreenWithFile(zimFile: File) {
     composeTestRule.runOnUiThread {
       kiwixMainActivity.openZimFromFilePath(zimFile.absolutePath)
     }

@@ -37,7 +37,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.main.DrawerMenuGroup
 import org.kiwix.kiwixmobile.core.main.LeftDrawerMenu
 import org.kiwix.kiwixmobile.core.ui.theme.KiwixTheme
@@ -51,7 +51,7 @@ fun BrandedMainActivityScreen(
   topLevelDestinationsRoute: Set<String>,
   leftDrawerState: DrawerState,
   enableLeftDrawer: Boolean,
-  customBackHandler: MutableState<(() -> FragmentActivityExtensions.Super)?>,
+  customBackHandler: MutableState<(() -> BackPressActivityExtensions.Super)?>,
   uiCoroutineScope: CoroutineScope,
   viewModelFactory: ViewModelProvider.Factory,
   alertDialogShower: AlertDialogShower
@@ -105,13 +105,13 @@ private fun OnUserBackPressed(
   uiCoroutineScope: CoroutineScope,
   currentRoute: String?,
   navController: NavHostController,
-  customBackHandler: MutableState<(() -> FragmentActivityExtensions.Super)?>,
+  customBackHandler: MutableState<(() -> BackPressActivityExtensions.Super)?>,
 ) {
   val activity = LocalActivity.current
   BackHandler(enabled = true) {
     when {
       leftDrawerState.isOpen -> uiCoroutineScope.launch { leftDrawerState.close() }
-      customBackHandler.value?.invoke() == FragmentActivityExtensions.Super.ShouldNotCall -> {
+      customBackHandler.value?.invoke() == BackPressActivityExtensions.Super.ShouldNotCall -> {
         // do nothing since compose screen handles the back press.
       }
 

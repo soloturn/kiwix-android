@@ -45,7 +45,7 @@ import org.kiwix.kiwixmobile.core.R.string
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.ui.components.CONTENT_LOADING_PROGRESS_BAR_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.components.SWIPE_REFRESH_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.models.ActionMenuItem
@@ -99,7 +99,7 @@ class OnlineLibraryScreenTest {
     actionMenuItems: List<ActionMenuItem> = emptyList(),
     lazyListState: LazyListState = LazyListState(),
     snackbarHostState: SnackbarHostState = SnackbarHostState(),
-    onBackPressed: () -> FragmentActivityExtensions.Super = { FragmentActivityExtensions.Super.ShouldCall },
+    onBackPressed: () -> BackPressActivityExtensions.Super = { BackPressActivityExtensions.Super.ShouldCall },
     navHostController: NavHostController = mockk(relaxed = true)
   ) {
     composeTestRule.setContent {

@@ -56,7 +56,7 @@ class BrandedMainActivity : CoreMainActivity() {
   override val mainActivity: AppCompatActivity by lazy { this }
   override val appName: String by lazy { getString(R.string.app_name) }
 
-  override val searchFragmentRoute: String = CustomDestination.Search.route
+  override val searchScreenRoute: String = CustomDestination.Search.route
   override val bookmarksScreenRoute: String = CustomDestination.Bookmarks.route
   override val settingsScreenRoute: String = CustomDestination.Settings.route
   override val readerScreenRoute: String = CustomDestination.Reader.route
@@ -102,7 +102,7 @@ class BrandedMainActivity : CoreMainActivity() {
   }
 
   /**
-   * Hide the 'ZimHostFragment' option from the navigation menu
+   * Hide the 'ZimHostScreen' option from the navigation menu
    * because we are now using fd (FileDescriptor)
    * to read the zim file from the asset folder. Currently,
    * 'KiwixServer' is unable to host zim files via fd.
@@ -125,7 +125,7 @@ class BrandedMainActivity : CoreMainActivity() {
         title = getString(string.menu_help),
         iconRes = drawable.ic_help_24px,
         visible = true,
-        onClick = { openHelpFragment() },
+        onClick = { openHelpScreen() },
         testingTag = LEFT_DRAWER_HELP_ITEM_TESTING_TAG
       )
     }
@@ -218,7 +218,7 @@ class BrandedMainActivity : CoreMainActivity() {
         isOpenedFromTabView = isOpenedFromTabView,
         isVoice = isVoice
       ),
-      NavOptions.Builder().setPopUpTo(searchFragmentRoute, inclusive = true).build()
+      NavOptions.Builder().setPopUpTo(searchScreenRoute, inclusive = true).build()
     )
   }
 

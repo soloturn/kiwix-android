@@ -78,7 +78,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
     }
     testZimFile = getZimFileFromResourceFolder(context, "testzim.zim")
-    openKiwixReaderFragmentWithFile(testZimFile)
+    openKiwixReaderScreenWithFile(testZimFile)
     search { checkZimFileSearchSuccessful(composeTestRule) }
     openSearchWithQuery("Android", testZimFile)
     search {
@@ -131,7 +131,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
         }
       }
     })
-    openKiwixReaderFragmentWithFile(downloadingZimFile)
+    openKiwixReaderScreenWithFile(downloadingZimFile)
     search { checkZimFileSearchSuccessful(composeTestRule) }
     openSearchWithQuery(zimFile = downloadingZimFile)
     search {
@@ -158,7 +158,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       searchWithFrequentlyTypedWords(searchQueryForDownloadedZimFile, 300, composeTestRule)
       assertSearchSuccessful(searchResultForDownloadedZimFile, composeTestRule)
       deleteSearchedQueryFrequently(searchQueryForDownloadedZimFile, uiDevice, 300, composeTestRule)
-      // open the reader fragment for next text case.
+      // open the reader screen for next test case.
       clickOnNavigationIcon(composeTestRule)
     }
 
@@ -220,11 +220,11 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
           }
         }
       })
-      openKiwixReaderFragmentWithFile(downloadingZimFile)
+      openKiwixReaderScreenWithFile(downloadingZimFile)
       composeTestRule.waitForIdle()
       search { checkZimFileSearchSuccessful(composeTestRule) }
       openSearchWithQuery(searchTerms[0], downloadingZimFile)
-      // wait for searchFragment become visible on screen.
+      // wait for searchScreen to become visible on screen.
       delay(2000)
       val searchViewModel = ViewModelProvider(
         kiwixMainActivity,
@@ -263,7 +263,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
     }
     testZimFile = getZimFileFromResourceFolder(context, "testzim.zim")
-    openKiwixReaderFragmentWithFile(testZimFile)
+    openKiwixReaderScreenWithFile(testZimFile)
     search { checkZimFileSearchSuccessful(composeTestRule) }
     openSearchWithQuery("Android ", testZimFile)
     search {
@@ -281,7 +281,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
     testZimFile.delete()
   }
 
-  private fun openKiwixReaderFragmentWithFile(zimFile: File) {
+  private fun openKiwixReaderScreenWithFile(zimFile: File) {
     composeTestRule.runOnUiThread {
       kiwixMainActivity.openZimFromFilePath(zimFile.absolutePath)
     }

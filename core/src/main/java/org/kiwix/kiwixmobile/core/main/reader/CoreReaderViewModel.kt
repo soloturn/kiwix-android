@@ -63,7 +63,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
@@ -552,7 +552,7 @@ abstract class CoreReaderViewModel(
 
   /**
    * Provides the navigationIcon based on condition.
-   * Subclasses like CustomReaderFragment override this method to provide custom
+   * Subclasses like BrandedReaderViewModel override this method to provide custom
    * behavior, such as set the app icon on hamburger when configure to not show the title.
    *
    * WARNING: If modifying this method, ensure thorough testing with custom apps
@@ -698,7 +698,7 @@ abstract class CoreReaderViewModel(
     launchInViewModelScope {
       readerSessionManager.saveReaderSession {
         // Pass this function to saveTabStates so that after saving
-        // the tab state in the database, it will open the search fragment.
+        // the tab state in the database, it will open the search screen.
         openSearch(isOpenedFromTabView = uiState.value.showTabSwitcher)
       }
     }
@@ -1522,11 +1522,11 @@ abstract class CoreReaderViewModel(
   }
 
   @Suppress("ReturnCount")
-  suspend fun onUserBackPressed(coreMainActivity: CoreMainActivity?): FragmentActivityExtensions.Super {
+  suspend fun onUserBackPressed(coreMainActivity: CoreMainActivity?): BackPressActivityExtensions.Super {
     when {
       coreMainActivity?.navigationDrawerIsOpen() == true -> {
         coreMainActivity.closeNavigationDrawer()
-        return FragmentActivityExtensions.Super.ShouldNotCall
+        return BackPressActivityExtensions.Super.ShouldNotCall
       }
 
       uiState.value.showTabSwitcher -> {
@@ -1542,26 +1542,26 @@ abstract class CoreReaderViewModel(
           )
           hideTabSwitcher()
         }
-        return FragmentActivityExtensions.Super.ShouldNotCall
+        return BackPressActivityExtensions.Super.ShouldNotCall
       }
 
       uiState.value.findInPageUiState.visible -> {
         closeFindInPage()
-        return FragmentActivityExtensions.Super.ShouldNotCall
+        return BackPressActivityExtensions.Super.ShouldNotCall
       }
 
       uiState.value.showTableOfContentDrawer -> {
         onAction(ReaderAction.CloseTocDrawer)
-        return FragmentActivityExtensions.Super.ShouldNotCall
+        return BackPressActivityExtensions.Super.ShouldNotCall
       }
 
       getCurrentWebView().canGoBack() -> {
         // Otherwise, go to the previous page.
         getCurrentWebView().goBack()
-        return FragmentActivityExtensions.Super.ShouldNotCall
+        return BackPressActivityExtensions.Super.ShouldNotCall
       }
 
-      else -> return FragmentActivityExtensions.Super.ShouldCall
+      else -> return BackPressActivityExtensions.Super.ShouldCall
     }
   }
 
@@ -1718,7 +1718,7 @@ abstract class CoreReaderViewModel(
   /**
    * Creates the main menu for the reader.
    * Subclasses may override this method to customize the main menu creation process.
-   * For custom apps like CustomReaderFragment, this method dynamically generates the menu
+   * For custom apps like BrandedReaderViewModel, this method dynamically generates the menu
    * based on the app's configuration, considering features like "read aloud" and "tabs."
    *
    * WARNING: If modifying this method, ensure thorough testing with custom apps

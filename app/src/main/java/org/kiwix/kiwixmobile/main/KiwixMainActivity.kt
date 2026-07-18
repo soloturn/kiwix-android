@@ -97,7 +97,7 @@ const val GET_CONTENT_SHORTCUT_ID = "get_content_shortcut"
 class KiwixMainActivity : CoreMainActivity() {
   private var actionMode: ActionMode? = null
   override val cachedComponent by lazy { kiwixActivityComponent }
-  override val searchFragmentRoute: String = KiwixDestination.Search.route
+  override val searchScreenRoute: String = KiwixDestination.Search.route
 
   @Inject lateinit var libkiwixBookOnDisk: LibkiwixBookOnDisk
 
@@ -180,7 +180,7 @@ class KiwixMainActivity : CoreMainActivity() {
           .filterNotNull()
           .collectLatest { intent ->
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-              // Wait until fragment manager is fully initialized and view hierarchy is ready
+              // Wait until Compose view hierarchy is ready
               delay(HUNDERED.toLong())
               handleAllIntents(intent)
               pendingIntentFlow.value = null
@@ -262,14 +262,14 @@ class KiwixMainActivity : CoreMainActivity() {
   }
 
   /**
-   * Fetches the storage device list once in the main activity and reuses it across all fragments.
+   * Fetches the storage device list once in the main activity and reuses it across all screens.
    * This is necessary because retrieving the storage device list, especially on devices with large SD cards,
-   * is a resource-intensive operation. Performing this operation repeatedly in fragments can negatively
+   * is a resource-intensive operation. Performing this operation repeatedly in screens can negatively
    * affect the user experience, as it takes time and can block the UI.
    *
-   * If a fragment is destroyed and we need to retrieve the device list again, performing the operation
+   * If a screen is destroyed and we need to retrieve the device list again, performing the operation
    * repeatedly leads to inefficiency. To optimize this, we fetch the storage device list once and reuse
-   * it in all fragments, thereby reducing redundant processing and improving performance.
+   * it in all screens, thereby reducing redundant processing and improving performance.
    */
   suspend fun getStorageDeviceList(): List<StorageDevice> {
     if (storageDeviceList.isEmpty()) {
@@ -403,7 +403,7 @@ class KiwixMainActivity : CoreMainActivity() {
       title = getString(string.menu_wifi_hotspot),
       iconRes = drawable.ic_mobile_screen_share_24px,
       visible = true,
-      onClick = { openZimHostFragment() },
+      onClick = { openZimHostScreen() },
       testingTag = LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG
     )
   }
@@ -413,7 +413,7 @@ class KiwixMainActivity : CoreMainActivity() {
       title = getString(string.menu_help),
       iconRes = drawable.ic_help_24px,
       visible = true,
-      onClick = { openHelpFragment() },
+      onClick = { openHelpScreen() },
       testingTag = LEFT_DRAWER_HELP_ITEM_TESTING_TAG
     )
   }
@@ -433,7 +433,7 @@ class KiwixMainActivity : CoreMainActivity() {
    */
   override val aboutAppDrawerMenuItem: DrawerMenuItem? = null
 
-  private fun openZimHostFragment() {
+  private fun openZimHostScreen() {
     disableLeftDrawer()
     handleDrawerOnNavigation()
     navigate(KiwixDestination.ZimHost.route)
@@ -446,14 +446,14 @@ class KiwixMainActivity : CoreMainActivity() {
   }
 
   override fun openSearch(searchString: String, isOpenedFromTabView: Boolean, isVoice: Boolean) {
-    // Freshly open the search fragment.
+    // Freshly open the search screen.
     navigate(
       KiwixDestination.Search.createRoute(
         searchString = searchString,
         isOpenedFromTabView = isOpenedFromTabView,
         isVoice = isVoice
       ),
-      NavOptions.Builder().setPopUpTo(searchFragmentRoute, inclusive = true).build()
+      NavOptions.Builder().setPopUpTo(searchScreenRoute, inclusive = true).build()
     )
   }
 
@@ -490,7 +490,7 @@ class KiwixMainActivity : CoreMainActivity() {
         )
         .build()
 
-    // create a shortCut for opening the online fragment.
+    // create a shortCut for opening the online screen.
     val getContentShortcut =
       ShortcutInfoCompat.Builder(this, GET_CONTENT_SHORTCUT_ID)
         .setShortLabel(getString(string.get_content_shortcut_label))

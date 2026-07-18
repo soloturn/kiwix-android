@@ -48,7 +48,7 @@ import org.kiwix.kiwixmobile.core.page.viewmodel.Action.UserClickedShowAllToggle
 import org.kiwix.kiwixmobile.core.page.viewmodel.effects.OpenPage
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
-import org.kiwix.kiwixmobile.core.search.viewmodel.effects.PopFragmentBackstack
+import org.kiwix.kiwixmobile.core.search.viewmodel.effects.PopBackstack
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.sharedFunctions.MainDispatcherRule
 
@@ -83,10 +83,10 @@ internal class PageViewModelTest {
   }
 
   @Test
-  fun `Exit calls PopFragmentBackstack`() = runTest {
+  fun `Exit calls PopBackstack`() = runTest {
     viewModel.effects.test {
       viewModel.actions.tryEmit(Exit)
-      assertThat(awaitItem()).isEqualTo(PopFragmentBackstack)
+      assertThat(awaitItem()).isEqualTo(PopBackstack)
     }
     viewModel.state.test {
       assertThat(awaitItem()).isEqualTo(pageState())

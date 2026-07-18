@@ -1,6 +1,6 @@
 /*
  * Kiwix Android
- * Copyright (c) 2020 Kiwix <android.kiwix.org>
+ * Copyright (c) 2026 Kiwix <android.kiwix.org>
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -16,11 +16,13 @@
  *
  */
 
-package org.kiwix.kiwixmobile.core.base
+package org.kiwix.kiwixmobile.core.extensions
 
-interface FragmentActivityExtensions {
-  enum class Super {
-    ShouldCall,
-    ShouldNotCall
-  }
+import android.content.Context
+import android.view.View
+import android.view.inputmethod.InputMethodManager
+
+fun View.closeKeyboard() {
+  val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+  imm.hideSoftInputFromWindow(windowToken, 0)
 }

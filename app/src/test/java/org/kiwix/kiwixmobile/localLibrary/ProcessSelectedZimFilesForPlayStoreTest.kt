@@ -42,6 +42,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -52,7 +54,6 @@ import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.settings.StorageCalculator
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
-import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.nav.destination.library.CopyMoveFileHandler
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
 import org.kiwix.kiwixmobile.nav.destination.library.local.ProcessSelectedZimFilesForPlayStore
@@ -80,7 +81,6 @@ class ProcessSelectedZimFilesForPlayStoreTest {
     clearAllMocks()
     mockkStatic("org.kiwix.kiwixmobile.core.extensions.ContextExtensionsKt")
     mockkStatic(DocumentFile::class)
-    mockkStatic(FileUtils::class)
 
     processSelectedZimFiles = ProcessSelectedZimFilesForPlayStore(
       kiwixDataStore,
@@ -131,6 +131,7 @@ class ProcessSelectedZimFilesForPlayStoreTest {
       every { uri.scheme } returns "content"
       every { DocumentFile.fromSingleUri(any(), uri) } returns documentFile
       every { documentFile.length() } returns 1000L
+      every { documentFile.name } returns "test.file"
 
       coEvery { storageCalculator.availableBytes(any()) } returns 500L
 
@@ -224,8 +225,6 @@ class ProcessSelectedZimFilesForPlayStoreTest {
       every { DocumentFile.fromSingleUri(any(), uri) } returns documentFile
       every { documentFile.length() } returns 100L
       every { documentFile.name } returns "test.jpg"
-      every { FileUtils.isValidZimFile("test.jpg") } returns false
-      every { FileUtils.isSplittedZimFile("test.jpg") } returns false
 
       coEvery { storageCalculator.availableBytes(any()) } returns 1000L
       every { activity.getString(R.string.error_file_invalid, "test.jpg") } returns "Invalid file"
@@ -290,9 +289,6 @@ class ProcessSelectedZimFilesForPlayStoreTest {
     val uri = createValidUri(fileName = "test.zimaa")
     val documentFile = DocumentFile.fromSingleUri(activity, uri)!!
 
-    every { FileUtils.isValidZimFile("test.zimaa") } returns false
-    every { FileUtils.isSplittedZimFile("test.zimaa") } returns true
-
     processSelectedZimFiles.processSelectedFiles(listOf(uri))
     advanceUntilIdle()
     coVerify {
@@ -317,7 +313,7 @@ class ProcessSelectedZimFilesForPlayStoreTest {
 
     processSelectedZimFiles.onFileCopied(file)
 
-    verify { selectedZimFileCallback.navigateToReaderFragment(file) }
+    verify { selectedZimFileCallback.navigateToReaderScreen(file) }
   }
 
   @Test
@@ -329,7 +325,7 @@ class ProcessSelectedZimFilesForPlayStoreTest {
     processSelectedZimFiles.processSelectedFiles(listOf(uri))
     processSelectedZimFiles.onFileMoved(file)
 
-    verify { selectedZimFileCallback.navigateToReaderFragment(file) }
+    verify { selectedZimFileCallback.navigateToReaderScreen(file) }
   }
 
   @Test
@@ -387,6 +383,136 @@ class ProcessSelectedZimFilesForPlayStoreTest {
     verify { copyMoveFileHandler.dispose() }
   }
 
+  @Test
+  fun `processSelectedFiles should open file directly when already in app directory`() =
+    testScope.runTest {
+      // Create a real temp directory simulating the app's public directory
+      val appDir = File(System.getProperty("java.io.tmpdir"), "kiwix_test_${System.nanoTime()}")
+      appDir.mkdirs()
+      val testFile = File(appDir, "test.zim")
+      testFile.writeBytes(ByteArray(100))
+
+      try {
+        // Point selectedStorage to the temp directory
+        every { kiwixDataStore.selectedStorage } returns flowOf(appDir.absolutePath)
+
+        val uri = createValidUri(fileSize = 100L)
+
+        processSelectedZimFiles.processSelectedFiles(listOf(uri))
+        advanceUntilIdle()
+
+        // Should navigate directly to reader, NOT show copy/move dialog
+        verify { selectedZimFileCallback.navigateToReaderScreen(any()) }
+        coVerify(exactly = 0) {
+          copyMoveFileHandler.showMoveFileToPublicDirectoryDialog(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+          )
+        }
+      } finally {
+        testFile.delete()
+        appDir.delete()
+      }
+    }
+
+  @Test
+  fun `processSelectedFiles should skip space check when file already in app directory`() =
+    testScope.runTest {
+      // Create a real temp directory with a file of size 1000 bytes
+      val appDir = File(System.getProperty("java.io.tmpdir"), "kiwix_test_space_${System.nanoTime()}")
+      appDir.mkdirs()
+      val testFile = File(appDir, "test.zim")
+      testFile.writeBytes(ByteArray(1000))
+
+      try {
+        every { kiwixDataStore.selectedStorage } returns flowOf(appDir.absolutePath)
+        // File size = 1000, available space = 500 (insufficient for copy)
+        // But since file is already in app dir, space check should be skipped
+        val uri = createValidUri(fileSize = 1000L, availableSpace = 500L)
+
+        processSelectedZimFiles.processSelectedFiles(listOf(uri))
+        advanceUntilIdle()
+
+        // Should open directly, not show "not enough space" error
+        verify { selectedZimFileCallback.navigateToReaderScreen(any()) }
+      } finally {
+        testFile.delete()
+        appDir.delete()
+      }
+    }
+
+  @Test
+  fun `getExistingFileInAppDirectory returns null when file not in app directory`() =
+    testScope.runTest {
+      val documentFile = mockk<DocumentFile>()
+      every { documentFile.name } returns "nonexistent.zim"
+      every { documentFile.length() } returns 100L
+
+      val result = processSelectedZimFiles.getExistingFileInAppDirectory(documentFile)
+
+      assertNull(result)
+    }
+
+  @Test
+  fun `getExistingFileInAppDirectory returns null when sizes differ`() =
+    testScope.runTest {
+      val appDir = File(System.getProperty("java.io.tmpdir"), "kiwix_test_diff_${System.nanoTime()}")
+      appDir.mkdirs()
+      val testFile = File(appDir, "test.zim")
+      testFile.writeBytes(ByteArray(100))
+
+      try {
+        every { kiwixDataStore.selectedStorage } returns flowOf(appDir.absolutePath)
+
+        val documentFile = mockk<DocumentFile>()
+        every { documentFile.name } returns "test.zim"
+        every { documentFile.length() } returns 200L // Different size than actual file
+
+        val result = processSelectedZimFiles.getExistingFileInAppDirectory(documentFile)
+
+        assertNull(result)
+      } finally {
+        testFile.delete()
+        appDir.delete()
+      }
+    }
+
+  @Test
+  fun `getExistingFileInAppDirectory returns null for null documentFile`() =
+    testScope.runTest {
+      val result = processSelectedZimFiles.getExistingFileInAppDirectory(null)
+      assertNull(result)
+    }
+
+  @Test
+  fun `getExistingFileInAppDirectory returns file when file exists with matching size`() =
+    testScope.runTest {
+      val appDir = File(System.getProperty("java.io.tmpdir"), "kiwix_test_match_${System.nanoTime()}")
+      appDir.mkdirs()
+      val testFile = File(appDir, "test.zim")
+      testFile.writeBytes(ByteArray(100))
+
+      try {
+        every { kiwixDataStore.selectedStorage } returns flowOf(appDir.absolutePath)
+
+        val documentFile = mockk<DocumentFile>()
+        every { documentFile.name } returns "test.zim"
+        every { documentFile.length() } returns 100L // Same size as actual file
+
+        val result = processSelectedZimFiles.getExistingFileInAppDirectory(documentFile)
+
+        assertNotNull(result)
+        assertTrue(result!!.name == "test.zim")
+      } finally {
+        testFile.delete()
+        appDir.delete()
+      }
+    }
+
   private fun createValidUri(
     fileName: String = "test.zim",
     fileSize: Long = 100L,
@@ -398,8 +524,6 @@ class ProcessSelectedZimFilesForPlayStoreTest {
     every { DocumentFile.fromSingleUri(any(), uri) } returns documentFile
     every { documentFile.length() } returns fileSize
     every { documentFile.name } returns fileName
-    every { FileUtils.isValidZimFile(fileName) } returns true
-    every { FileUtils.isSplittedZimFile(fileName) } returns false
     coEvery { storageCalculator.availableBytes(any()) } returns availableSpace
     return uri
   }

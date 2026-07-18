@@ -77,7 +77,7 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
     if (file == null) {
       context.toast(errorMessage)
     } else {
-      selectedZimFileCallback?.navigateToReaderFragment(file)
+      selectedZimFileCallback?.navigateToReaderScreen(file)
     }
   }
 
@@ -140,7 +140,7 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
 }
 
 interface SelectedZimFileCallback {
-  fun navigateToReaderFragment(file: File)
+  fun navigateToReaderScreen(file: File)
   fun addBookToLibkiwixBookOnDisk(file: File)
   fun showFileCopyMoveErrorDialog(errorMessage: String, callBack: suspend () -> Unit)
   fun showStorageSelectionDialog(dialogConfig: StorageSelectDialogConfig)

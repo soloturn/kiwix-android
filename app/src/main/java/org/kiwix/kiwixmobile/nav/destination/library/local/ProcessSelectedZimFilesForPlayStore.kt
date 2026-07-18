@@ -20,6 +20,7 @@ package org.kiwix.kiwixmobile.nav.destination.library.local
 
 import android.content.Context
 import android.net.Uri
+import androidx.annotation.VisibleForTesting
 import androidx.compose.material3.SnackbarHostState
 import androidx.documentfile.provider.DocumentFile
 import eu.mhutti1.utils.storage.Bytes
@@ -75,6 +76,7 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
    */
   private var multipleFilesProcessAction: MultipleFilesProcessAction? = null
   private val selectedZimFileUriList: MutableList<Uri> = mutableListOf()
+  private var selectedStoragePath: String = ""
 
   /**
    * Initializes the handler with required dependencies and callbacks.
@@ -122,13 +124,20 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
    */
   suspend fun processSelectedFiles(uris: List<Uri>, isAfterRetry: Boolean = false) {
     storeSelectedFiles(uris)
+    selectedStoragePath = kiwixDataStore.selectedStorage.first()
     val totalSelectedFileSize = getTotalSizeOfSelectedZIMFiles(uris)
-    val availableSpaceInStorage =
-      storageCalculator.availableBytes(File(kiwixDataStore.selectedStorage.first()))
-    if (availableSpaceInStorage < totalSelectedFileSize) {
-      // Not enough storage → show storage selection dialog/snackbar
-      insufficientSpaceInStorage(availableSpaceInStorage)
-      return
+    // Exclude files already in the app directory from the space calculation,
+    // since they don't need to be copied/moved.
+    val sizeAlreadyInAppDir = getSizeOfFilesAlreadyInAppDirectory(uris, selectedStoragePath)
+    val additionalSpaceNeeded = totalSelectedFileSize - sizeAlreadyInAppDir
+    if (additionalSpaceNeeded > ZERO) {
+      val availableSpaceInStorage =
+        storageCalculator.availableBytes(File(selectedStoragePath))
+      if (availableSpaceInStorage < additionalSpaceNeeded) {
+        // Not enough storage → show storage selection dialog/snackbar
+        insufficientSpaceInStorage(availableSpaceInStorage)
+        return
+      }
     }
 
     if (uris.size == 1 && !isAfterRetry) {
@@ -160,6 +169,14 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
     val fileName = documentFile?.name
     if (!isValidZimFile(fileName)) {
       handleInvalidFile(uri, fileName, isFromMultipleFiles)
+      return
+    }
+
+    // If the file is already in the app's public directory,
+    // open it directly without copying/moving.
+    val existingFile = getExistingFileInAppDirectory(documentFile)
+    if (existingFile != null) {
+      validateAndOpenZimInReader(existingFile)
       return
     }
 
@@ -233,6 +250,50 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
     fileName?.let {
       FileUtils.isValidZimFile(it) || isSplittedZimFile(it)
     } ?: false
+
+  /**
+   * Checks if a file with the same name and size already exists in the app's
+   * public directory. Returns the existing [File] if found, null otherwise.
+   * This avoids unnecessary copy/move operations for files the user has
+   * already placed in the app directory.
+   */
+  @VisibleForTesting
+  suspend fun getExistingFileInAppDirectory(documentFile: DocumentFile?): File? {
+    val fileName = documentFile?.name ?: return null
+    if (selectedStoragePath.isEmpty()) {
+      selectedStoragePath = kiwixDataStore.selectedStorage.first()
+    }
+    val fileInAppDir = File(selectedStoragePath, fileName)
+    return if (fileInAppDir.exists() && fileInAppDir.length() == documentFile.length()) {
+      fileInAppDir
+    } else {
+      null
+    }
+  }
+
+  /**
+   * Returns the total size of files from the given URIs that already exist
+   * in the app's public directory. Used to exclude these files from the
+   * upfront storage space check.
+   */
+  private fun getSizeOfFilesAlreadyInAppDirectory(
+    uris: List<Uri>,
+    selectedStoragePath: String
+  ): Long {
+    var totalSize = 0L
+    uris.forEach { uri ->
+      val documentFile = when (uri.scheme) {
+        "file" -> DocumentFile.fromFile(File("$uri"))
+        else -> DocumentFile.fromSingleUri(context, uri)
+      }
+      val fileName = documentFile?.name ?: return@forEach
+      val fileInAppDir = File(selectedStoragePath, fileName)
+      if (fileInAppDir.exists() && fileInAppDir.length() == documentFile.length()) {
+        totalSize += documentFile.length()
+      }
+    }
+    return totalSize
+  }
 
   /** Shows a snackbar suggesting the user to change storage. */
   private fun showStorageSelectionSnackBar(message: String) {
@@ -335,7 +396,7 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
         if (isSplittedZimFile(file.path)) {
           showWarningDialogForSplittedZimFile()
         } else {
-          selectedZimFileCallback?.navigateToReaderFragment(file = file)
+          selectedZimFileCallback?.navigateToReaderScreen(file = file)
         }
         multipleFilesProcessAction = null
       }

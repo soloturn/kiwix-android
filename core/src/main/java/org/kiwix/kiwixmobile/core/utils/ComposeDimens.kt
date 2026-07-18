@@ -104,7 +104,7 @@ object ComposeDimens {
   // Material minimum width and height
   val MATERIAL_MINIMUM_HEIGHT_AND_WIDTH = 48.dp
 
-  // ZimHostFragment dimens
+  // ZimHostScreen dimens
   val MINIMUM_HEIGHT_OF_QR_CODE = 76.dp
   val MAXIMUM_HEIGHT_OF_QR_CODE = 128.dp
   val MINIMUM_HEIGHT_OF_BOOKS_LIST = 256.dp
@@ -112,7 +112,7 @@ object ComposeDimens {
   // BookItem dimens
   val BOOK_ICON_SIZE = 48.dp
 
-  // HelpFragment dimens
+  // HelpScreen dimens
   val HELP_SCREEN_DIVIDER_HEIGHT = 0.7.dp
   val HELP_SCREEN_ITEM_TITLE_TEXT_SIZE = 20.sp
   val HELP_SCREEN_ITEM_TITLE_LETTER_SPACING = 0.0125.em
@@ -123,7 +123,7 @@ object ComposeDimens {
   val PAGE_SWITCH_LEFT_RIGHT_MARGIN = 10.dp
   val PAGE_SWITCH_ROW_BOTTOM_MARGIN = 8.dp
 
-  // LocalFileTransferFragment dimens
+  // LocalFileTransferScreen dimens
   val PEER_DEVICE_ITEM_TEXT_SIZE = 17.sp
   val FILE_ITEM_TEXT_SIZE = 14.sp
   val FILE_ITEM_ICON_SIZE = 24.dp

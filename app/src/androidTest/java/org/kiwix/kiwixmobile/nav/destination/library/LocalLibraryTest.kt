@@ -137,7 +137,7 @@ class LocalLibraryTest : BaseActivityTest() {
         showManagePermissionDialog = true,
         isPlayStoreBuild = false
       )
-      clickOnReaderFragment(composeTestRule)
+      clickOnReaderScreen(composeTestRule)
       clickOnLocalLibraryScreen(composeTestRule)
       observeLocalLibraryActions()
       composeTestRule.waitUntilTimeout()
@@ -149,7 +149,7 @@ class LocalLibraryTest : BaseActivityTest() {
         clickOnDialogDismissButton(composeTestRule)
       }
       // Assert scan dialog does not show again.
-      clickOnReaderFragment(composeTestRule)
+      clickOnReaderScreen(composeTestRule)
       clickOnLocalLibraryScreen(composeTestRule)
       observeLocalLibraryActions()
       assertScanDialogNotDisplayed(composeTestRule)
@@ -164,7 +164,7 @@ class LocalLibraryTest : BaseActivityTest() {
       getZimFileFromResourceFolder(context, "testzim.zim")
       refreshList(composeTestRule)
       waitUntilZimFilesRefreshing(composeTestRule)
-      clickOnReaderFragment(composeTestRule)
+      clickOnReaderScreen(composeTestRule)
       showScanFileSystemDialog(
         scanFileSystemDialogShown = false,
         false,

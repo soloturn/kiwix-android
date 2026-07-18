@@ -191,7 +191,7 @@ class NavigationHistoryRobot : BaseRobot() {
     composeTestRule.waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_SEARCH_TEST.toLong())
   }
 
-  fun clickOnReaderFragment(composeTestRule: ComposeContentTestRule) {
+  fun clickOnReaderScreen(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
         waitUntilTimeout()

@@ -61,7 +61,7 @@ import org.kiwix.kiwixmobile.core.BuildConfig
 import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BaseActivity
-import org.kiwix.kiwixmobile.core.base.FragmentActivityExtensions
+import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.components.CoreActivityComponent
@@ -94,7 +94,7 @@ const val NEW_TAB_SHORTCUT_ID = "new_tab_shortcut"
 private const val ADAPTIVE_ICON_SIZE_DP = 108
 private const val ADAPTIVE_ICON_INSET_DP = 36
 
-// Fragments names for compose based navigation.
+// Screen names for compose based navigation.
 const val READER_SCREEN = "readerScreen"
 const val LOCAL_LIBRARY_SCREEN = "localLibraryScreen"
 const val DOWNLOAD_SCREEN = "downloadsScreen"
@@ -109,7 +109,7 @@ const val SETTINGS_SCREEN = "settingsScreen"
 const val SEARCH_SCREEN = "searchScreen"
 const val LOCAL_FILE_TRANSFER_SCREEN = "localFileTransferScreen"
 
-// Zim host deep link for opening the ZimHost fragment from notification.
+// Zim host deep link for opening the ZimHost screen from notification.
 const val ZIM_HOST_DEEP_LINK_SCHEME = "kiwix"
 const val ZIM_HOST_NAV_DEEP_LINK = "$ZIM_HOST_DEEP_LINK_SCHEME://zimhost"
 
@@ -125,7 +125,7 @@ const val LEFT_DRAWER_ABOUT_APP_ITEM_TESTING_TAG = "leftDrawerAboutAppItemTestin
 
 abstract class CoreMainActivity : BaseActivity() {
   @Inject lateinit var viewModelFactory: ViewModelProvider.Factory
-  abstract val searchFragmentRoute: String
+  abstract val searchScreenRoute: String
 
   @Inject lateinit var alertDialogShower: AlertDialogShower
 
@@ -187,7 +187,7 @@ abstract class CoreMainActivity : BaseActivity() {
   /**
    * For managing the back press of compose screens.
    */
-  val customBackHandler = mutableStateOf<(() -> FragmentActivityExtensions.Super)?>(null)
+  val customBackHandler = mutableStateOf<(() -> BackPressActivityExtensions.Super)?>(null)
 
   /**
    * For managing the the showing/hiding the bottomAppBar when scrolling.
@@ -405,7 +405,7 @@ abstract class CoreMainActivity : BaseActivity() {
     enableLeftDrawer.value = false
   }
 
-  protected fun openHelpFragment() {
+  protected fun openHelpScreen() {
     handleDrawerOnNavigation()
     navigate(helpScreenRoute)
   }

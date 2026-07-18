@@ -256,7 +256,7 @@ class DownloadMonitorService : Service() {
     val yesIntent = Intents.internal(CoreMainActivity::class.java).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       // on clicking on yes button it will open the "Download" screen.
-      // For custom apps, it will simply open the app, and the rest custom reader fragment
+      // For custom apps, it will simply open the app, and the rest custom reader screen
       // automatically handles it.
       putExtra(DOWNLOAD_TIMEOUT_RESUME_INTENT, true)
     }
