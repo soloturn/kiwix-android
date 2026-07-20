@@ -21,7 +21,11 @@ package org.kiwix.kiwixmobile.core.main.reader.helper
 import android.content.Context
 import android.util.AttributeSet
 import android.widget.FrameLayout
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.MainCoroutineDispatcher
 import org.kiwix.kiwixmobile.core.R
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.main.CoreWebViewClient
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.WebViewCallback
@@ -33,7 +37,9 @@ import javax.inject.Inject
 class WebViewFactory @Inject constructor(
   private val context: Context,
   private val zimReaderContainer: ZimReaderContainer,
-  private val kiwixDataStore: KiwixDataStore
+  private val kiwixDataStore: KiwixDataStore,
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) {
   /**
    * Initializes a new instance of `KiwixWebView`.
@@ -58,7 +64,10 @@ class WebViewFactory @Inject constructor(
       attrs,
       videoView,
       CoreWebViewClient(callback, zimReaderContainer),
-      kiwixDataStore
+      kiwixDataStore,
+      zimReaderContainer,
+      ioDispatcher,
+      mainDispatcher
     )
   }
 }
