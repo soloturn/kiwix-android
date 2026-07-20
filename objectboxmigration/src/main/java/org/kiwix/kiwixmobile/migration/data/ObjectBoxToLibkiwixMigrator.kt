@@ -53,7 +53,6 @@ class ObjectBoxToLibkiwixMigrator @Inject constructor(
     if (!kiwixDataStore.isBookOnDiskMigrated.first()) {
       migrateLocalBooks(boxStore.boxFor())
     }
-    // TODO we will migrate here for other entities
   }
 
   @Suppress("Deprecation")

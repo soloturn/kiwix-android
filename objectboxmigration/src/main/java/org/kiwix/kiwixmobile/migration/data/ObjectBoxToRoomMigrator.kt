@@ -51,7 +51,6 @@ class ObjectBoxToRoomMigrator @Inject constructor(
     if (!kiwixDataStore.isNotesMigrated.first()) {
       migrateNotes(boxStore.boxFor())
     }
-    // TODO we will migrate here for other entities
   }
 
   suspend fun migrateRecentSearch(box: Box<RecentSearchEntity>) {
