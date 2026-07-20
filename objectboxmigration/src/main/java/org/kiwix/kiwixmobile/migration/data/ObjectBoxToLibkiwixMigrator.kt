@@ -38,18 +38,12 @@ import org.kiwix.libzim.Archive
 import java.io.File
 import javax.inject.Inject
 
-class ObjectBoxToLibkiwixMigrator {
-  @Inject
-  lateinit var boxStore: BoxStore
-
-  @Inject
-  lateinit var kiwixDataStore: KiwixDataStore
-
-  @Inject
-  lateinit var libkiwixBookmarks: LibkiwixBookmarks
-
-  @Inject
-  lateinit var libkiwixBookOnDisk: LibkiwixBookOnDisk
+class ObjectBoxToLibkiwixMigrator @Inject constructor(
+  private val boxStore: BoxStore,
+  private val kiwixDataStore: KiwixDataStore,
+  private val libkiwixBookmarks: LibkiwixBookmarks,
+  private val libkiwixBookOnDisk: LibkiwixBookOnDisk
+) {
   private val migrationMutex = Mutex()
 
   suspend fun migrateObjectBoxDataToLibkiwix() {
