@@ -36,7 +36,6 @@ import org.kiwix.kiwixmobile.core.data.KiwixRoomDatabase
 import org.kiwix.kiwixmobile.core.page.history.models.HistoryListItem
 import org.kiwix.kiwixmobile.core.page.notes.models.NoteListItem
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
-import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.migration.data.ObjectBoxToRoomMigrator
 import org.kiwix.kiwixmobile.migration.entities.HistoryEntity
 import org.kiwix.kiwixmobile.migration.entities.MyObjectBox
@@ -69,12 +68,13 @@ class ObjectBoxToRoomMigratorTest : BaseActivityTest() {
       .directory(testDir)
       .androidContext(InstrumentationRegistry.getInstrumentation().targetContext)
       .build()
-    objectBoxToRoomMigrator = ObjectBoxToRoomMigrator()
-    objectBoxToRoomMigrator.historyRoomDao = kiwixRoomDatabase.historyRoomDao()
-    objectBoxToRoomMigrator.notesRoomDao = kiwixRoomDatabase.notesRoomDao()
-    objectBoxToRoomMigrator.recentSearchRoomDao = kiwixRoomDatabase.recentSearchRoomDao()
-    objectBoxToRoomMigrator.boxStore = boxStore
-    objectBoxToRoomMigrator.kiwixDataStore = KiwixDataStore(context)
+    objectBoxToRoomMigrator = ObjectBoxToRoomMigrator(
+      kiwixRoomDatabase.recentSearchRoomDao(),
+      kiwixRoomDatabase.historyRoomDao(),
+      kiwixRoomDatabase.notesRoomDao(),
+      boxStore,
+      kiwixDataStore
+    )
   }
 
   @After
@@ -521,7 +521,7 @@ class ObjectBoxToRoomMigratorTest : BaseActivityTest() {
       clearRoomAndBoxStoreDatabases(notesBox)
 
       // Ensure flags are false
-      val dataStore = objectBoxToRoomMigrator.kiwixDataStore
+      val dataStore = kiwixDataStore
       dataStore.setRecentSearchMigrated(false)
       dataStore.setHistoryMigrated(false)
       dataStore.setNotesMigrated(false)

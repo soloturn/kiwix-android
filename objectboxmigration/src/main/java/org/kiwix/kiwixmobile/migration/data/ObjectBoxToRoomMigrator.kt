@@ -41,7 +41,6 @@ class ObjectBoxToRoomMigrator @Inject constructor(
   private val boxStore: BoxStore,
   private val kiwixDataStore: KiwixDataStore
 ) {
-
   suspend fun migrateObjectBoxDataToRoom() {
     if (!kiwixDataStore.isRecentSearchMigrated.first()) {
       migrateRecentSearch(boxStore.boxFor())

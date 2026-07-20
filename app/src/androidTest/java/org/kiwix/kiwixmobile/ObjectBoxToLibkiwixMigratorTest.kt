@@ -33,14 +33,14 @@ import org.junit.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.kiwix.kiwixmobile.core.CoreApp
+import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
+import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.kiwixmobile.core.page.bookmark.models.BookmarkItem
 import org.kiwix.kiwixmobile.core.page.bookmark.models.LibkiwixBookmarkItem
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem
 import org.kiwix.kiwixmobile.migration.data.ObjectBoxToLibkiwixMigrator
-import org.kiwix.kiwixmobile.migration.di.component.DaggerMigrationComponent
 import org.kiwix.kiwixmobile.migration.entities.BookOnDiskEntity
 import org.kiwix.kiwixmobile.migration.entities.BookmarkEntity
 import org.kiwix.kiwixmobile.migration.entities.MyObjectBox
@@ -55,7 +55,9 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
-  private val objectBoxToLibkiwixMigrator = ObjectBoxToLibkiwixMigrator()
+  private lateinit var objectBoxToLibkiwixMigrator: ObjectBoxToLibkiwixMigrator
+  private lateinit var libkiwixBookmarks: LibkiwixBookmarks
+  private lateinit var libkiwixBookOnDisk: LibkiwixBookOnDisk
 
   // take the existing boxStore object
   private var boxStore: BoxStore? = null
@@ -112,12 +114,10 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
     launchMainActivity {
       it.navigate(KiwixDestination.Library.route)
     }
-    val migrationComponent = DaggerMigrationComponent.builder()
-      .coreComponent(CoreApp.coreComponent)
-      .build()
+    val testComponent = testComponent()
+    libkiwixBookmarks = testComponent.libkiwixBookmarks()
+    libkiwixBookOnDisk = testComponent.libkiwixBooks()
 
-    // Inject dependencies into migrators
-    migrationComponent.inject(objectBoxToLibkiwixMigrator)
     val testDir = File(
       InstrumentationRegistry.getInstrumentation().targetContext.filesDir,
       "objectbox-test"
@@ -126,6 +126,14 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       .directory(testDir)
       .androidContext(InstrumentationRegistry.getInstrumentation().targetContext)
       .build()
+
+    // Inject dependencies into migrators
+    objectBoxToLibkiwixMigrator = ObjectBoxToLibkiwixMigrator(
+      boxStore = boxStore!!,
+      kiwixDataStore = kiwixDataStore,
+      libkiwixBookmarks = libkiwixBookmarks,
+      libkiwixBookOnDisk = libkiwixBookOnDisk
+    )
     setUpObjectBoxAndData()
   }
 
@@ -157,7 +165,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       objectBoxToLibkiwixMigrator.migrateBookMarks(bookmarkBox)
       // check if data successfully migrated to libkiwix.
       val actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookmarks.bookmarks().first()
+        libkiwixBookmarks.bookmarks().first()
       assertEquals(1, actualDataAfterMigration.size)
       assertEquals(actualDataAfterMigration[0].zimReaderSource?.toDatabase(), expectedZimFilePath)
       assertEquals(actualDataAfterMigration[0].zimId, expectedZimId)
@@ -176,7 +184,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       objectBoxToLibkiwixMigrator.migrateLocalBooks(bookOnDiskBox)
       // check if data successfully migrated to libkiwix.
       var actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookOnDisk.getBooks()
+        libkiwixBookOnDisk.getBooks()
       assertEquals(1, actualDataAfterMigration.size)
       assertEquals(
         actualDataAfterMigration[0].book.zimReaderSource.toDatabase(),
@@ -191,7 +199,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       objectBoxToLibkiwixMigrator.migrateLocalBooks(bookOnDiskBox)
       // check if data successfully migrated to libkiwix.
       actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookOnDisk.getBooks()
+        libkiwixBookOnDisk.getBooks()
       assertTrue(actualDataAfterMigration.isEmpty())
       // Clear the bookOnDisk list from device to not affect the other test cases.
       clearBookOnDisk()
@@ -203,7 +211,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       val book = Book().apply {
         update(archive)
       }
-      objectBoxToLibkiwixMigrator.libkiwixBookOnDisk.insert(listOf(book))
+      libkiwixBookOnDisk.insert(listOf(book))
       val thirdZim = getZimFileFromResourceFolder(context, "characters_encoding.zim")
       val thirdEntity = BookOnDiskEntity(
         id = 0,
@@ -228,7 +236,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       // Migrate data into libkiwix
       objectBoxToLibkiwixMigrator.migrateLocalBooks(bookOnDiskBox)
       actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookOnDisk.getBooks()
+        libkiwixBookOnDisk.getBooks()
       assertEquals(3, actualDataAfterMigration.size)
       val existingItem =
         actualDataAfterMigration.find {
@@ -275,7 +283,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       // migrate data into libkiwix
       objectBoxToLibkiwixMigrator.migrateLocalBooks(bookOnDiskBox)
 
-      val actualDataAfterMigration = objectBoxToLibkiwixMigrator.libkiwixBookOnDisk.getBooks()
+      val actualDataAfterMigration = libkiwixBookOnDisk.getBooks()
       assertEquals(1, actualDataAfterMigration.size)
       // zimReaderSource should be set during migration
       assertNotNull(actualDataAfterMigration[0].zimReaderSource)
@@ -293,7 +301,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       // Migrate data from empty ObjectBox database
       objectBoxToLibkiwixMigrator.migrateBookMarks(bookmarkBox)
       val actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookmarks.bookmarks().first()
+        libkiwixBookmarks.bookmarks().first()
       assertTrue(actualDataAfterMigration.isEmpty())
       // Clear the bookmarks list from device to not affect the other test cases.
       clearBookmarks()
@@ -317,7 +325,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
           expectedFavicon
         )
       val libkiwixBook = Book()
-      objectBoxToLibkiwixMigrator.libkiwixBookmarks.saveBookmark(
+      libkiwixBookmarks.saveBookmark(
         LibkiwixBookmarkItem(
           zimId = secondBookmarkEntity.zimId,
           zimFilePath = secondBookmarkEntity.zimReaderSource?.toDatabase(),
@@ -333,7 +341,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       // Migrate data into libkiwix
       objectBoxToLibkiwixMigrator.migrateBookMarks(bookmarkBox)
       val actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookmarks.bookmarks().first()
+        libkiwixBookmarks.bookmarks().first()
       assertEquals(2, actualDataAfterMigration.size)
       val existingItem =
         actualDataAfterMigration.find {
@@ -371,7 +379,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       objectBoxToLibkiwixMigrator.migrateBookMarks(bookmarkBox)
       // Check if data successfully migrated to libkiwix
       val actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookmarks.bookmarks().first()
+        libkiwixBookmarks.bookmarks().first()
       assertEquals(1000, actualDataAfterMigration.size)
       // Clear the bookmarks list from device to not affect the other test cases.
       clearBookmarks()
@@ -395,9 +403,10 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       bookmarkBox.put(bookmarkEntity)
       // migrate data into libkiwix
       objectBoxToLibkiwixMigrator.migrateBookMarks(bookmarkBox)
-      // check if data successfully migrated to libkiwix
+
       val actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookmarks.bookmarks().first()
+        libkiwixBookmarks.bookmarks().first()
+      // Check if data successfully migrated to libkiwix
       assertEquals(1, actualDataAfterMigration.size)
       assertEquals(actualDataAfterMigration[0].zimReaderSource?.toDatabase(), null)
       assertEquals(actualDataAfterMigration[0].zimId, expectedZimId)
@@ -426,9 +435,10 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       bookmarkBox.put(bookmarkEntity)
       // migrate data into libkiwix
       objectBoxToLibkiwixMigrator.migrateBookMarks(bookmarkBox)
-      // check if data successfully migrated to libkiwix
+
       val actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookmarks.bookmarks().first()
+        libkiwixBookmarks.bookmarks().first()
+      // Check if data successfully migrated to libkiwix
       assertEquals(1, actualDataAfterMigration.size)
       assertEquals(actualDataAfterMigration[0].zimReaderSource?.toDatabase(), null)
       assertEquals(actualDataAfterMigration[0].zimId, expectedZimId)
@@ -455,7 +465,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
     objectBoxToLibkiwixMigrator.migrateBookMarks(bookmarkBox)
     // check if data successfully migrated to libkiwix
     val actualDataAfterMigration =
-      objectBoxToLibkiwixMigrator.libkiwixBookmarks.bookmarks().first()
+      libkiwixBookmarks.bookmarks().first()
     assertEquals(1, actualDataAfterMigration.size)
     // Assert it sets the zimReaderSource from the file path.
     assertEquals(actualDataAfterMigration[0].zimReaderSource?.toDatabase(), expectedZimFilePath)
@@ -474,7 +484,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       val libkiwixBook = Book().apply {
         update(Archive(expectedZimFilePath))
       }
-      objectBoxToLibkiwixMigrator.libkiwixBookmarks.saveBookmark(
+      libkiwixBookmarks.saveBookmark(
         LibkiwixBookmarkItem(
           zimId = expectedZimId,
           zimFilePath = expectedZimFilePath,
@@ -503,7 +513,7 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       objectBoxToLibkiwixMigrator.migrateBookMarks(bookmarkBox)
 
       val actualDataAfterMigration =
-        objectBoxToLibkiwixMigrator.libkiwixBookmarks.bookmarks().first()
+        libkiwixBookmarks.bookmarks().first()
       // Should not insert duplicate if zimReaderSource is backfilled correctly
       assertEquals(1, actualDataAfterMigration.size)
 
@@ -533,8 +543,8 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
   }
 
   private suspend fun clearBookOnDisk() {
-    objectBoxToLibkiwixMigrator.libkiwixBookOnDisk.delete(
-      objectBoxToLibkiwixMigrator.libkiwixBookOnDisk.getBooks()
+    libkiwixBookOnDisk.delete(
+      libkiwixBookOnDisk.getBooks()
         .map { LibkiwixBook(it.book.nativeBook) }
     )
     bookOnDiskBox.removeAll()
@@ -545,8 +555,8 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
 
   private suspend fun clearBookmarks() {
     // delete bookmarks for testing other edge cases
-    objectBoxToLibkiwixMigrator.libkiwixBookmarks.deleteBookmarks(
-      objectBoxToLibkiwixMigrator.libkiwixBookmarks.bookmarks()
+    libkiwixBookmarks.deleteBookmarks(
+      libkiwixBookmarks.bookmarks()
         .first() as List<LibkiwixBookmarkItem>
     )
     bookmarkBox.removeAll()
