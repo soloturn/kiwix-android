@@ -107,7 +107,7 @@ fun ReaderScreenRoute(
         viewModel.viewModelScope.launch {
           viewModel.readerWebViewManager.destroyAllTabs()
         }
-      }
+      }.onFailure { it.printStackTrace() }
     }
   }
   CollectFileSearched(navHostController, viewModel)
