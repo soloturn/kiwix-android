@@ -21,7 +21,6 @@ package org.kiwix.kiwixmobile.core.page.notes.viewmodel.effects
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.kiwix.kiwixmobile.core.base.SideEffect
-import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.cachedComponent
 import org.kiwix.kiwixmobile.core.main.note.AddNoteViewModel
 import org.kiwix.kiwixmobile.core.page.adapter.Page
 import org.kiwix.kiwixmobile.core.page.notes.models.NoteListItem
@@ -39,7 +38,6 @@ data class ShowOpenNoteDialog(
   private val addNoteViewModel: AddNoteViewModel
 ) : SideEffect<Unit> {
   override fun invokeWith(activity: AppCompatActivity) {
-    activity.cachedComponent.inject(this)
     dialogShower.show(
       ShowNoteDialog,
       { effects.tryEmit(OpenPage(page, zimReaderContainer)) },
