@@ -98,7 +98,6 @@ import org.kiwix.kiwixmobile.core.utils.ComposeDimens.SIX_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.THREE_DP
 import org.kiwix.kiwixmobile.core.utils.FIVE
 import org.kiwix.kiwixmobile.core.utils.ZERO
-import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryUiState
 import org.kiwix.kiwixmobile.zimManager.libraryView.LibraryListItem
@@ -125,7 +124,6 @@ fun OnlineLibraryScreen(
   bottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
   onUserBackPressed: () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
-  activity: KiwixMainActivity,
   navigationIcon: @Composable () -> Unit
 ) {
   val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -162,8 +160,7 @@ fun OnlineLibraryScreen(
         paddingValues,
         onUserBackPressed,
         navHostController,
-        listState,
-        activity
+        listState
       )
     }
   }
@@ -177,8 +174,7 @@ private fun OnlineLibraryMainContent(
   paddingValues: PaddingValues,
   onUserBackPressed: () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
-  listState: LazyListState,
-  activity: KiwixMainActivity
+  listState: LazyListState
 ) {
   SwipeRefreshLayout(
     isRefreshing = uiState.isRefreshing && !uiState.showScanningProgressBar,
@@ -193,7 +189,7 @@ private fun OnlineLibraryMainContent(
       )
   ) {
     OnBackPressed(onUserBackPressed, navHostController)
-    OnlineLibraryScreenContent(uiState, listState, onlineLibraryViewModel, activity)
+    OnlineLibraryScreenContent(uiState, listState, onlineLibraryViewModel)
   }
 }
 
@@ -256,8 +252,7 @@ private fun searchBarIfActive(
 private fun OnlineLibraryScreenContent(
   uiState: OnlineLibraryUiState,
   lazyListState: LazyListState,
-  onlineLibraryViewModel: OnlineLibraryViewModel,
-  activity: KiwixMainActivity
+  onlineLibraryViewModel: OnlineLibraryViewModel
 ) {
   Box(
     modifier = Modifier.fillMaxSize(),
@@ -266,7 +261,7 @@ private fun OnlineLibraryScreenContent(
     if (uiState.showNoContent) {
       NoContentView(uiState.noContentMessage)
     } else {
-      OnlineLibraryList(uiState, lazyListState, onlineLibraryViewModel, activity)
+      OnlineLibraryList(uiState, lazyListState, onlineLibraryViewModel)
     }
     if (uiState.showScanningProgressBar) {
       ShowFetchingLibraryLayout(uiState.scanningProgressBarMessage)
@@ -279,8 +274,7 @@ private fun OnlineLibraryScreenContent(
 private fun OnlineLibraryList(
   state: OnlineLibraryUiState,
   lazyListState: LazyListState,
-  onlineLibraryViewModel: OnlineLibraryViewModel,
-  activity: KiwixMainActivity
+  onlineLibraryViewModel: OnlineLibraryViewModel
 ) {
   LazyColumn(
     modifier = Modifier
@@ -297,7 +291,7 @@ private fun OnlineLibraryList(
           item = item,
           onlineLibraryViewModel.bookUtils,
           onlineLibraryViewModel.availableSpaceCalculator
-        ) { onlineLibraryViewModel.onBookItemClick(it, activity) }
+        ) { onlineLibraryViewModel.onBookItemClick(it) }
 
         is LibraryListItem.LibraryDownloadItem -> DownloadBookItem(
           index = index,

@@ -182,7 +182,7 @@ private fun SetUpViewModelAndPermissionLauncher(
       }
     }
   LaunchedEffect(Unit) {
-    coreSettingsViewModel.initialize(activity = coreMainActivity)
+    coreSettingsViewModel.initialize()
     coreSettingsViewModel.actions
       .collect { action ->
         handleSettingsAction(
@@ -222,7 +222,7 @@ private suspend fun handleSettingsAction(
       showImportBookmarkDialog(viewModel, filePickerLauncher)
 
     is OnStorageItemClick ->
-      viewModel.onStorageDeviceSelected(action.storageDevice, activity)
+      viewModel.onStorageDeviceSelected(action.storageDevice)
 
     is ShowSnackbar ->
       showSnackbar(action.message, action.lifecycleScope, viewModel)

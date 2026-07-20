@@ -132,7 +132,6 @@ fun OnlineLibraryRoute(
       }
     },
     navHostController = navController,
-    activity = activity,
     navigationIcon = {
       NavigationIcon(
         iconItem = if (uiState.isSearchActive) {

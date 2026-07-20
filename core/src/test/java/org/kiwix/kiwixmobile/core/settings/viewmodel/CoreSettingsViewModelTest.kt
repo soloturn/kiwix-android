@@ -82,6 +82,7 @@ import org.kiwix.kiwixmobile.core.settings.viewmodel.Action.ShowSnackbar
 import org.kiwix.kiwixmobile.core.utils.EXTERNAL_SELECT_POSITION
 import org.kiwix.kiwixmobile.core.utils.INTERNAL_SELECT_POSITION
 import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
+import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.StorageUtils
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore.Companion.DEFAULT_ZOOM
@@ -102,7 +103,8 @@ private class TestCoreSettingsViewModel(
   storageCalculator: StorageCalculator,
   themeConfig: ThemeConfig,
   libkiwixBookmarks: LibkiwixBookmarks,
-  kiwixPermissionChecker: KiwixPermissionChecker
+  kiwixPermissionChecker: KiwixPermissionChecker,
+  storageDeviceProvider: StorageDeviceProvider
 ) : CoreSettingsViewModel(
     context,
     kiwixDataStore,
@@ -110,9 +112,10 @@ private class TestCoreSettingsViewModel(
     storageCalculator,
     themeConfig,
     libkiwixBookmarks,
-    kiwixPermissionChecker
+    kiwixPermissionChecker,
+    storageDeviceProvider
   ) {
-  override suspend fun setStorage(coreMainActivity: CoreMainActivity) {
+  override suspend fun setStorage() {
     // Do nothing
   }
 
@@ -149,6 +152,7 @@ internal class CoreSettingsViewModelTest {
   private val themeConfig: ThemeConfig = mockk(relaxed = true)
   private val libkiwixBookmarks: LibkiwixBookmarks = mockk(relaxed = true)
   private val kiwixPermissionChecker: KiwixPermissionChecker = mockk(relaxed = true)
+  private val storageDeviceProvider: StorageDeviceProvider = mockk(relaxed = true)
   private val activity: CoreMainActivity = mockk(relaxed = true)
   private val contentResolver: ContentResolver = mockk(relaxed = true)
   private val tempDir = File(System.getProperty("java.io.tmpdir"))
@@ -225,7 +229,8 @@ internal class CoreSettingsViewModelTest {
       storageCalculator,
       themeConfig,
       libkiwixBookmarks,
-      kiwixPermissionChecker
+      kiwixPermissionChecker,
+      storageDeviceProvider
     )
   }
 
@@ -239,16 +244,16 @@ internal class CoreSettingsViewModelTest {
     @Test
     fun `initialize calls all required methods`() = runTest {
       val spyViewModel = spykViewModel()
-      coEvery { spyViewModel.setStorage(any()) } just Runs
+      coEvery { spyViewModel.setStorage() } just Runs
       coEvery { spyViewModel.showExternalLinksPreference() } just Runs
       coEvery { spyViewModel.showPrefWifiOnlyPreference() } just Runs
       coEvery { spyViewModel.showPermissionItem() } just Runs
       coEvery { spyViewModel.showLanguageCategory() } just Runs
       coEvery { spyViewModel.showRatingCategory() } just Runs
 
-      spyViewModel.initialize(activity)
+      spyViewModel.initialize()
 
-      coVerify(exactly = 1) { spyViewModel.setStorage(activity) }
+      coVerify(exactly = 1) { spyViewModel.setStorage() }
       coVerify(exactly = 1) { spyViewModel.showExternalLinksPreference() }
       coVerify(exactly = 1) { spyViewModel.showPrefWifiOnlyPreference() }
       coVerify(exactly = 1) { spyViewModel.showPermissionItem() }
@@ -262,7 +267,7 @@ internal class CoreSettingsViewModelTest {
     @Test
     fun `initialize fails if one method throws exception`() = runTest {
       val spyViewModel = spykViewModel()
-      coEvery { spyViewModel.setStorage(any()) } throws RuntimeException("failure")
+      coEvery { spyViewModel.setStorage() } throws RuntimeException("failure")
 
       coEvery { spyViewModel.showExternalLinksPreference() } just Runs
       coEvery { spyViewModel.showPrefWifiOnlyPreference() } just Runs
@@ -271,7 +276,7 @@ internal class CoreSettingsViewModelTest {
       coEvery { spyViewModel.showRatingCategory() } just Runs
 
       try {
-        spyViewModel.initialize(activity)
+        spyViewModel.initialize()
         fail("CoreViewModel should throw an error when the internal method throws an error. But no error was thrown.")
       } catch (e: RuntimeException) {
         assertEquals("failure", e.message)
@@ -1207,18 +1212,17 @@ internal class CoreSettingsViewModelTest {
     fun `internal storage device sets INTERNAL_SELECT_POSITION`() = runTest {
       val internalStoragePath = "/public/path"
       val storageDevice: StorageDevice = mockk()
-      val activity: CoreMainActivity = mockk(relaxed = true)
       every { storageDevice.isInternal } returns true
       every { storageDevice.name } returns internalStoragePath
       coEvery { kiwixDataStore.getPublicDirectoryPath(any()) } returns internalStoragePath
 
-      viewModel.onStorageDeviceSelected(storageDevice, activity)
+      viewModel.onStorageDeviceSelected(storageDevice)
       advanceUntilIdle()
       coVerify {
         kiwixDataStore.setSelectedStorage(internalStoragePath)
         kiwixDataStore.setSelectedStoragePosition(INTERNAL_SELECT_POSITION)
         kiwixDataStore.setShowStorageOption(false)
-        viewModel.setStorage(activity)
+        viewModel.setStorage()
       }
     }
 
@@ -1226,18 +1230,17 @@ internal class CoreSettingsViewModelTest {
     fun `external storage device sets EXTERNAL_SELECT_POSITION`() = runTest {
       val externalStoragePath = "/public/ext/path"
       val storageDevice: StorageDevice = mockk()
-      val activity: CoreMainActivity = mockk(relaxed = true)
       every { storageDevice.isInternal } returns false
       every { storageDevice.name } returns externalStoragePath
       coEvery { kiwixDataStore.getPublicDirectoryPath(any()) } returns externalStoragePath
 
-      viewModel.onStorageDeviceSelected(storageDevice, activity)
+      viewModel.onStorageDeviceSelected(storageDevice)
       advanceUntilIdle()
       coVerify {
         kiwixDataStore.setSelectedStorage(externalStoragePath)
         kiwixDataStore.setSelectedStoragePosition(EXTERNAL_SELECT_POSITION)
         kiwixDataStore.setShowStorageOption(false)
-        viewModel.setStorage(activity)
+        viewModel.setStorage()
       }
     }
   }

@@ -30,7 +30,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import eu.mhutti1.utils.storage.StorageDevice
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -204,7 +203,6 @@ class LocalLibraryViewModel @Inject constructor(
   internal val requestFileSystemCheck = MutableSharedFlow<Unit>()
 
   fun initialize(
-    storageDeviceList: List<StorageDevice>,
     validateZimViewModel: ValidateZimViewModel,
     alertDialogShower: AlertDialogShower,
     snackBarHostState: SnackbarHostState
@@ -213,7 +211,6 @@ class LocalLibraryViewModel @Inject constructor(
     this.alertDialogShower = alertDialogShower
     processSelectedZimFilesForStandalone.init(this)
     processSelectedZimFilesForPlayStore.init(
-      storageDeviceList = storageDeviceList,
       lifecycleScope = viewModelScope,
       alertDialogShower = alertDialogShower,
       snackBarHostState = snackBarHostState,

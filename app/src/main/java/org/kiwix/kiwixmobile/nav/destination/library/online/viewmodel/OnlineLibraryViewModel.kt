@@ -63,6 +63,7 @@ import org.kiwix.kiwixmobile.core.utils.BookUtils
 import org.kiwix.kiwixmobile.core.utils.EXTERNAL_SELECT_POSITION
 import org.kiwix.kiwixmobile.core.utils.INTERNAL_SELECT_POSITION
 import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
+import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
@@ -135,6 +136,7 @@ class OnlineLibraryViewModel @Inject constructor(
   private val observeOnlineLibrary: ObserveOnlineLibrary,
   private val refreshLibraryAction: ResolveRefreshLibraryAction,
   private val observeNetworkState: ObserveNetworkState,
+  private val storageDeviceProvider: StorageDeviceProvider,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
   data class OnlineLibraryRequest(
@@ -564,15 +566,15 @@ class OnlineLibraryViewModel @Inject constructor(
     }
   }
 
-  fun onBookItemClick(item: BookItem, activity: KiwixMainActivity) {
+  fun onBookItemClick(item: BookItem) {
     viewModelScope.launch {
       downloadBookItem = item
       val action = resolveBookClickAction.onBookItemClick(
         item,
-        activity.getStorageDeviceList().size
+        storageDeviceProvider.getWritableStorage().size
       )
       when (action) {
-        ShowStorageSelection -> showStorageSelectDialog(activity, false)
+        ShowStorageSelection -> showStorageSelectDialog(false)
         is StartDownload -> downloadFile()
         NoInternet -> emitNoInternetSnackbar()
         RequestStoragePermission -> sendUiEvent(RequestPermission(WRITE_EXTERNAL_STORAGE))
@@ -592,18 +594,18 @@ class OnlineLibraryViewModel @Inject constructor(
           positiveAction = {
             viewModelScope.launch {
               kiwixDataStore.setWifiOnly(false)
-              onBookItemClick(item, activity)
+              onBookItemClick(item)
             }
           }
         )
 
         DisableStorageSelection -> {
           kiwixDataStore.setShowStorageOption(false)
-          onBookItemClick(item, activity)
+          onBookItemClick(item)
         }
 
         is NotEnoughSpace -> emitNoSpaceSnackbar(context, action.availableSpace) {
-          showStorageSelectDialog(activity, true)
+          showStorageSelectDialog(true)
         }
 
         else -> Unit
@@ -646,22 +648,22 @@ class OnlineLibraryViewModel @Inject constructor(
     sendUiEvent(NavigateToAppSettings)
   }
 
-  fun showStorageSelectDialog(activity: KiwixMainActivity, showCheckboxSelected: Boolean) {
+  private fun showStorageSelectDialog(showCheckboxSelected: Boolean) {
     viewModelScope.launch {
       val dialogConfig = StorageSelectDialogConfig(
         title = context.getString(R.string.choose_storage_to_download_book),
         titleSize = STORAGE_SELECT_STORAGE_TITLE_TEXTVIEW_SIZE,
-        storageDeviceList = activity.getStorageDeviceList(),
+        storageDeviceList = storageDeviceProvider.getWritableStorage(),
         storageCalculator = availableSpaceCalculator.storageCalculator,
         kiwixDataStore = kiwixDataStore,
         shouldShowCheckboxSelected = showCheckboxSelected,
-        onSelectAction = { onStorageDeviceClick(it, activity) }
+        onSelectAction = { onStorageDeviceClick(it) }
       )
       sendUiEvent(SideEffects(UISideEffects.StorageSelectionDialog(dialogConfig)))
     }
   }
 
-  private fun onStorageDeviceClick(device: StorageDevice, activity: KiwixMainActivity) {
+  private fun onStorageDeviceClick(device: StorageDevice) {
     viewModelScope.launch {
       kiwixDataStore.setShowStorageOption(false)
       kiwixDataStore.setSelectedStorage(
@@ -675,7 +677,7 @@ class OnlineLibraryViewModel @Inject constructor(
         }
       )
       downloadBookItem?.let {
-        onBookItemClick(it, activity)
+        onBookItemClick(it)
       }
     }
   }
@@ -794,7 +796,7 @@ class OnlineLibraryViewModel @Inject constructor(
 
   fun onNotificationPermissionResult(isGranted: Boolean, activity: KiwixMainActivity) {
     if (isGranted) {
-      downloadBookItem?.let { onBookItemClick(it, activity) }
+      downloadBookItem?.let { onBookItemClick(it) }
       return
     }
     if (!permissionChecker.shouldShowRationale(activity, POST_NOTIFICATIONS)) {
@@ -807,7 +809,7 @@ class OnlineLibraryViewModel @Inject constructor(
 
   fun onStoragePermissionResult(isGranted: Boolean, activity: KiwixMainActivity) {
     if (isGranted) {
-      downloadBookItem?.let { onBookItemClick(it, activity) }
+      downloadBookItem?.let { onBookItemClick(it) }
       return
     }
     if (permissionChecker.shouldShowRationale(activity, WRITE_EXTERNAL_STORAGE)) {

@@ -48,8 +48,6 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.rememberNavController
-import eu.mhutti1.utils.storage.StorageDevice
-import eu.mhutti1.utils.storage.StorageDeviceUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
@@ -85,6 +83,7 @@ import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
 import org.kiwix.kiwixmobile.core.main.ZIM_HOST_DEEP_LINK_SCHEME
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Companion.CONTENT_PREFIX
 import org.kiwix.kiwixmobile.core.utils.HUNDERED
+import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
 import org.kiwix.kiwixmobile.kiwixActivityComponent
 import org.kiwix.kiwixmobile.ui.KiwixDestination
@@ -102,6 +101,8 @@ class KiwixMainActivity : CoreMainActivity() {
   @Inject lateinit var libkiwixBookOnDisk: LibkiwixBookOnDisk
 
   @Inject lateinit var libkiwixBookmarks: LibkiwixBookmarks
+
+  @Inject lateinit var storageDeviceProvider: StorageDeviceProvider
 
   @Inject
   @MainDispatcher
@@ -130,7 +131,6 @@ class KiwixMainActivity : CoreMainActivity() {
     NavController.OnDestinationChangedListener { _, _, _ ->
       actionMode?.finish()
     }
-  private val storageDeviceList = arrayListOf<StorageDevice>()
   private val pendingIntentFlow = MutableStateFlow<Intent?>(null)
 
   @OptIn(ExperimentalMaterial3Api::class)
@@ -242,7 +242,7 @@ class KiwixMainActivity : CoreMainActivity() {
   private suspend fun migrateInternalToPublicAppDirectory() {
     if (!kiwixDataStore.isAppDirectoryMigrated.first()) {
       val storagePath =
-        getStorageDeviceList()
+        storageDeviceProvider.getWritableStorage()
           .getOrNull(kiwixDataStore.selectedStoragePosition.first())
           ?.name
       storagePath?.let {
@@ -259,23 +259,6 @@ class KiwixMainActivity : CoreMainActivity() {
       )
       kiwixDataStore.putPerAppLanguageMigration(true)
     }
-  }
-
-  /**
-   * Fetches the storage device list once in the main activity and reuses it across all screens.
-   * This is necessary because retrieving the storage device list, especially on devices with large SD cards,
-   * is a resource-intensive operation. Performing this operation repeatedly in screens can negatively
-   * affect the user experience, as it takes time and can block the UI.
-   *
-   * If a screen is destroyed and we need to retrieve the device list again, performing the operation
-   * repeatedly leads to inefficiency. To optimize this, we fetch the storage device list once and reuse
-   * it in all screens, thereby reducing redundant processing and improving performance.
-   */
-  suspend fun getStorageDeviceList(): List<StorageDevice> {
-    if (storageDeviceList.isEmpty()) {
-      storageDeviceList.addAll(StorageDeviceUtils.getWritableStorage(this, ioDispatcher))
-    }
-    return storageDeviceList
   }
 
   override fun onStart() {
