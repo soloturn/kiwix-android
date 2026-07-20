@@ -370,7 +370,6 @@
   <string name="reaching_remote_library">Met bibliotheek op afstand verbinden</string>
   <string name="parsing_remote_library">Bibliotheek op afstand verwerken</string>
   <string name="starting_downloading_remote_library">Starten met downloaden van de online bibliotheek</string>
-  <string name="downloading_library">Downloaden van bibliotheek\n%s</string>
   <string name="no_notes">Geen aantekeningen</string>
   <string name="notes_from_all_books">Aantekeningen bij alle boeken bekijken</string>
   <string name="search_notes">Aantekeningen zoeken</string>

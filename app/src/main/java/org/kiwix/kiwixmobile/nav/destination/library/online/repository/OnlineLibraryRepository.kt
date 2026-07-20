@@ -21,11 +21,9 @@ package org.kiwix.kiwixmobile.nav.destination.library.online.repository
 import kotlinx.coroutines.flow.Flow
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryRequest
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState
-import org.kiwix.kiwixmobile.data.remote.AppProgressListenerProvider
 
 interface OnlineLibraryRepository {
   fun fetchOnlineLibrary(
-    request: OnlineLibraryRequest,
-    appProgressListener: AppProgressListenerProvider?
+    request: OnlineLibraryRequest
   ): Flow<OnlineLibraryState>
 }

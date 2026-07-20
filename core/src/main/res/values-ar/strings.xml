@@ -379,7 +379,6 @@
   <string name="reaching_remote_library">الوصول إلى المكتبة البعيدة</string>
   <string name="parsing_remote_library">تحليل المكتبة البعيدة</string>
   <string name="starting_downloading_remote_library">بدء تنزيل المكتبة الإلكترونية</string>
-  <string name="downloading_library">جاري تنزيل المكتبة \n %s</string>
   <string name="no_notes">لا توجد ملاحظات</string>
   <string name="notes_from_all_books">عرض الملاحظات من جميع الكتب</string>
   <string name="search_notes">ملاحظات البحث</string>

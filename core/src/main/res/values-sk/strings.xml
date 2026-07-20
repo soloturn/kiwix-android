@@ -365,7 +365,6 @@
   <string name="reaching_remote_library">Pripája sa k vzdialenej knižnici</string>
   <string name="parsing_remote_library">Spracúva sa vzdialená knižnica</string>
   <string name="starting_downloading_remote_library">Spúšťa sa sťahovanie online knižnice</string>
-  <string name="downloading_library">Sťahuje sa knižnica \n%s</string>
   <string name="no_notes">Žiadne poznámky</string>
   <string name="notes_from_all_books">Zobraziť poznámky zo všetkých kníh</string>
   <string name="search_notes">Hľadať v poznámkach</string>

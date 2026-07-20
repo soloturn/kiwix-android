@@ -377,7 +377,6 @@
   <string name="reaching_remote_library">Uzak kütüphaneye bağlanılıyor</string>
   <string name="parsing_remote_library">Uzak kütüphanenin ayrıştırılması</string>
   <string name="starting_downloading_remote_library">Çevrimiçi kütüphanenin indirilmesi başlatılıyor</string>
-  <string name="downloading_library">Kütüphane indiriliyor %s</string>
   <string name="no_notes">Not Yok</string>
   <string name="notes_from_all_books">Tüm Kitaplardan Notları Görüntüle</string>
   <string name="search_notes">Notları Ara</string>

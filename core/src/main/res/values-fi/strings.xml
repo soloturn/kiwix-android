@@ -327,7 +327,6 @@
   <string name="allowed">Sallittu</string>
   <string name="not_allowed">Ei sallittu</string>
   <string name="allow">Salli</string>
-  <string name="downloading_library">Ladataan kirjastoa %s</string>
   <string name="no_notes">Ei muistiinpanoja</string>
   <string name="notes_from_all_books">Näytä muistiinpanot kaikista kirjoista</string>
   <string name="open_article">Avaa artikkeli</string>

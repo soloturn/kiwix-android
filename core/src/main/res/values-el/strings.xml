@@ -258,7 +258,6 @@
   <string name="file_copy_move_error_dialog_message">%s \nΘέλετε να συνεχίσετε με άλλα αρχεία ZIM;</string>
   <string name="your_selected_files_added_to_library">Τα επιλεγμένα αρχεία ZIM προστέθηκαν στη βιβλιοθήκη.</string>
   <string name="how_to_update_content">Πώς να ενημερώσω το περιεχόμενο;</string>
-  <string name="downloading_library">Γίνεται λήψη της βιβλιοθήκης \n%s</string>
   <string name="no_notes">Χωρίς σημειώσεις</string>
   <string name="notes_from_all_books">Προβολή σημειώσεων από όλα τα βιβλία</string>
   <string name="search_notes">Αναζήτηση σημειώσεων</string>

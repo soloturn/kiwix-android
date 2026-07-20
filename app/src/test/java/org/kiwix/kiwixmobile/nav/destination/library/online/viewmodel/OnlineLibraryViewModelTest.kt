@@ -127,7 +127,7 @@ class OnlineLibraryViewModelTest {
   fun setup() {
     every { connectivityReceiver.networkStates } returns MutableStateFlow(NetworkState.NOT_CONNECTED)
     every { observeItems.invoke(any(), any(), any(), any(), any()) } returns emptyFlow()
-    every { observeLibrary.invoke(any(), any()) } returns flowOf(mockk(relaxed = true))
+    every { observeLibrary.invoke(any()) } returns flowOf(mockk(relaxed = true))
     every { observeNetwork.invoke(any()) } returns emptyFlow()
     every { kiwixDataStore.selectedOnlineContentCategory } returns MutableStateFlow("")
     every { kiwixDataStore.selectedOnlineContentLanguage } returns MutableStateFlow("")

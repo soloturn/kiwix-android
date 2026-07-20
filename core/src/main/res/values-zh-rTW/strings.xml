@@ -372,7 +372,6 @@
   <string name="reaching_remote_library">取得遠距文庫</string>
   <string name="parsing_remote_library">解析遠端文庫</string>
   <string name="starting_downloading_remote_library">開始下載線上文庫</string>
-  <string name="downloading_library">正在下載文庫\n%s</string>
   <string name="no_notes">沒有註釋</string>
   <string name="notes_from_all_books">檢視來自所有書籍的註釋</string>
   <string name="search_notes">搜尋註釋</string>

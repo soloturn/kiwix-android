@@ -19,6 +19,8 @@
 package org.kiwix.kiwixmobile.nav.destination.library.online.helper
 
 import android.net.ConnectivityManager
+import org.kiwix.kiwixmobile.core.compat.CompatHelper.Companion.isNetworkAvailable
+import org.kiwix.kiwixmobile.core.compat.CompatHelper.Companion.isWifi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -40,17 +42,15 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.kiwix.kiwixmobile.core.compat.CompatHelper.Companion.isNetworkAvailable
-import org.kiwix.kiwixmobile.core.compat.CompatHelper.Companion.isWifi
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
-import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState
-import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.NoInternetConnection
-import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.WifiOnlyException
-import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Loading
-import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Success
-import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Idle
-import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryRequest
 import org.kiwix.kiwixmobile.nav.destination.library.online.repository.OnlineLibraryRepository
+import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryRequest
+import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState
+import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Idle
+import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Loading
+import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.NoInternetConnection
+import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Success
+import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.WifiOnlyException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ObserveOnlineLibraryTest {
@@ -88,14 +88,13 @@ class ObserveOnlineLibraryTest {
     every { connectivityManager.isNetworkAvailable() } returns false
     val request = onlineLibraryRequest()
     val result = observeOnlineLibrary(
-      flowOf(request),
-      null
+      flowOf(request)
     ).first()
 
     assertThat(NoInternetConnection).isEqualTo(result)
 
     coVerify(exactly = 0) {
-      repository.fetchOnlineLibrary(request, any())
+      repository.fetchOnlineLibrary(request)
     }
   }
 
@@ -106,14 +105,13 @@ class ObserveOnlineLibraryTest {
     every { kiwixDataStore.wifiOnly } returns flowOf(true)
     val request = onlineLibraryRequest()
     val results = observeOnlineLibrary(
-      flowOf(request),
-      null
+      flowOf(request)
     ).toList()
 
     assertThat(listOf(WifiOnlyException)).isEqualTo(results)
 
     coVerify(exactly = 0) {
-      repository.fetchOnlineLibrary(request, any())
+      repository.fetchOnlineLibrary(request)
     }
   }
 
@@ -128,12 +126,11 @@ class ObserveOnlineLibraryTest {
     )
 
     coEvery {
-      repository.fetchOnlineLibrary(request, any())
+      repository.fetchOnlineLibrary(request)
     } returns repoFlow
 
     val results = observeOnlineLibrary(
-      flowOf(request),
-      null
+      flowOf(request)
     ).toList()
 
     assertEquals(
@@ -157,12 +154,11 @@ class ObserveOnlineLibraryTest {
     )
 
     coEvery {
-      repository.fetchOnlineLibrary(request, any())
+      repository.fetchOnlineLibrary(request)
     } returns repoFlow
 
     val results = observeOnlineLibrary(
-      flowOf(request),
-      null
+      flowOf(request)
     ).toList()
 
     assertEquals(
@@ -195,17 +191,17 @@ class ObserveOnlineLibraryTest {
     )
 
     coEvery {
-      repository.fetchOnlineLibrary(match { it.page == 1 }, any())
+      repository.fetchOnlineLibrary(match { it.page == 1 })
     } returns slowFlow
 
     coEvery {
-      repository.fetchOnlineLibrary(match { it.page == 2 }, any())
+      repository.fetchOnlineLibrary(match { it.page == 2 })
     } returns fastFlow
 
     val results = mutableListOf<OnlineLibraryState>()
 
     val job = launch {
-      observeOnlineLibrary(requestFlow, null).toList(results)
+      observeOnlineLibrary(requestFlow).toList(results)
     }
     requestFlow.emit(request1)
     advanceTimeBy(1)

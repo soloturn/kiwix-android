@@ -393,7 +393,6 @@
   <string name="reaching_remote_library">获取远程文库</string>
   <string name="parsing_remote_library">解析远程文库</string>
   <string name="starting_downloading_remote_library">开始下载在线文库</string>
-  <string name="downloading_library">正在下载文库\n%s</string>
   <string name="no_notes">没有注释</string>
   <string name="notes_from_all_books">查看来自所有书籍的注释</string>
   <string name="search_notes">搜索注释</string>

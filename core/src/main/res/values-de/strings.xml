@@ -392,7 +392,6 @@
   <string name="reaching_remote_library">Erreiche externe Bibliothek</string>
   <string name="parsing_remote_library">Verarbeite externe Bibliothek</string>
   <string name="starting_downloading_remote_library">Beginne Download der Online-Bibliothek</string>
-  <string name="downloading_library">Lade Bibliothek herunter\n%s</string>
   <string name="no_notes">Keine Notizen</string>
   <string name="notes_from_all_books">Notizen aus allen Büchern ansehen</string>
   <string name="search_notes">Notizen suchen</string>

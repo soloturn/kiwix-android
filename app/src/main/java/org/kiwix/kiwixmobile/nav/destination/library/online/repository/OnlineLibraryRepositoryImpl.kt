@@ -22,14 +22,14 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import org.kiwix.kiwixmobile.core.data.remote.KiwixService
 import org.kiwix.kiwixmobile.core.data.remote.KiwixService.Companion.ITEMS_PER_PAGE
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.di.OPDSKiwixService
 import org.kiwix.kiwixmobile.core.di.modules.KIWIX_OPDS_LIBRARY_URL
 import org.kiwix.kiwixmobile.core.ui.components.ONE
 import org.kiwix.kiwixmobile.core.utils.FIVE
-import org.kiwix.kiwixmobile.data.remote.AppProgressListenerProvider
 import org.kiwix.kiwixmobile.data.remote.OnlineLibraryManager
-import org.kiwix.kiwixmobile.data.remote.opds.KiwixOpdsServiceFactory
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryRequest
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Error
@@ -41,27 +41,16 @@ import javax.inject.Inject
 
 class OnlineLibraryRepositoryImpl @Inject constructor(
   private val onlineLibraryManager: OnlineLibraryManager,
-  private val serviceFactory: KiwixOpdsServiceFactory,
+  @OPDSKiwixService private val kiwixService: KiwixService,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : OnlineLibraryRepository {
   override fun fetchOnlineLibrary(
-    request: OnlineLibraryRequest,
-    appProgressListener: AppProgressListenerProvider?
+    request: OnlineLibraryRequest
   ): Flow<OnlineLibraryState> = flow {
     emit(Loading(request.isLoadMoreItem))
     val baseUrl = KIWIX_OPDS_LIBRARY_URL
     val start = onlineLibraryManager.getStartOffset(request.page, ITEMS_PER_PAGE)
 
-    val service = serviceFactory.create(
-      baseUrl = baseUrl,
-      start = start,
-      count = ITEMS_PER_PAGE,
-      query = request.query,
-      lang = request.lang,
-      category = request.category,
-      shouldTrackProgress = !request.isLoadMoreItem,
-      appProgressListener = appProgressListener
-    )
     val maxRetries = FIVE
     repeat(maxRetries) { attempt ->
       try {
@@ -74,7 +63,7 @@ class OnlineLibraryRepositoryImpl @Inject constructor(
           request.category
         )
 
-        val response = service.getLibraryPage(url)
+        val response = kiwixService.getLibraryPage(url)
         val base = response.getResolvedBaseUrl()
         emit(Parsing(request.isLoadMoreItem))
         val books = onlineLibraryManager
