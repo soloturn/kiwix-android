@@ -249,7 +249,6 @@
   <string name="reaching_remote_library">لرې‌پروت کتابتون ته رسېدل</string>
   <string name="parsing_remote_library">د لرې‌پروت کتابتون ارزول</string>
   <string name="starting_downloading_remote_library">د پرليکه کتابتون راکښته‌کول پيلول</string>
-  <string name="downloading_library">کتابتون راکښته‌کېږي\n%s</string>
   <string name="no_notes">هېڅ يادښت نشته</string>
   <string name="notes_from_all_books">د ټولو کتابتونو يادښتونه کتل</string>
   <string name="search_notes">يادښتونه پلټل</string>

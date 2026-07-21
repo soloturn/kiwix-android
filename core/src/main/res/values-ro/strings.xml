@@ -349,7 +349,6 @@
   <string name="reaching_remote_library">Se ajunge la biblioteca de la distanță</string>
   <string name="parsing_remote_library">Analizarea bibliotecii de la distanță</string>
   <string name="starting_downloading_remote_library">Începe descărcarea bibliotecii online</string>
-  <string name="downloading_library">Descărcare bibliotecă\n%s</string>
   <string name="no_notes">Nicio notă</string>
   <string name="notes_from_all_books">Vedeți notele din toate cărțile</string>
   <string name="search_notes">Căutați Note</string>

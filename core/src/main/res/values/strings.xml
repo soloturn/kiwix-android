@@ -371,8 +371,7 @@
   <string name="swipe_down_for_library">Swipe Down for Library</string>
   <string name="reaching_remote_library">Reaching remote library</string>
   <string name="parsing_remote_library">Parsing remote library</string>
-  <string name="starting_downloading_remote_library">Starting download of the online library</string>
-  <string name="downloading_library">Downloading library \n%s</string>
+  <string name="starting_downloading_remote_library">Loading online library</string>
   <string-array name="pref_themes_entries">
     <item>@string/theme_system</item>
     <item>@string/theme_light</item>

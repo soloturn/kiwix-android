@@ -374,7 +374,6 @@
   <string name="reaching_remote_library">Når ut till fjärrbibliotek</string>
   <string name="parsing_remote_library">Bearbetar fjärrbibliotek</string>
   <string name="starting_downloading_remote_library">Startar nedladdning av onlinebiblioteket</string>
-  <string name="downloading_library">Laddar ner bibliotek \n%s</string>
   <string name="no_notes">Inga anteckningar</string>
   <string name="notes_from_all_books">Visa anteckningar från alla böcker</string>
   <string name="search_notes">Sök i anteckningar</string>

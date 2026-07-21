@@ -373,7 +373,6 @@
   <string name="swipe_down_for_library">Scorri verso il basso per la libreria</string>
   <string name="parsing_remote_library">Analisi della libreria remota</string>
   <string name="starting_downloading_remote_library">Avvio del download della biblioteca online</string>
-  <string name="downloading_library">Scaricamento della libreria in corso %s</string>
   <string name="no_notes">Nessuna nota</string>
   <string name="notes_from_all_books">Visualizza le note di tutti i libri</string>
   <string name="search_notes">Cerca note</string>

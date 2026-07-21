@@ -250,7 +250,6 @@
   <string name="system_unable_to_grant_permission_message">Systemet kan ikke gi tillatelse!</string>
   <string name="allow">Tillat</string>
   <string name="swipe_down_for_library">Sveip ned for Bibliotek</string>
-  <string name="downloading_library">Laster ned bibliotek \n%s</string>
   <string name="no_notes">Ingen merknader</string>
   <string name="notes_from_all_books">Vis merknader fra alle bøker</string>
   <string name="search_notes">Søk i notater</string>

@@ -33,7 +33,6 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.data.remote.KiwixService
 import org.kiwix.kiwixmobile.core.utils.FIVE
 import org.kiwix.kiwixmobile.data.remote.OnlineLibraryManager
-import org.kiwix.kiwixmobile.data.remote.opds.KiwixOpdsServiceFactory
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryRequest
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Error
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Loading
@@ -48,21 +47,17 @@ class OnlineLibraryRepositoryImplTest {
   @JvmField
   val dispatcherRule = MainDispatcherRule()
   private val onlineLibraryManager: OnlineLibraryManager = mockk()
-  private val kiwixService: KiwixService = mockk()
-  private val factory: KiwixOpdsServiceFactory = mockk()
-
+  private lateinit var kiwixService: KiwixService
   private lateinit var repository: OnlineLibraryRepositoryImpl
 
   @BeforeEach
   fun setup() {
+    kiwixService = mockk()
     repository = OnlineLibraryRepositoryImpl(
       onlineLibraryManager,
-      factory,
+      kiwixService,
       dispatcherRule.dispatcher
     )
-    every {
-      factory.create(any(), any(), any(), any(), any(), any(), any(), any())
-    } returns kiwixService
   }
 
   @Test
@@ -92,7 +87,7 @@ class OnlineLibraryRepositoryImplTest {
     every { onlineLibraryManager.totalResult } returns 10
     every { onlineLibraryManager.calculateTotalPages(any(), any()) } returns 1
 
-    val result = repository.fetchOnlineLibrary(request, null).toList()
+    val result = repository.fetchOnlineLibrary(request).toList()
     advanceUntilIdle()
     assertTrue(result[0] is Loading)
     assertTrue(result[1] is Parsing)
@@ -117,7 +112,7 @@ class OnlineLibraryRepositoryImplTest {
 
     coEvery { kiwixService.getLibraryPage(any()) } throws RuntimeException("network error")
 
-    val result = repository.fetchOnlineLibrary(request, null).toList()
+    val result = repository.fetchOnlineLibrary(request).toList()
     advanceUntilIdle()
     assertTrue(result.size == 2)
     assertTrue(result[0] is Loading)
@@ -152,7 +147,7 @@ class OnlineLibraryRepositoryImplTest {
     every { onlineLibraryManager.totalResult } returns 10
     every { onlineLibraryManager.calculateTotalPages(any(), any()) } returns 1
 
-    val result = repository.fetchOnlineLibrary(request, null).toList()
+    val result = repository.fetchOnlineLibrary(request).toList()
 
     assertTrue(result.any { it is Success })
   }
@@ -180,7 +175,7 @@ class OnlineLibraryRepositoryImplTest {
     every { onlineLibraryManager.totalResult } returns 10
     every { onlineLibraryManager.calculateTotalPages(any(), any()) } returns 1
 
-    val result = repository.fetchOnlineLibrary(request, null).toList()
+    val result = repository.fetchOnlineLibrary(request).toList()
 
     assertTrue((result[0] as Loading).isLoadMore)
   }
@@ -208,7 +203,7 @@ class OnlineLibraryRepositoryImplTest {
     every { onlineLibraryManager.totalResult } returns 0
     every { onlineLibraryManager.calculateTotalPages(any(), any()) } returns 0
 
-    val result = repository.fetchOnlineLibrary(request, null).toList()
+    val result = repository.fetchOnlineLibrary(request).toList()
 
     assertTrue(result.any { it is Success })
   }
@@ -231,8 +226,8 @@ class OnlineLibraryRepositoryImplTest {
 
     coEvery { kiwixService.getLibraryPage(any()) } throws RuntimeException()
 
-    repository.fetchOnlineLibrary(request, null).toList()
+    repository.fetchOnlineLibrary(request).toList()
 
-    coVerify(exactly = FIVE * 2) { kiwixService.getLibraryPage(any()) }
+    coVerify(exactly = FIVE) { kiwixService.getLibraryPage(any()) }
   }
 }

@@ -360,7 +360,6 @@
   <string name="reaching_remote_library">Ја добивам далечинската библиотека</string>
   <string name="parsing_remote_library">Ја расчленувам далечинската библиотека</string>
   <string name="starting_downloading_remote_library">Започнувам со преземање на мрежната библиотека</string>
-  <string name="downloading_library">Преземање на библиотека\n%s</string>
   <string name="no_notes">Нема белешки</string>
   <string name="notes_from_all_books">Погл. белешки од сите книги</string>
   <string name="search_notes">Пребарај белешки</string>

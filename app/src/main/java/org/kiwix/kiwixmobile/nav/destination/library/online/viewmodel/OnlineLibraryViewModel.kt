@@ -69,7 +69,6 @@ import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
 import org.kiwix.kiwixmobile.core.utils.files.Log
 import org.kiwix.kiwixmobile.core.zim_manager.ConnectivityBroadcastReceiver
-import org.kiwix.kiwixmobile.data.remote.AppProgressListenerProvider
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
 import org.kiwix.kiwixmobile.nav.destination.library.online.helper.ObserveNetworkState
@@ -230,7 +229,6 @@ class OnlineLibraryViewModel @Inject constructor(
 
   private val _uiState = MutableStateFlow(OnlineLibraryUiState())
   val uiState = _uiState.asStateFlow()
-  private var appProgressListener: AppProgressListenerProvider? = null
   internal val onlineLibraryRequest = MutableSharedFlow<OnlineLibraryRequest>(
     replay = 1,
     onBufferOverflow = BufferOverflow.DROP_OLDEST
@@ -259,9 +257,6 @@ class OnlineLibraryViewModel @Inject constructor(
 
   init {
     context.registerReceiver(connectivityBroadcastReceiver)
-    appProgressListener = AppProgressListenerProvider(context) {
-      _uiState.update { current -> current.copy(scanningProgressBarMessage = it) }
-    }
     observeFlows()
   }
 
@@ -396,7 +391,7 @@ class OnlineLibraryViewModel @Inject constructor(
   }
 
   private fun observeLibrary() =
-    observeOnlineLibrary(onlineLibraryRequest, appProgressListener)
+    observeOnlineLibrary(onlineLibraryRequest)
       .onEach { state -> handleLibraryState(state) }
       .flowOn(ioDispatcher)
       .launchIn(viewModelScope)
@@ -789,7 +784,6 @@ class OnlineLibraryViewModel @Inject constructor(
     }
     coroutineJobs.clear()
     context.unregisterReceiver(connectivityBroadcastReceiver)
-    appProgressListener = null
     observeOnlineLibraryItems.dispose()
     super.onCleared()
   }

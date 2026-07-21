@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.flow
 import org.kiwix.kiwixmobile.core.compat.CompatHelper.Companion.isNetworkAvailable
 import org.kiwix.kiwixmobile.core.compat.CompatHelper.Companion.isWifi
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
-import org.kiwix.kiwixmobile.data.remote.AppProgressListenerProvider
 import org.kiwix.kiwixmobile.nav.destination.library.online.repository.OnlineLibraryRepository
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryRequest
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState
@@ -44,8 +43,7 @@ class ObserveOnlineLibrary @Inject constructor(
 ) {
   @OptIn(ExperimentalCoroutinesApi::class)
   operator fun invoke(
-    requests: Flow<OnlineLibraryRequest>,
-    appProgressListener: AppProgressListenerProvider?
+    requests: Flow<OnlineLibraryRequest>
   ): Flow<OnlineLibraryState> {
     return requests
       .flatMapLatest { request ->
@@ -59,7 +57,7 @@ class ObserveOnlineLibrary @Inject constructor(
             return@flow
           }
           emit(Idle(request.isLoadMoreItem))
-          emitAll(repository.fetchOnlineLibrary(request, appProgressListener))
+          emitAll(repository.fetchOnlineLibrary(request))
         }
       }
   }
