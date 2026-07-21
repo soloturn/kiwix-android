@@ -1034,10 +1034,12 @@ abstract class CoreReaderViewModel(
 
   open suspend fun openZimFile(zimReaderSource: ZimReaderSource) {
     if (isBrandedApp() || kiwixPermissionChecker.hasReadExternalStoragePermission()) {
+      // Destroy all existing WebViews before opening a new ZIM file.
+      // Each WebView is associated with the currently opened archive, so they
+      // must be recreated to avoid retaining references to the previous ZIM.
+      readerWebViewManager.destroyAllTabs()
       val result =
-        zimFileManager.openZimFileInReader(zimReaderSource, shouldShowSpellCheckedSuggestions()) {
-          readerWebViewManager.destroyAllTabs()
-        }
+        zimFileManager.openZimFileInReader(zimReaderSource, shouldShowSpellCheckedSuggestions())
       when (result) {
         is Success -> {
           // Show content if there is `Open Library` button showing

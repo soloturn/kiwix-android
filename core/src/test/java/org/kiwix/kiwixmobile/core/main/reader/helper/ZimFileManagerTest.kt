@@ -22,7 +22,6 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Before
@@ -36,7 +35,6 @@ class ZimFileManagerTest {
 
   private val zimReaderContainer = mockk<ZimReaderContainer>(relaxed = true)
   private val zimReader = mockk<ZimFileReader>(relaxed = true)
-  private val destroyWebViews: () -> Unit = mockk(relaxed = true)
 
   @Before
   fun setup() {
@@ -74,11 +72,7 @@ class ZimFileManagerTest {
 
     coEvery { source.canOpenInLibkiwix() } returns false
 
-    val result = manager.openZimFileInReader(
-      source,
-      false,
-      destroyWebViews
-    )
+    val result = manager.openZimFileInReader(source, false)
 
     assertThat(result).isEqualTo(ZimFileManager.OpenZimResult.InvalidFile)
 
@@ -95,11 +89,7 @@ class ZimFileManagerTest {
     every { zimReaderContainer.zimReaderSource } returns null
     every { zimReaderContainer.zimFileReader } returns zimReader
 
-    val result = manager.openZimFileInReader(
-      source,
-      true,
-      destroyWebViews
-    )
+    val result = manager.openZimFileInReader(source, true)
 
     assertThat(result)
       .isEqualTo(ZimFileManager.OpenZimResult.Success(zimReader))
@@ -117,54 +107,9 @@ class ZimFileManagerTest {
     every { zimReaderContainer.zimReaderSource } returns null
     every { zimReaderContainer.zimFileReader } returns null
 
-    val result = manager.openZimFileInReader(
-      source,
-      false,
-      destroyWebViews
-    )
+    val result = manager.openZimFileInReader(source, false)
 
     assertThat(result)
       .isEqualTo(ZimFileManager.OpenZimResult.InvalidFile)
-  }
-
-  @Test
-  fun `changing zim destroys webviews`() = runTest {
-    val oldSource = mockk<ZimReaderSource>()
-    val newSource = mockk<ZimReaderSource>()
-
-    coEvery { oldSource.canOpenInLibkiwix() } returns true
-    coEvery { newSource.canOpenInLibkiwix() } returns true
-
-    every { zimReaderContainer.zimReaderSource } returns oldSource
-    every { zimReaderContainer.zimFileReader } returns zimReader
-
-    manager.openZimFileInReader(
-      newSource,
-      false,
-      destroyWebViews
-    )
-
-    verify {
-      destroyWebViews.invoke()
-    }
-  }
-
-  @Test
-  fun `opening same zim does not destroy webviews`() = runTest {
-    val source = mockk<ZimReaderSource>()
-
-    coEvery { source.canOpenInLibkiwix() } returns true
-    every { zimReaderContainer.zimReaderSource } returns source
-    every { zimReaderContainer.zimFileReader } returns zimReader
-
-    manager.openZimFileInReader(
-      source,
-      false,
-      destroyWebViews
-    )
-
-    verify(exactly = 0) {
-      destroyWebViews.invoke()
-    }
   }
 }

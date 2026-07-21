@@ -59,6 +59,7 @@ import org.kiwix.kiwixmobile.core.settings.viewmodel.Action.ShowSnackbar
 import org.kiwix.kiwixmobile.core.utils.EXTERNAL_SELECT_POSITION
 import org.kiwix.kiwixmobile.core.utils.INTERNAL_SELECT_POSITION
 import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
+import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.StorageUtils.isExternalStorageWritable
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
@@ -82,7 +83,8 @@ abstract class CoreSettingsViewModel(
   val storageCalculator: StorageCalculator,
   val themeConfig: ThemeConfig,
   val libkiwixBookmarks: LibkiwixBookmarks,
-  val kiwixPermissionChecker: KiwixPermissionChecker
+  val kiwixPermissionChecker: KiwixPermissionChecker,
+  val storageDeviceProvider: StorageDeviceProvider
 ) : ViewModel() {
   data class SettingsUiState(
     val storageDeviceList: List<StorageDevice> = emptyList(),
@@ -97,7 +99,7 @@ abstract class CoreSettingsViewModel(
     val shouldShowRatingCategory: Boolean = false
   )
 
-  abstract suspend fun setStorage(coreMainActivity: CoreMainActivity)
+  abstract suspend fun setStorage()
   abstract suspend fun showExternalLinksPreference()
   abstract suspend fun showPrefWifiOnlyPreference()
   abstract suspend fun showPermissionItem()
@@ -110,8 +112,8 @@ abstract class CoreSettingsViewModel(
   val actions: SharedFlow<Action> = _actions
   lateinit var alertDialogShower: AlertDialogShower
 
-  suspend fun initialize(activity: CoreMainActivity) {
-    setStorage(activity)
+  suspend fun initialize() {
+    setStorage()
     showExternalLinksPreference()
     showPrefWifiOnlyPreference()
     showPermissionItem()
@@ -429,7 +431,7 @@ abstract class CoreSettingsViewModel(
   }
 
   @Suppress("NestedBlockDepth")
-  fun onStorageDeviceSelected(storageDevice: StorageDevice, coreMainActivity: CoreMainActivity) {
+  fun onStorageDeviceSelected(storageDevice: StorageDevice) {
     viewModelScope.launch {
       kiwixDataStore.apply {
         setSelectedStorage(getPublicDirectoryPath(storageDevice.name))
@@ -441,7 +443,7 @@ abstract class CoreSettingsViewModel(
           }
         )
         setShowStorageOption()
-        setStorage(coreMainActivity)
+        setStorage()
       }
     }
   }

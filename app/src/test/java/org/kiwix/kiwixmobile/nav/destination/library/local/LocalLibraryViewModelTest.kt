@@ -127,7 +127,6 @@ class LocalLibraryViewModelTest {
       mainDispatcherRule.dispatcher
     )
     vm.initialize(
-      emptyList(),
       validateZimViewModel,
       alertDialogShower,
       snackBarHostState
@@ -430,7 +429,6 @@ class LocalLibraryViewModelTest {
     }
     verify {
       processSelectedZimFilesForPlayStore.init(
-        storageDeviceList = any(),
         lifecycleScope = any(),
         alertDialogShower = alertDialogShower,
         snackBarHostState = snackBarHostState,

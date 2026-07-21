@@ -112,7 +112,6 @@ class OnlineLibraryScreenTest {
         bottomAppBarScrollBehaviour = null,
         onUserBackPressed = onBackPressed,
         navHostController = navHostController,
-        activity = mockk(relaxed = true),
         navigationIcon = {}
       )
     }
@@ -372,7 +371,7 @@ class OnlineLibraryScreenTest {
       .onAllNodesWithTag(ONLINE_BOOK_ITEM_TESTING_TAG)[0]
       .performClick()
 
-    verify { viewModel.onBookItemClick(item, any()) }
+    verify { viewModel.onBookItemClick(item) }
   }
 
   @Test
@@ -389,7 +388,7 @@ class OnlineLibraryScreenTest {
       .onAllNodesWithTag(ONLINE_BOOK_ITEM_TESTING_TAG)[0]
       .performClick()
 
-    verify(exactly = ZERO) { viewModel.onBookItemClick(any(), any()) }
+    verify(exactly = ZERO) { viewModel.onBookItemClick(any()) }
   }
 
   @Test

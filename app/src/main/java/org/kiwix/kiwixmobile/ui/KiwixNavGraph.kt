@@ -120,13 +120,11 @@ fun KiwixNavGraph(
         }
       )
     ) { backStackEntry ->
-      val activity = LocalActivity.current as KiwixMainActivity
       val validateZimViewModel: ValidateZimViewModel = viewModel(factory = viewModelFactory)
       val localLibraryViewModel: LocalLibraryViewModel = viewModel(factory = viewModelFactory)
       LaunchedEffect(Unit) {
         localLibraryViewModel.apply {
           initialize(
-            activity.getStorageDeviceList(),
             validateZimViewModel,
             alertDialogShower,
             snackBarHostState

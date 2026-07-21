@@ -143,6 +143,10 @@ class CopyMoveFileHandler @Inject constructor(
     lifecycleScope = coroutineScope
   }
 
+  private fun requireLifeCycleScope() = requireNotNull(lifecycleScope) {
+    "LifecycleScope is not set. Call CopyMoveFileHandler.setLifeCycleScope before using it"
+  }
+
   fun showStorageSelectDialog(storageDeviceList: List<StorageDevice>) {
     val dialogConfig = StorageSelectDialogConfig(
       storageDeviceList = storageDeviceList,
@@ -151,7 +155,7 @@ class CopyMoveFileHandler @Inject constructor(
       kiwixDataStore = kiwixDataStore,
       storageCalculator = storageCalculator,
       onSelectAction = { storageDevice ->
-        lifecycleScope?.launch {
+        requireLifeCycleScope().launch {
           copyMoveZIMFileInSelectedStorage(storageDevice)
         }
       }
@@ -234,7 +238,7 @@ class CopyMoveFileHandler @Inject constructor(
 
   fun observeFileSystemState() {
     if (storageObservingJob?.isActive == true) return
-    storageObservingJob = lifecycleScope?.launch {
+    storageObservingJob = requireLifeCycleScope().launch {
       // Wait until filesystem detection completes
       fat32Checker.fileSystemStates.first { it != DetectingFileSystem }
       copyMoveProgressBarController.hidePreparingCopyMoveDialog()
@@ -263,13 +267,13 @@ class CopyMoveFileHandler @Inject constructor(
   }
 
   private fun onCopyClicked(showStorageSelectionDialog: Boolean) {
-    lifecycleScope?.launch {
+    requireLifeCycleScope().launch {
       performCopyOperation(showStorageSelectionDialog)
     }
   }
 
   private fun onMoveClicked(showStorageSelectionDialog: Boolean) {
-    lifecycleScope?.launch {
+    requireLifeCycleScope().launch {
       performMoveOperation(showStorageSelectionDialog)
     }
   }

@@ -24,7 +24,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import leakcanary.LeakAssertions
 import org.junit.After
 import org.junit.Before
@@ -79,9 +78,7 @@ class LocalLibraryTest : BaseActivityTest() {
         kiwixMainActivity,
         kiwixMainActivity.viewModelFactory
       )[ValidateZimViewModel::class.java]
-      val storageDeviceList = runBlocking { kiwixMainActivity.getStorageDeviceList() }
       localLibraryViewModel.initialize(
-        storageDeviceList = storageDeviceList,
         validateZimViewModel = validateZimViewModel,
         kiwixMainActivity.alertDialogShower,
         kiwixMainActivity.snackBarHostState

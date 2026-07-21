@@ -78,6 +78,7 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
   fun assertStorageSelectionDialogDisplayed(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
+        waitForIdle()
         waitUntilTimeout()
         onNodeWithTag(STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG)
           .assertTextEquals(context.getString(R.string.choose_storage_to_copy_move_zim_file))

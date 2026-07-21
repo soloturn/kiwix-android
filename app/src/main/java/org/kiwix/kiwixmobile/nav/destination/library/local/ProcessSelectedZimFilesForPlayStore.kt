@@ -37,6 +37,7 @@ import org.kiwix.kiwixmobile.core.settings.StorageCalculator
 import org.kiwix.kiwixmobile.core.ui.components.ONE
 import org.kiwix.kiwixmobile.core.utils.EXTERNAL_SELECT_POSITION
 import org.kiwix.kiwixmobile.core.utils.INTERNAL_SELECT_POSITION
+import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
@@ -62,14 +63,14 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
   private val kiwixDataStore: KiwixDataStore,
   private val context: Context,
   private val copyMoveFileHandler: CopyMoveFileHandler,
-  private val storageCalculator: StorageCalculator
+  private val storageCalculator: StorageCalculator,
+  private val storageDeviceProvider: StorageDeviceProvider
 ) : CopyMoveFileHandler.FileCopyMoveCallback {
   private var snackBarHostState: SnackbarHostState? = null
   private var selectedZimFileCallback: SelectedZimFileCallback? = null
   private var lifecycleScope: CoroutineScope? = null
   private var alertDialogShower: AlertDialogShower? = null
   private var isSingleFileSelected = false
-  private var storageDeviceList: List<StorageDevice> = emptyList()
 
   /**
    * Manages the selected action by user when processing the multiple files.
@@ -83,13 +84,11 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
    * Must be called before using this class.
    */
   fun init(
-    storageDeviceList: List<StorageDevice>,
     lifecycleScope: CoroutineScope,
     alertDialogShower: AlertDialogShower,
     snackBarHostState: SnackbarHostState,
     selectedZimFileCallback: SelectedZimFileCallback
   ) {
-    this.storageDeviceList = storageDeviceList
     this.lifecycleScope = lifecycleScope
     this.selectedZimFileCallback = selectedZimFileCallback
     this.alertDialogShower = alertDialogShower
@@ -181,7 +180,7 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
     }
 
     copyMoveFileHandler.showMoveFileToPublicDirectoryDialog(
-      storageDeviceList,
+      storageDeviceProvider.getWritableStorage(),
       uri,
       documentFile,
       // pass if fileName is null then we will validate it after copying/moving
@@ -302,15 +301,18 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
       actionLabel = context.getString(string.change_storage),
       lifecycleScope = requireLifecycleScope(),
       actionClick = {
-        val dialogConfig = StorageSelectDialogConfig(
-          storageDeviceList = storageDeviceList,
-          title = context.getString(string.pref_storage),
-          shouldShowCheckboxSelected = true,
-          kiwixDataStore = kiwixDataStore,
-          storageCalculator = storageCalculator,
-          onSelectAction = ::storeDeviceInPreferences
-        )
-        showStorageSelectionDialog(dialogConfig)
+        requireLifecycleScope().runSafelyInLifecycleScope {
+          val storageDeviceList = storageDeviceProvider.getWritableStorage()
+          val dialogConfig = StorageSelectDialogConfig(
+            storageDeviceList = storageDeviceList,
+            title = context.getString(string.pref_storage),
+            shouldShowCheckboxSelected = true,
+            kiwixDataStore = kiwixDataStore,
+            storageCalculator = storageCalculator,
+            onSelectAction = ::storeDeviceInPreferences
+          )
+          showStorageSelectionDialog(dialogConfig)
+        }
       }
     )
   }

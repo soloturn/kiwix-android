@@ -52,6 +52,7 @@ import org.kiwix.kiwixmobile.R.string
 import org.kiwix.kiwixmobile.core.extensions.snack
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.settings.StorageCalculator
+import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.nav.destination.library.CopyMoveFileHandler
@@ -67,6 +68,7 @@ class ProcessSelectedZimFilesForPlayStoreTest {
   private val activity: Activity = mockk(relaxed = true)
   private val copyMoveFileHandler: CopyMoveFileHandler = mockk(relaxed = true)
   private val storageCalculator: StorageCalculator = mockk(relaxed = true)
+  private val storageDeviceProvider: StorageDeviceProvider = mockk(relaxed = true)
   private val alertDialogShower: AlertDialogShower = mockk(relaxed = true)
   private val snackBarHostState: SnackbarHostState = mockk(relaxed = true)
 
@@ -86,11 +88,11 @@ class ProcessSelectedZimFilesForPlayStoreTest {
       kiwixDataStore,
       activity,
       copyMoveFileHandler,
-      storageCalculator
+      storageCalculator,
+      storageDeviceProvider
     )
 
     processSelectedZimFiles.init(
-      emptyList(),
       testScope,
       alertDialogShower,
       snackBarHostState,
@@ -156,7 +158,7 @@ class ProcessSelectedZimFilesForPlayStoreTest {
       }
 
       actionClickSlot.captured?.invoke()
-
+      advanceUntilIdle()
       verify {
         selectedZimFileCallback.showStorageSelectionDialog(any())
       }

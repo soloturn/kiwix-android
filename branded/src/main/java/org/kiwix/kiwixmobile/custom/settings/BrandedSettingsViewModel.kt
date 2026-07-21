@@ -23,10 +23,10 @@ import kotlinx.coroutines.flow.update
 import org.kiwix.kiwixmobile.core.ThemeConfig
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.data.DataSource
-import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.settings.StorageCalculator
 import org.kiwix.kiwixmobile.core.settings.viewmodel.CoreSettingsViewModel
 import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
+import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.custom.BuildConfig
 import javax.inject.Inject
@@ -39,7 +39,8 @@ class BrandedSettingsViewModel @Inject constructor(
   storageCalculator: StorageCalculator,
   themeConfig: ThemeConfig,
   libkiwixBookmarks: LibkiwixBookmarks,
-  kiwixPermissionChecker: KiwixPermissionChecker
+  kiwixPermissionChecker: KiwixPermissionChecker,
+  storageDeviceProvider: StorageDeviceProvider
 ) : CoreSettingsViewModel(
     context,
     kiwixDataStore,
@@ -47,9 +48,10 @@ class BrandedSettingsViewModel @Inject constructor(
     storageCalculator,
     themeConfig,
     libkiwixBookmarks,
-    kiwixPermissionChecker
+    kiwixPermissionChecker,
+    storageDeviceProvider
   ) {
-  override suspend fun setStorage(coreMainActivity: CoreMainActivity) {
+  override suspend fun setStorage() {
     settingsUiState.update {
       it.copy(
         shouldShowStorageCategory = false,

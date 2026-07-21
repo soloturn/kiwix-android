@@ -61,7 +61,6 @@ class ReadAloudManager @Inject constructor(
 
   private var ttsStateCallback: ((TtsState) -> Unit)? = null
   var tts: KiwixTextToSpeech? = null
-  private var isReadAloudServiceRunning = false
 
   // This is for if the read aloud is currently reading the selected text inside webView.
   private var isReadSelection = false
@@ -73,61 +72,66 @@ class ReadAloudManager @Inject constructor(
   }
 
   private fun requireTtsStateCallback() = requireNotNull(ttsStateCallback) {
-    "TtsState callback is set. Set ReadAloudManager.setTtsStateCallback before using it"
+    "TtsState callback is not set. Set ReadAloudManager.setTtsStateCallback before using it"
   }
 
   private fun requireTts() = requireNotNull(tts) {
     "KiwixTextToSpeech is not initialized. Call ReadAloudManager.setUpTTS before using it"
   }
 
+  private fun dispatchState(state: TtsState) {
+    requireTtsStateCallback().invoke(state)
+  }
+
   fun isTtsInitialed() = requireTts().isInitialized
+
+  private val initListener = object : OnInitSucceedListener {
+    override fun onInitSucceed() {
+      dispatchState(if (isReadSelection) StartReadSelection else StartReadAloud)
+    }
+  }
+
+  private val speakingListener = object : OnSpeakingListener {
+    override fun onSpeakingStarted() {
+      dispatchState(SpeakingStarted)
+      setActionAndStartTTSService(ACTION_PAUSE_OR_RESUME_TTS, false)
+    }
+
+    override fun onSpeakingEnded() {
+      dispatchState(SpeakingEnded)
+      setActionAndStartTTSService(ACTION_STOP_TTS)
+    }
+  }
+
+  private val audioFocusChangedListener = OnAudioFocusChangeListener { focusChange: Int ->
+    val tts = tts ?: return@OnAudioFocusChangeListener
+    Log.d(TAG_KIWIX, "Focus change: $focusChange")
+    tts.currentTTSTask?.let {
+      tts.stop()
+      setActionAndStartTTSService(ACTION_STOP_TTS)
+      return@OnAudioFocusChangeListener
+    }
+    when (focusChange) {
+      AudioManager.AUDIOFOCUS_LOSS -> {
+        if (tts.currentTTSTask?.paused == false) tts.pauseOrResume()
+        dispatchState(AudioFocusLoss)
+        setActionAndStartTTSService(ACTION_PAUSE_OR_RESUME_TTS, true)
+      }
+
+      AudioManager.AUDIOFOCUS_GAIN -> {
+        dispatchState(AudioFocusGain)
+        setActionAndStartTTSService(ACTION_PAUSE_OR_RESUME_TTS, false)
+      }
+    }
+  }
 
   fun setUpTTS() {
     tts =
       KiwixTextToSpeech(
         context,
-        object : OnInitSucceedListener {
-          override fun onInitSucceed() {
-            if (isReadSelection) {
-              requireTtsStateCallback().invoke(StartReadSelection)
-            } else {
-              requireTtsStateCallback().invoke(StartReadAloud)
-            }
-          }
-        },
-        object : OnSpeakingListener {
-          override fun onSpeakingStarted() {
-            requireTtsStateCallback().invoke(SpeakingStarted)
-            setActionAndStartTTSService(ACTION_PAUSE_OR_RESUME_TTS, false)
-          }
-
-          override fun onSpeakingEnded() {
-            requireTtsStateCallback().invoke(SpeakingEnded)
-            setActionAndStartTTSService(ACTION_STOP_TTS)
-          }
-        },
-        OnAudioFocusChangeListener label@{ focusChange: Int ->
-          if (tts != null) {
-            Log.d(TAG_KIWIX, "Focus change: $focusChange")
-            tts?.currentTTSTask?.let {
-              tts?.stop()
-              setActionAndStartTTSService(ACTION_STOP_TTS)
-              return@label
-            }
-            when (focusChange) {
-              AudioManager.AUDIOFOCUS_LOSS -> {
-                if (tts?.currentTTSTask?.paused == false) tts?.pauseOrResume()
-                requireTtsStateCallback().invoke(AudioFocusLoss)
-                setActionAndStartTTSService(ACTION_PAUSE_OR_RESUME_TTS, true)
-              }
-
-              AudioManager.AUDIOFOCUS_GAIN -> {
-                requireTtsStateCallback().invoke(AudioFocusGain)
-                setActionAndStartTTSService(ACTION_PAUSE_OR_RESUME_TTS, false)
-              }
-            }
-          }
-        },
+        initListener,
+        speakingListener,
+        audioFocusChangedListener,
         zimReaderContainer
       )
   }
@@ -144,7 +148,6 @@ class ReadAloudManager @Inject constructor(
   fun stopReadAloudSafely() {
     runCatching {
       ttsStateCallback = null
-      isReadAloudServiceRunning = false
       tts?.apply {
         setActionAndStartTTSService(ACTION_STOP_TTS)
         shutdown()
@@ -161,9 +164,7 @@ class ReadAloudManager @Inject constructor(
   private fun setActionAndStartTTSService(action: String, isPauseTTS: Boolean = false) {
     context.startService(
       createReadAloudIntent(action, isPauseTTS)
-    ).also {
-      isReadAloudServiceRunning = action == ACTION_PAUSE_OR_RESUME_TTS
-    }
+    )
   }
 
   private fun createReadAloudIntent(action: String, isPauseTTS: Boolean): Intent =
@@ -182,32 +183,28 @@ class ReadAloudManager @Inject constructor(
   fun startReadAloud(kiwixWebView: KiwixWebView, index: Int) {
     currentTtsIndex = index
     requireTts().readAloud(kiwixWebView) {
-      requireTtsStateCallback().invoke(ShowTTSLanguageDownloadDialog)
+      dispatchState(ShowTTSLanguageDownloadDialog)
     }
   }
 
   fun pauseTts() {
-    if (tts?.currentTTSTask == null) {
-      tts?.stop()
+    val tts = requireTts()
+    val task = tts.currentTTSTask
+    if (task == null) {
+      tts.stop()
       setActionAndStartTTSService(ACTION_STOP_TTS)
       return
     }
-    tts?.currentTTSTask?.let {
-      if (it.paused) {
-        tts?.pauseOrResume()
-        requireTtsStateCallback().invoke(TtsResumed)
-        setActionAndStartTTSService(ACTION_PAUSE_OR_RESUME_TTS, false)
-      } else {
-        tts?.pauseOrResume()
-        requireTtsStateCallback().invoke(TtsPaused)
-        setActionAndStartTTSService(ACTION_PAUSE_OR_RESUME_TTS, true)
-      }
-    }
+    val wasPaused = task.paused
+    tts.pauseOrResume()
+    dispatchState(if (wasPaused) TtsResumed else TtsPaused)
+    setActionAndStartTTSService(ACTION_PAUSE_OR_RESUME_TTS, !wasPaused)
   }
 
   fun stopReadAloud() {
-    requireTts().currentTTSTask?.let {
-      requireTts().stop()
+    val tts = requireTts()
+    tts.currentTTSTask?.let {
+      tts.stop()
       setActionAndStartTTSService(ACTION_STOP_TTS)
     }
   }

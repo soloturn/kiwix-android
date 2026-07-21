@@ -28,12 +28,11 @@ import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ThemeConfig
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.data.DataSource
-import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.settings.StorageCalculator
 import org.kiwix.kiwixmobile.core.settings.viewmodel.CoreSettingsViewModel
 import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
+import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
-import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import javax.inject.Inject
 
 @Suppress("LongParameterList")
@@ -44,7 +43,8 @@ class KiwixSettingsViewModel @Inject constructor(
   storageCalculator: StorageCalculator,
   themeConfig: ThemeConfig,
   libkiwixBookmarks: LibkiwixBookmarks,
-  kiwixPermissionChecker: KiwixPermissionChecker
+  kiwixPermissionChecker: KiwixPermissionChecker,
+  storageDeviceProvider: StorageDeviceProvider
 ) : CoreSettingsViewModel(
     context,
     kiwixDataStore,
@@ -52,10 +52,11 @@ class KiwixSettingsViewModel @Inject constructor(
     storageCalculator,
     themeConfig,
     libkiwixBookmarks,
-    kiwixPermissionChecker
+    kiwixPermissionChecker,
+    storageDeviceProvider,
   ) {
   private var storageDeviceList: List<StorageDevice> = listOf()
-  override suspend fun setStorage(coreMainActivity: CoreMainActivity) {
+  override suspend fun setStorage() {
     settingsUiState.update { it.copy(shouldShowStorageCategory = true) }
     if (storageDeviceList.isNotEmpty()) {
       // update the storage when user switch to other storage.
@@ -63,7 +64,7 @@ class KiwixSettingsViewModel @Inject constructor(
       return
     }
     showHideProgressBarWhileFetchingStorageInfo(true)
-    storageDeviceList = (coreMainActivity as KiwixMainActivity).getStorageDeviceList()
+    storageDeviceList = storageDeviceProvider.getWritableStorage()
     showHideProgressBarWhileFetchingStorageInfo(false)
     setUpStoragePreference()
   }

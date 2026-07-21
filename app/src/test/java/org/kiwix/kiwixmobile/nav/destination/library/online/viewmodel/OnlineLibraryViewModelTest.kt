@@ -55,6 +55,7 @@ import org.kiwix.kiwixmobile.core.downloader.Downloader
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.kiwixmobile.core.utils.BookUtils
 import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
+import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
 import org.kiwix.kiwixmobile.core.zim_manager.ConnectivityBroadcastReceiver
@@ -80,6 +81,7 @@ import org.kiwix.kiwixmobile.nav.destination.library.online.helper.ResolveRefres
 import org.kiwix.kiwixmobile.nav.destination.library.online.helper.ResolveRefreshLibraryAction.Result.NoInternetWithEmptyContent
 import org.kiwix.kiwixmobile.nav.destination.library.online.helper.ResolveRefreshLibraryAction.Result.Proceed
 import org.kiwix.kiwixmobile.nav.destination.library.online.helper.ResolveRefreshLibraryAction.Result.WifiOnlyBlocked
+import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryRequest
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Idle
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Loading
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.NoInternetConnection
@@ -92,7 +94,6 @@ import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibr
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.UiEvent.ShowDialog
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.UiEvent.ShowNoSpaceSnackbar
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.UiEvent.ShowSnackbar
-import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryRequest
 import org.kiwix.kiwixmobile.zimManager.libraryView.AvailableSpaceCalculator
 import org.kiwix.kiwixmobile.zimManager.libraryView.LibraryListItem
 import org.kiwix.sharedFunctions.MainDispatcherRule
@@ -119,6 +120,7 @@ class OnlineLibraryViewModelTest {
   private val observeLibrary: ObserveOnlineLibrary = mockk(relaxed = true)
   private val refreshAction: ResolveRefreshLibraryAction = mockk(relaxed = true)
   private val observeNetwork: ObserveNetworkState = mockk(relaxed = true)
+  private val storageDeviceProvider: StorageDeviceProvider = mockk(relaxed = true)
   private lateinit var viewModel: OnlineLibraryViewModel
 
   @BeforeEach
@@ -153,6 +155,7 @@ class OnlineLibraryViewModelTest {
       observeLibrary,
       refreshAction,
       observeNetwork,
+      storageDeviceProvider,
       dispatcherRule.dispatcher
     )
     viewModel.networkBooks.tryEmit(emptyList())
@@ -241,12 +244,11 @@ class OnlineLibraryViewModelTest {
     @Test
     fun `when action is StartDownload then triggers download`() = runTest {
       val item = mockk<LibraryListItem.BookItem>(relaxed = true)
-      val activity = mockk<KiwixMainActivity>(relaxed = true)
 
       coEvery { resolveClick.onBookItemClick(item, any()) } returns
         StartDownload(item)
 
-      viewModel.onBookItemClick(item, activity)
+      viewModel.onBookItemClick(item)
 
       advanceUntilIdle()
 
@@ -256,12 +258,11 @@ class OnlineLibraryViewModelTest {
     @Test
     fun `when action is NoInternet then emits snackbar`() = runTest {
       val item = mockk<LibraryListItem.BookItem>(relaxed = true)
-      val activity = mockk<KiwixMainActivity>(relaxed = true)
 
       coEvery { resolveClick.onBookItemClick(any(), any()) } returns
         NoInternet
       viewModel.uiEvents.test {
-        viewModel.onBookItemClick(item, activity)
+        viewModel.onBookItemClick(item)
 
         advanceUntilIdle()
         val snackBar = awaitItem() as ShowSnackbar
@@ -274,12 +275,11 @@ class OnlineLibraryViewModelTest {
     @Test
     fun `when action is RequestStoragePermission then emits permission event`() = runTest {
       val item = mockk<LibraryListItem.BookItem>(relaxed = true)
-      val activity = mockk<KiwixMainActivity>(relaxed = true)
 
       coEvery { resolveClick.onBookItemClick(any(), any()) } returns RequestStoragePermission
 
       viewModel.uiEvents.test {
-        viewModel.onBookItemClick(item, activity)
+        viewModel.onBookItemClick(item)
         advanceUntilIdle()
         val permission = awaitItem() as RequestPermission
         assertTrue(permission.permission == WRITE_EXTERNAL_STORAGE)
@@ -291,11 +291,10 @@ class OnlineLibraryViewModelTest {
     @Test
     fun `when action is RequestNotificationPermission then emits permission event`() = runTest {
       val item = mockk<LibraryListItem.BookItem>(relaxed = true)
-      val activity = mockk<KiwixMainActivity>(relaxed = true)
       coEvery { resolveClick.onBookItemClick(any(), any()) } returns RequestNotificationPermission
 
       viewModel.uiEvents.test {
-        viewModel.onBookItemClick(item, activity)
+        viewModel.onBookItemClick(item)
         advanceUntilIdle()
         val permission = awaitItem() as RequestPermission
         assertTrue(permission.permission == POST_NOTIFICATIONS)
@@ -308,7 +307,6 @@ class OnlineLibraryViewModelTest {
     fun `when action is RequestManageExternalFilesPermission then emits permission event`() =
       runTest {
         val item = mockk<LibraryListItem.BookItem>(relaxed = true)
-        val activity = mockk<KiwixMainActivity>(relaxed = true)
         coEvery {
           resolveClick.onBookItemClick(
             any(),
@@ -317,7 +315,7 @@ class OnlineLibraryViewModelTest {
         } returns RequestManageExternalFilesPermission
 
         viewModel.uiEvents.test {
-          viewModel.onBookItemClick(item, activity)
+          viewModel.onBookItemClick(item)
           advanceUntilIdle()
           val dialog = awaitItem() as ShowDialog
           assertTrue(dialog.dialog == KiwixDialog.ManageExternalFilesPermissionDialog)
@@ -330,12 +328,11 @@ class OnlineLibraryViewModelTest {
     @Test
     fun `when action is ShowWifiOnlyDialog then shows dialog`() = runTest {
       val item = mockk<LibraryListItem.BookItem>(relaxed = true)
-      val activity = mockk<KiwixMainActivity>(relaxed = true)
 
       coEvery { resolveClick.onBookItemClick(any(), any()) } returns ShowWifiOnlyDialog
 
       viewModel.uiEvents.test {
-        viewModel.onBookItemClick(item, activity)
+        viewModel.onBookItemClick(item)
         advanceUntilIdle()
 
         val dialog = awaitItem() as ShowDialog
@@ -347,12 +344,11 @@ class OnlineLibraryViewModelTest {
     @Test
     fun `when action is NotEnoughSpace then shows no space snackbar`() = runTest {
       val item = mockk<LibraryListItem.BookItem>(relaxed = true)
-      val activity = mockk<KiwixMainActivity>(relaxed = true)
 
       coEvery { resolveClick.onBookItemClick(any(), any()) } returns NotEnoughSpace("100MB")
 
       viewModel.uiEvents.test {
-        viewModel.onBookItemClick(item, activity)
+        viewModel.onBookItemClick(item)
         advanceUntilIdle()
         val snackBar = awaitItem() as ShowNoSpaceSnackbar
         assertTrue(snackBar.message.contains("100MB"))
@@ -363,13 +359,12 @@ class OnlineLibraryViewModelTest {
     @Test
     fun `when action is DisableStorageSelection then it sets the showStorageOption`() = runTest {
       val item = mockk<LibraryListItem.BookItem>(relaxed = true)
-      val activity = mockk<KiwixMainActivity>(relaxed = true)
 
       coEvery { resolveClick.onBookItemClick(any(), any()) } returnsMany listOf(
         DisableStorageSelection,
         StartDownload(item)
       )
-      viewModel.onBookItemClick(item, activity)
+      viewModel.onBookItemClick(item)
       advanceUntilIdle()
       coVerify { kiwixDataStore.setShowStorageOption(false) }
       verify { downloader.download(item.book) }
@@ -524,6 +519,7 @@ class OnlineLibraryViewModelTest {
         observeLibrary,
         refreshAction,
         observeNetwork,
+        storageDeviceProvider,
         dispatcherRule.dispatcher
       )
       verify(exactly = 0) { downloaderProvider.get() }
@@ -532,7 +528,6 @@ class OnlineLibraryViewModelTest {
     @Test
     fun `downloaderProvider is called only when download is triggered`() = runTest {
       val item = mockk<LibraryListItem.BookItem>(relaxed = true)
-      val activity = mockk<KiwixMainActivity>(relaxed = true)
 
       coEvery {
         resolveClick.onBookItemClick(item, any())
@@ -540,7 +535,7 @@ class OnlineLibraryViewModelTest {
 
       verify(exactly = 0) { downloaderProvider.get() }
 
-      viewModel.onBookItemClick(item, activity)
+      viewModel.onBookItemClick(item)
 
       advanceUntilIdle()
 
@@ -761,11 +756,11 @@ class OnlineLibraryViewModelTest {
       viewModel.downloadBookItem = item
 
       val spyVm = spyk(viewModel)
-      every { spyVm.onBookItemClick(item, activity) } just Runs
+      every { spyVm.onBookItemClick(item) } just Runs
 
       spyVm.onNotificationPermissionResult(true, activity)
 
-      verify { spyVm.onBookItemClick(item, activity) }
+      verify { spyVm.onBookItemClick(item) }
     }
 
     @Test
@@ -816,11 +811,11 @@ class OnlineLibraryViewModelTest {
       viewModel.downloadBookItem = item
 
       val spyVm = spyk(viewModel)
-      every { spyVm.onBookItemClick(item, activity) } just Runs
+      every { spyVm.onBookItemClick(item) } just Runs
 
       spyVm.onStoragePermissionResult(true, activity)
 
-      verify { spyVm.onBookItemClick(item, activity) }
+      verify { spyVm.onBookItemClick(item) }
     }
 
     @Test

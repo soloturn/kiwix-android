@@ -33,7 +33,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.kiwix.kiwixmobile.BaseActivityTest
-import org.kiwix.kiwixmobile.core.reader.integrity.ValidateZimViewModel
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
@@ -126,26 +125,11 @@ class ProcessSelectedZimFilesForStandaloneTest : BaseActivityTest() {
       kiwixMainActivity = composeTestRule.activity
 
       val localLibraryViewModel = ViewModelProvider(
-        kiwixMainActivity,
+        kiwixMainActivity.navController.getBackStackEntry(KiwixDestination.Library.route),
         kiwixMainActivity.viewModelFactory
       )[LocalLibraryViewModel::class.java]
-
-      val validateZimViewModel = ViewModelProvider(
-        kiwixMainActivity,
-        kiwixMainActivity.viewModelFactory
-      )[ValidateZimViewModel::class.java]
-      val storageDeviceList = runBlocking { kiwixMainActivity.getStorageDeviceList() }
-      localLibraryViewModel.initialize(
-        storageDeviceList = storageDeviceList,
-        validateZimViewModel = validateZimViewModel,
-        kiwixMainActivity.alertDialogShower,
-        kiwixMainActivity.snackBarHostState
-      )
       kiwixMainActivity.lifecycleScope.launch {
         localLibraryViewModel.handleSelectedFileUri(urisList)
-        localLibraryViewModel.sideEffects.collect { effect ->
-          effect.invokeWith(kiwixMainActivity)
-        }
       }
     }
   }
