@@ -21,7 +21,6 @@ package org.kiwix.kiwixmobile.custom.main
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberDrawerState
@@ -47,13 +46,12 @@ import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_HELP_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.NEW_TAB_SHORTCUT_ID
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
-import org.kiwix.kiwixmobile.custom.BuildConfig
 import org.kiwix.kiwixmobile.custom.BrandedApp
+import org.kiwix.kiwixmobile.custom.BuildConfig
 import org.kiwix.kiwixmobile.custom.R
 import org.kiwix.kiwixmobile.custom.brandedActivityComponent
 
 class BrandedMainActivity : CoreMainActivity() {
-  override val mainActivity: AppCompatActivity by lazy { this }
   override val appName: String by lazy { getString(R.string.app_name) }
 
   override val searchScreenRoute: String = CustomDestination.Search.route

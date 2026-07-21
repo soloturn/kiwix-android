@@ -23,10 +23,8 @@ import com.tonyodev.fetch2.Fetch
 import com.tonyodev.fetch2.NetworkType
 import com.tonyodev.fetch2.Request
 import com.tonyodev.fetch2core.Func
-import io.mockk.Runs
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
@@ -42,6 +40,7 @@ import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.dao.entities.DownloadRoomEntity
 import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadManagerRequester
+import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorServiceManager
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadRequest
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.utils.AUTO_RETRY_MAX_ATTEMPTS
@@ -55,6 +54,7 @@ class DownloadManagerRequesterTest {
   private lateinit var downloadRoomDao: DownloadRoomDao
   private lateinit var requester: DownloadManagerRequester
   private lateinit var mainActivity: CoreMainActivity
+  private lateinit var downloadMonitorServiceManager: DownloadMonitorServiceManager
 
   @RegisterExtension
   @JvmField
@@ -67,10 +67,7 @@ class DownloadManagerRequesterTest {
     downloadRoomDao = mockk(relaxed = true)
     mainActivity = mockk(relaxed = true)
     context = mockk(relaxed = true)
-    every { context.getMainActivity() } returns mainActivity
-    every {
-      mainActivity.startDownloadMonitorServiceIfOngoingDownloads()
-    } just Runs
+    downloadMonitorServiceManager = mockk(relaxed = true)
     every { kiwixDataStore.selectedStorage } returns flowOf("/storage/emulated/0")
     every { kiwixDataStore.wifiOnly } returns flowOf(false)
   }
@@ -79,8 +76,8 @@ class DownloadManagerRequesterTest {
     requester = DownloadManagerRequester(
       fetch,
       kiwixDataStore,
-      context,
       downloadRoomDao,
+      downloadMonitorServiceManager,
       mainDispatcherRule.dispatcher
     )
   }
@@ -99,7 +96,7 @@ class DownloadManagerRequesterTest {
         func2 = any<Func<Error>>()
       )
     }
-    verify { mainActivity.startDownloadMonitorServiceIfOngoingDownloads() }
+    verify { downloadMonitorServiceManager.startDownloadMonitorServiceIfOngoingDownloads() }
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -140,7 +137,7 @@ class DownloadManagerRequesterTest {
       )
     }
     advanceUntilIdle()
-    verify { mainActivity.startDownloadMonitorServiceIfOngoingDownloads() }
+    verify { downloadMonitorServiceManager.startDownloadMonitorServiceIfOngoingDownloads() }
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -206,7 +203,7 @@ class DownloadManagerRequesterTest {
         func2 = any<Func<Error>>()
       )
     }
-    verify { mainActivity.startDownloadMonitorServiceIfOngoingDownloads() }
+    verify { downloadMonitorServiceManager.startDownloadMonitorServiceIfOngoingDownloads() }
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -248,7 +245,7 @@ class DownloadManagerRequesterTest {
     requester.pauseResumeDownload(downloadId, isPause = false)
     advanceUntilIdle()
     verify { fetch.pause(id = downloadId.toInt()) }
-    verify { mainActivity.startDownloadMonitorServiceIfOngoingDownloads() }
+    verify { downloadMonitorServiceManager.startDownloadMonitorServiceIfOngoingDownloads() }
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)

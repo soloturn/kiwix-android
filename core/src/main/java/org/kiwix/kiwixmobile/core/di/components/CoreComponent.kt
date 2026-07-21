@@ -52,6 +52,7 @@ import org.kiwix.kiwixmobile.core.di.modules.NetworkModule
 import org.kiwix.kiwixmobile.core.di.modules.ReaderModule
 import org.kiwix.kiwixmobile.core.di.modules.SearchModule
 import org.kiwix.kiwixmobile.core.downloader.Downloader
+import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorServiceManager
 import org.kiwix.kiwixmobile.core.error.ErrorActivity
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.reader.helper.TabsManager
@@ -128,4 +129,5 @@ interface CoreComponent {
   fun provideTabsManager(): TabsManager
   fun provideReaderIntentManager(): ReaderIntentManager
   fun provideStorageDeviceProvider(): StorageDeviceProvider
+  fun provideDownloadMonitorServiceManager(): DownloadMonitorServiceManager
 }

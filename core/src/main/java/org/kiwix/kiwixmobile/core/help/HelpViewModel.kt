@@ -18,19 +18,15 @@
 
 package org.kiwix.kiwixmobile.core.help
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.os.Bundle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.kiwix.kiwixmobile.core.downloader.downloadManager.APP_NAME_KEY
 import org.kiwix.kiwixmobile.core.error.DiagnosticReportActivity
-import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 
 abstract class HelpViewModel : ViewModel() {
   abstract suspend fun rawTitleDescriptionMap(context: Context): List<Pair<Int, Any>>
@@ -48,13 +44,7 @@ abstract class HelpViewModel : ViewModel() {
   }
 
   fun onSendReportButtonClick(context: Context) {
-    val activity = context as? Activity ?: return
-    val appName = (activity as? CoreMainActivity)?.appName
     val intent = Intent(context, DiagnosticReportActivity::class.java)
-    val extras = Bundle().apply {
-      putString(APP_NAME_KEY, appName)
-    }
-    intent.putExtras(extras)
     context.startActivity(intent)
   }
 

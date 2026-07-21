@@ -27,7 +27,6 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
-import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.main.ZIM_HOST_NAV_DEEP_LINK
 import org.kiwix.kiwixmobile.core.qr.GenerateQR
@@ -56,14 +55,18 @@ class HotspotNotificationManager @Inject constructor(
 
   @SuppressLint("UnspecifiedImmutableFlag")
   fun buildForegroundNotification(uri: String? = null): Notification {
-    val coreMainActivity = (context as CoreApp).getMainActivity()
+    val launchIntent = requireNotNull(
+      context.packageManager.getLaunchIntentForPackage(context.packageName)
+    ) {
+      "No launcher activity found for package ${context.packageName}"
+    }.apply {
+      action = Intent.ACTION_VIEW
+      data = ZIM_HOST_NAV_DEEP_LINK.toUri()
+    }
     val contentIntent = PendingIntent.getActivity(
       context,
       0,
-      Intent(context, coreMainActivity.mainActivity::class.java).apply {
-        action = Intent.ACTION_VIEW
-        data = ZIM_HOST_NAV_DEEP_LINK.toUri()
-      },
+      launchIntent,
       PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
     )
     hotspotNotificationChannel()
