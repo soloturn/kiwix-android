@@ -66,7 +66,6 @@ import javax.inject.Inject
 
 const val THIRTY_TREE = 33
 const val DOWNLOAD_SERVICE_NOTIFICATION_ID = 1
-const val APP_NAME_KEY = "appNameKey"
 const val DOWNLOAD_TIMEOUT_RESUME_INTENT = "downloadTimeoutResumeIntent"
 const val BACKGROUND_DOWNLOAD_LIMIT_REACH_ACTION = "backgroundDownloadLimitReachAction"
 const val DOWNLOAD_TIMEOUT_LIMIT_REACH_NOTIFICATION_ID = 2
@@ -102,8 +101,6 @@ class DownloadMonitorService : Service() {
 
   @Inject
   lateinit var kiwixDataStore: KiwixDataStore
-
-  private var appName: String? = "kiwix"
 
   private val networkCallback = object : ConnectivityManager.NetworkCallback() {
     override fun onAvailable(network: Network) {
@@ -170,9 +167,6 @@ class DownloadMonitorService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    if (intent?.hasExtra(APP_NAME_KEY) == true) {
-      appName = intent.getStringExtra(APP_NAME_KEY)
-    }
     if (intent?.action == STOP_DOWNLOAD_SERVICE) {
       stopForegroundServiceForDownloads()
     }
@@ -252,7 +246,7 @@ class DownloadMonitorService : Service() {
     }
   }
 
-  private fun buildTimeoutNotification(): Notification {
+  private suspend fun buildTimeoutNotification(): Notification {
     val yesIntent = Intents.internal(CoreMainActivity::class.java).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       // on clicking on yes button it will open the "Download" screen.
@@ -280,7 +274,7 @@ class DownloadMonitorService : Service() {
     return NotificationCompat.Builder(this, DOWNLOAD_NOTIFICATION_CHANNEL_ID)
       .setPriority(NotificationManager.IMPORTANCE_DEFAULT)
       .setSmallIcon(android.R.drawable.stat_sys_warning)
-      .setContentTitle(appName)
+      .setContentTitle(kiwixDataStore.appName.first())
       .setContentText(getString(R.string.download_timeout_resume_message))
       .setAutoCancel(true)
       .setOngoing(false)
@@ -300,15 +294,17 @@ class DownloadMonitorService : Service() {
 
   private fun startForegroundService() {
     runCatching {
-      downloadNotificationChannel()
-      startForeground(DOWNLOAD_SERVICE_NOTIFICATION_ID, buildForegroundNotification())
-      startPausedDownloadsDueToAndroidServiceLimitation()
+      CoroutineScope(ioDispatcher).launch {
+        downloadNotificationChannel()
+        startForeground(DOWNLOAD_SERVICE_NOTIFICATION_ID, buildForegroundNotification())
+        startPausedDownloadsDueToAndroidServiceLimitation()
+      }
     }.onFailure { it.printStackTrace() }
   }
 
-  private fun buildForegroundNotification(): Notification =
+  private suspend fun buildForegroundNotification(): Notification =
     NotificationCompat.Builder(this, DOWNLOAD_NOTIFICATION_CHANNEL_ID)
-      .setContentTitle(appName)
+      .setContentTitle(kiwixDataStore.appName.first())
       .setContentText(getString(string.download_notification_channel_description))
       .setSmallIcon(R.mipmap.ic_launcher)
       .setWhen(System.currentTimeMillis())
@@ -328,19 +324,17 @@ class DownloadMonitorService : Service() {
    * 3. Resets their `pauseReason` to `NONE` and updates the status to `QUEUED`
    *    so they can continue downloading normally.
    */
-  private fun startPausedDownloadsDueToAndroidServiceLimitation() {
-    CoroutineScope(ioDispatcher).launch {
-      downloadRoomDao.getDownloadsPausedByService()
-        .forEach {
-          fetch.resume(it.downloadId.toInt())
-          // Reset the PauseReason.
-          downloadRoomDao.getEntityForDownloadId(it.downloadId)?.let { downloadRoomEntity ->
-            downloadRoomDao.updateDownloadItem(
-              downloadRoomEntity.copy(pauseReason = PauseReason.NONE, status = Status.QUEUED)
-            )
-          }
+  private suspend fun startPausedDownloadsDueToAndroidServiceLimitation() {
+    downloadRoomDao.getDownloadsPausedByService()
+      .forEach {
+        fetch.resume(it.downloadId.toInt())
+        // Reset the PauseReason.
+        downloadRoomDao.getEntityForDownloadId(it.downloadId)?.let { downloadRoomEntity ->
+          downloadRoomDao.updateDownloadItem(
+            downloadRoomEntity.copy(pauseReason = PauseReason.NONE, status = Status.QUEUED)
+          )
         }
-    }
+      }
   }
 
   private val fetchListener = object : FetchListener {

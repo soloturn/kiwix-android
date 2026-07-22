@@ -22,7 +22,6 @@ import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import org.kiwix.kiwixmobile.core.R
-import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.ui.models.IconItem
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.DIALOG_CUSTOM_VIEW_BOTTOM_PADDING
 
@@ -295,11 +294,11 @@ sealed class KiwixDialog(
       neutralButtonText = R.string.rate_dialog_neutral
     ),
     HasBodyFormatArgs {
-    constructor(icon: IconItem?, activity: Activity) : this(
+    constructor(icon: IconItem?, activity: Activity, appName: String) : this(
       listOf(
         String.format(
           activity.getString(R.string.rate_dialog_msg),
-          (activity as CoreMainActivity).appName
+          appName
         )
       ),
       icon

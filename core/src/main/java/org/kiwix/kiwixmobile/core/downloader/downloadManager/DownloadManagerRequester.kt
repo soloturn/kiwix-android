@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.core.downloader.downloadManager
 
-import android.content.Context
 import com.tonyodev.fetch2.Fetch
 import com.tonyodev.fetch2.NetworkType.ALL
 import com.tonyodev.fetch2.NetworkType.WIFI_ONLY
@@ -27,7 +26,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.downloader.DownloadRequester
@@ -39,8 +37,8 @@ import javax.inject.Inject
 class DownloadManagerRequester @Inject constructor(
   private val fetch: Fetch,
   private val kiwixDataStore: KiwixDataStore,
-  private val context: Context,
   private val downloadRoomDao: DownloadRoomDao,
+  private val downloadMonitorServiceManager: DownloadMonitorServiceManager,
   @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : DownloadRequester {
   override suspend fun enqueue(downloadRequest: DownloadRequest): Long {
@@ -100,7 +98,7 @@ class DownloadManagerRequester @Inject constructor(
   }
 
   override fun startDownloadMonitorService() {
-    (context as CoreApp).getMainActivity().startDownloadMonitorServiceIfOngoingDownloads()
+    downloadMonitorServiceManager.startDownloadMonitorServiceIfOngoingDownloads()
   }
 }
 

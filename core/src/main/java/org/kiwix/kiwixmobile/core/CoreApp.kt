@@ -26,7 +26,6 @@ import androidx.multidex.MultiDex
 import com.jakewharton.threetenabp.AndroidThreeTen
 import org.kiwix.kiwixmobile.core.di.components.CoreComponent
 import org.kiwix.kiwixmobile.core.di.components.DaggerCoreComponent
-import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.utils.files.FileLogger
 import javax.inject.Inject
 
@@ -52,8 +51,6 @@ abstract class CoreApp : Application() {
 
   @Inject
   lateinit var fileLogger: FileLogger
-
-  private lateinit var coreMainActivity: CoreMainActivity
 
   override fun attachBaseContext(base: Context) {
     super.attachBaseContext(base)
@@ -113,10 +110,4 @@ abstract class CoreApp : Application() {
       )
     }
   }
-
-  fun setMainActivity(coreMainActivity: CoreMainActivity) {
-    this.coreMainActivity = coreMainActivity
-  }
-
-  fun getMainActivity() = coreMainActivity
 }

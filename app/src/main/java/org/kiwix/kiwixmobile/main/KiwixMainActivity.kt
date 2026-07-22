@@ -22,7 +22,6 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.view.ActionMode
 import androidx.compose.material3.BottomAppBarDefaults
@@ -107,7 +106,6 @@ class KiwixMainActivity : CoreMainActivity() {
   @Inject
   @MainDispatcher
   lateinit var mainDispatcher: MainCoroutineDispatcher
-  override val mainActivity: AppCompatActivity by lazy { this }
   override val appName: String by lazy { getString(R.string.app_name) }
 
   override val bookmarksScreenRoute: String = KiwixDestination.Bookmarks.route
@@ -234,7 +232,7 @@ class KiwixMainActivity : CoreMainActivity() {
   }
 
   private fun safelyHandleDeepLink(intent: Intent) {
-    if (intent.data != null && intent.extras != null) {
+    intent.data?.let {
       navController.handleDeepLink(intent)
     }
   }

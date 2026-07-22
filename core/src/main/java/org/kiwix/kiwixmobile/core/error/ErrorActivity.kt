@@ -52,7 +52,6 @@ import org.kiwix.kiwixmobile.core.compat.CompatHelper.Companion.getVersionCode
 import org.kiwix.kiwixmobile.core.compat.CompatHelper.Companion.queryIntentActivitiesCompat
 import org.kiwix.kiwixmobile.core.compat.ResolveInfoFlagsCompat
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
-import org.kiwix.kiwixmobile.core.downloader.downloadManager.APP_NAME_KEY
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.viewModel
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
@@ -120,11 +119,6 @@ open class ErrorActivity : BaseActivity() {
       } else {
         null
       }
-    appName = if (extras != null && safeContains(extras, APP_NAME_KEY)) {
-      extras.getString(APP_NAME_KEY)
-    } else {
-      null
-    }
     setContent {
       val showDialog by showValidationDialog.collectAsState()
       ErrorActivityScreen(
@@ -137,6 +131,7 @@ open class ErrorActivity : BaseActivity() {
       ShowValidatingZimFilesDialog(showDialog)
     }
     lifecycleScope.launch {
+      appName = kiwixDataStore.appName.first()
       repeatOnLifecycle(Lifecycle.State.STARTED) {
         validateZimViewModel.allZIMValidated
           .filter { it }

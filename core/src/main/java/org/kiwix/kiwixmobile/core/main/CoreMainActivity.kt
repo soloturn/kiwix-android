@@ -30,7 +30,6 @@ import android.view.ActionMode
 import android.view.MenuItem
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.ActionBarDrawerToggle
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.material3.BottomAppBarScrollBehavior
 import androidx.compose.material3.DrawerState
@@ -65,11 +64,8 @@ import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.components.CoreActivityComponent
-import org.kiwix.kiwixmobile.core.downloader.downloadManager.APP_NAME_KEY
 import org.kiwix.kiwixmobile.core.downloader.downloadManager.DOWNLOAD_TIMEOUT_LIMIT_REACH_NOTIFICATION_ID
-import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorService
-import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorService.Companion.STOP_DOWNLOAD_SERVICE
-import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorService.Companion.isDownloadMonitorServiceRunning
+import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorServiceManager
 import org.kiwix.kiwixmobile.core.error.ErrorActivity
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationResultOnCurrent
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
@@ -151,6 +147,9 @@ abstract class CoreMainActivity : BaseActivity() {
   @Inject
   lateinit var readerIntentManager: ReaderIntentManager
 
+  @Inject
+  lateinit var downloadMonitorServiceManager: DownloadMonitorServiceManager
+
   private var selectionActionModeListener: WebViewSelectionActionMode? = null
 
   /**
@@ -204,7 +203,6 @@ abstract class CoreMainActivity : BaseActivity() {
   abstract val readerScreenRoute: String
   abstract val cachedComponent: CoreActivityComponent
   abstract val topLevelDestinationsRoute: Set<String>
-  abstract val mainActivity: AppCompatActivity
   abstract val appName: String
 
   /**
@@ -234,7 +232,6 @@ abstract class CoreMainActivity : BaseActivity() {
         intent.putExtra(ErrorActivity.EXCEPTION_KEY, paramThrowable)
         val extras = Bundle()
         extras.putSerializable(ErrorActivity.EXCEPTION_KEY, paramThrowable)
-        extras.putString(APP_NAME_KEY, appName)
         intent.putExtras(extras)
         intent.addFlags(FLAG_ACTIVITY_NEW_TASK)
         appContext.startActivity(intent)
@@ -247,8 +244,6 @@ abstract class CoreMainActivity : BaseActivity() {
         exitProcess(KIWIX_INTERNAL_ERROR)
       }
     }
-
-    setMainActivityToCoreApp()
     lifecycleScope.launch(ioDispatcher) {
       setIsDebugBuild(BuildConfig.DEBUG)
       setAppName()
@@ -318,53 +313,8 @@ abstract class CoreMainActivity : BaseActivity() {
 
   override fun onResume() {
     super.onResume()
-    startDownloadMonitorServiceIfOngoingDownloads(true)
+    downloadMonitorServiceManager.startDownloadMonitorServiceIfOngoingDownloads(true)
     cancelBackgroundTimeoutNotification()
-  }
-
-  /**
-   * Stops the DownloadService if it is currently running,
-   * as the application is now in the foreground and can handle downloads directly.
-   */
-  private fun stopDownloadServiceIfRunning() {
-    if (isDownloadMonitorServiceRunning) {
-      startService(
-        Intent(
-          this,
-          DownloadMonitorService::class.java
-        ).setAction(STOP_DOWNLOAD_SERVICE)
-      )
-    }
-  }
-
-  /**
-   * Starts the [DownloadMonitorService] if there are any ongoing downloads.
-   *
-   * This method checks whether the download monitoring service is already running.
-   * If not, it queries the database for ongoing downloads on a background thread.
-   * When at least one active download is found, the service is started with the
-   * required app metadata. If no ongoing downloads exist, the service is stopped
-   * to avoid unnecessary background work.
-   */
-  fun startDownloadMonitorServiceIfOngoingDownloads(isAppStart: Boolean = false) {
-    if (!isDownloadMonitorServiceRunning) {
-      CoroutineScope(ioDispatcher).launch {
-        runCatching {
-          if (downloadRoomDao.getOngoingDownloads().isNotEmpty() || !isAppStart) {
-            startService(
-              Intent(
-                this@CoreMainActivity,
-                DownloadMonitorService::class.java
-              ).apply {
-                putExtra(APP_NAME_KEY, appName)
-              }
-            )
-          } else {
-            stopDownloadServiceIfRunning()
-          }
-        }
-      }
-    }
   }
 
   override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -500,15 +450,11 @@ abstract class CoreMainActivity : BaseActivity() {
     disableLeftDrawer()
   }
 
-  private fun setMainActivityToCoreApp() {
-    (applicationContext as CoreApp).setMainActivity(this)
-  }
-
   private fun cancelBackgroundTimeoutNotification() {
     runCatching {
       val notificationManager =
-        getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-      notificationManager.cancel(DOWNLOAD_TIMEOUT_LIMIT_REACH_NOTIFICATION_ID)
+        getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+      notificationManager?.cancel(DOWNLOAD_TIMEOUT_LIMIT_REACH_NOTIFICATION_ID)
     }
   }
 
