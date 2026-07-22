@@ -82,7 +82,8 @@ class InitialDownloadTest : BaseActivityTest() {
       downloadZimFile(composeTestRule)
     }
     initialDownload {
-      selectInternalStorageIfDialogShown(composeTestRule)
+      assertStorageConfigureDialogDisplayed(composeTestRule)
+      clickOnInternalStorage(composeTestRule)
       downloadRobot {
         assertDownloadStart(composeTestRule)
         stopDownload(composeTestRule)

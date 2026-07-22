@@ -29,7 +29,6 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
@@ -63,7 +62,6 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
   @Rule(order = COMPOSE_TEST_RULE_ORDER)
   @JvmField
   val composeTestRule = createComposeRule()
-  private lateinit var kiwixMainActivity: KiwixMainActivity
   private val fileName = "testzim.zim"
 
   @Before
@@ -78,16 +76,9 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
   fun testOpeningFileWithFilePicker() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
       activityScenario.onActivity {
-        kiwixMainActivity = it
         it.navigate(KiwixDestination.Library.route)
       }
       composeTestRule.waitForIdle()
-      composeTestRule.waitUntil(60000) {
-        composeTestRule
-          .onAllNodesWithTag(SELECT_FILE_BUTTON_TESTING_TAG)
-          .fetchSemanticsNodes()
-          .isNotEmpty()
-      }
       val uri = copyFileToDownloadsFolder(context, fileName)
       try {
         updateKiwixDataStore { setShowStorageSelectionDialogOnCopyMove(true) }
@@ -103,7 +94,8 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
         copyMoveFileHandler {
           assertCopyMoveDialogDisplayed(composeTestRule)
           clickOnMove(composeTestRule)
-          selectInternalStorageIfDialogShown(composeTestRule)
+          assertStorageSelectionDialogDisplayed(composeTestRule)
+          clickOnInternalStorage(composeTestRule)
           assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
         }
       } catch (ignore: Exception) {
@@ -121,24 +113,19 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
   fun testOpeningFileFromFileManager() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
       activityScenario.onActivity {
-        kiwixMainActivity = it
         it.navigate(KiwixDestination.Library.route)
       }
       composeTestRule.waitForIdle()
       val uri = copyFileToDownloadsFolder(context, fileName)
       try {
         updateKiwixDataStore { setShowStorageSelectionDialogOnCopyMove(true) }
-        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-          setDataAndType(uri, "application/octet-stream")
-          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-          setPackage(context.packageName)
-        }
-        ActivityScenario.launch<KiwixMainActivity>(viewIntent).onActivity {}
+        ActivityScenario.launch<KiwixMainActivity>(createDeepLinkIntent(uri)).onActivity {}
         composeTestRule.waitForIdle()
         copyMoveFileHandler {
           assertCopyMoveDialogDisplayed(composeTestRule)
           clickOnMove(composeTestRule)
-          selectInternalStorageIfDialogShown(composeTestRule)
+          assertStorageSelectionDialogDisplayed(composeTestRule)
+          clickOnInternalStorage(composeTestRule)
           assertZimFileCopiedAndShowingIntoTheReader(composeTestRule)
         }
       } catch (ignore: Exception) {

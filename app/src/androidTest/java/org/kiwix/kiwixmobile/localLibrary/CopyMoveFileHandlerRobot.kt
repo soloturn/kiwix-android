@@ -34,6 +34,7 @@ import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.main.reader.READER_SCREEN_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.components.STORAGE_DEVICE_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FIVE_SECOND_DELAY
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_DISMISS_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_MESSAGE_TEXT_TESTING_TAG
@@ -79,7 +80,9 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
-        waitUntilTimeout()
+        waitUntil(FIVE_SECOND_DELAY) {
+          onNodeWithTag(STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG).isDisplayed()
+        }
         onNodeWithTag(STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG)
           .assertTextEquals(context.getString(R.string.choose_storage_to_copy_move_zim_file))
       }
@@ -89,7 +92,9 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
   fun clickOnInternalStorage(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitUntil(FIVE_SECOND_DELAY) {
+          onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
         onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG)[0].performClick()
       }
     })
@@ -98,7 +103,9 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
   fun clickOnCopy(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitUntil(FIVE_SECOND_DELAY) {
+          onNodeWithTag(ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG).isDisplayed()
+        }
         onNodeWithTag(ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG)
           .assertTextEquals(context.getString(R.string.action_copy).uppercase())
           .performClick()
