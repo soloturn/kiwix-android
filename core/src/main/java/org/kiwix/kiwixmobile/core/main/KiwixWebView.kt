@@ -38,7 +38,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.BuildConfig
-import org.kiwix.kiwixmobile.core.CoreApp.Companion.coreComponent
 import org.kiwix.kiwixmobile.core.CoreApp.Companion.instance
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
@@ -52,7 +51,6 @@ import org.kiwix.kiwixmobile.core.utils.files.Log
 import org.kiwix.kiwixmobile.core.utils.files.SaveResult
 import org.kiwix.videowebview.VideoEnabledWebChromeClient.ToggledFullscreenCallback
 import org.kiwix.videowebview.VideoEnabledWebView
-import javax.inject.Inject
 
 private const val INITIAL_SCALE = 100
 
@@ -64,19 +62,11 @@ open class KiwixWebView constructor(
   attrs: AttributeSet,
   videoView: ViewGroup?,
   private val coreWebViewClient: CoreWebViewClient,
-  val kiwixDataStore: KiwixDataStore
+  val kiwixDataStore: KiwixDataStore,
+  private val zimReaderContainer: ZimReaderContainer,
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  @MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) : VideoEnabledWebView(context, attrs) {
-  @Inject
-  lateinit var zimReaderContainer: ZimReaderContainer
-
-  @Inject
-  @IoDispatcher
-  lateinit var ioDispatcher: CoroutineDispatcher
-
-  @Inject
-  @MainDispatcher
-  lateinit var mainDispatcher: MainCoroutineDispatcher
-
   private var kiwixWebChromeClient: KiwixWebChromeClient? = null
   private var textZoomJob: Job? = null
 
@@ -84,7 +74,6 @@ open class KiwixWebView constructor(
     if (BuildConfig.DEBUG) {
       WebView.setWebContentsDebuggingEnabled(true)
     }
-    coreComponent.inject(this)
     // Set the user agent to the current locale so it can be read with navigator.userAgent
     settings.apply {
       userAgentString = "${getCurrentLocale(context)}"

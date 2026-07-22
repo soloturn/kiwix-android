@@ -56,19 +56,11 @@ internal class ShowDeleteBookmarksDialogTest {
         viewModelScope,
         dialogShower
       )
-    mockkActivityInjection(showDeleteBookmarksDialog)
     val lambdaSlot = slot<() -> Unit>()
     showDeleteBookmarksDialog.invokeWith(activity)
     verify { dialogShower.show(any(), capture(lambdaSlot)) }
     lambdaSlot.captured.invoke()
     verify { effects.tryEmit(DeletePageItems(bookmarkState(), libkiwixBookmark, viewModelScope)) }
-  }
-
-  private fun mockkActivityInjection(showDeleteBookmarksDialog: ShowDeleteBookmarksDialog) {
-    every { activity.cachedComponent.inject(showDeleteBookmarksDialog) } answers {
-      showDeleteBookmarksDialog.dialogShower = dialogShower
-      Unit
-    }
   }
 
   @Test
@@ -92,7 +84,6 @@ internal class ShowDeleteBookmarksDialogTest {
           viewModelScope,
           dialogShower
         )
-      mockkActivityInjection(showDeleteBookmarksDialog)
       showDeleteBookmarksDialog.invokeWith(activity)
       verify { dialogShower.show(DeleteSelectedBookmarks, any()) }
     }
@@ -117,7 +108,6 @@ internal class ShowDeleteBookmarksDialogTest {
           viewModelScope,
           dialogShower
         )
-      mockkActivityInjection(showDeleteBookmarksDialog)
       showDeleteBookmarksDialog.invokeWith(activity)
       verify { dialogShower.show(DeleteAllBookmarks, any()) }
     }

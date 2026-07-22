@@ -21,7 +21,6 @@ package org.kiwix.kiwixmobile.core.search.viewmodel.effects
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.kiwix.kiwixmobile.core.base.SideEffect
-import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.cachedComponent
 import org.kiwix.kiwixmobile.core.search.SearchListItem
 import org.kiwix.kiwixmobile.core.search.viewmodel.Action
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogShower
@@ -33,7 +32,6 @@ data class ShowDeleteSearchDialog(
   var dialogShower: DialogShower
 ) : SideEffect<Unit> {
   override fun invokeWith(activity: AppCompatActivity) {
-    activity.cachedComponent.inject(this)
     dialogShower.show(
       DeleteSearch,
       { actions.tryEmit(Action.ConfirmedDelete(searchListItem)) }

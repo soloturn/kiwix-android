@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.core.search.viewmodel.effects
 
-import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
@@ -39,10 +38,6 @@ internal class ShowDeleteSearchDialogTest {
     val activity = mockk<CoreMainActivity>()
     val dialogShower = mockk<DialogShower>()
     val showDeleteSearchDialog = ShowDeleteSearchDialog(searchListItem, actions, dialogShower)
-    every { activity.cachedComponent.inject(showDeleteSearchDialog) } answers {
-      showDeleteSearchDialog.dialogShower = dialogShower
-      Unit
-    }
     val lambdaSlot = slot<() -> Unit>()
     showDeleteSearchDialog.invokeWith(activity)
     verify {

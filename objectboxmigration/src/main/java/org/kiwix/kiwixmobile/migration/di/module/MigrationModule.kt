@@ -18,25 +18,13 @@
 
 package org.kiwix.kiwixmobile.migration.di.module
 
+import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import org.kiwix.kiwixmobile.core.data.ObjectBoxDataMigrationHandler
 import org.kiwix.kiwixmobile.migration.ObjectBoxMigrationHandler
-import org.kiwix.kiwixmobile.migration.data.ObjectBoxToLibkiwixMigrator
-import org.kiwix.kiwixmobile.migration.data.ObjectBoxToRoomMigrator
 
 @Module
-class MigrationModule {
-  @Provides
-  fun provideObjectBoxToLibkiwixMigrator() = ObjectBoxToLibkiwixMigrator()
-
-  @Provides
-  fun provideObjectBoxToRoomMigrator() = ObjectBoxToRoomMigrator()
-
-  @Provides
-  fun provideMigrationHandler(
-    objectBoxToRoomMigrator: ObjectBoxToRoomMigrator,
-    objectBoxToLibkiwixMigrator: ObjectBoxToLibkiwixMigrator
-  ): ObjectBoxDataMigrationHandler =
-    ObjectBoxMigrationHandler(objectBoxToRoomMigrator, objectBoxToLibkiwixMigrator)
+interface MigrationModule {
+  @Binds
+  fun bindMigrationHandler(handler: ObjectBoxMigrationHandler): ObjectBoxDataMigrationHandler
 }

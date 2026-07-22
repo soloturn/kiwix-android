@@ -23,7 +23,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.kiwix.kiwixmobile.core.base.SideEffect
 import org.kiwix.kiwixmobile.core.dao.PageDao
-import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.cachedComponent
 import org.kiwix.kiwixmobile.core.page.bookmark.models.LibkiwixBookmarkItem
 import org.kiwix.kiwixmobile.core.page.viewmodel.PageState
 import org.kiwix.kiwixmobile.core.page.viewmodel.effects.DeletePageItems
@@ -39,7 +38,6 @@ data class ShowDeleteBookmarksDialog(
   var dialogShower: DialogShower
 ) : SideEffect<Unit> {
   override fun invokeWith(activity: AppCompatActivity) {
-    activity.cachedComponent.inject(this)
     dialogShower.show(
       if (state.isInSelectionState) DeleteSelectedBookmarks else DeleteAllBookmarks,
       { effects.tryEmit(DeletePageItems(state, pageDao, viewModelScope)) }

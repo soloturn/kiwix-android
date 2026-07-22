@@ -18,11 +18,9 @@
 
 package org.kiwix.kiwixmobile.migration
 
-import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.data.ObjectBoxDataMigrationHandler
 import org.kiwix.kiwixmobile.migration.data.ObjectBoxToLibkiwixMigrator
 import org.kiwix.kiwixmobile.migration.data.ObjectBoxToRoomMigrator
-import org.kiwix.kiwixmobile.migration.di.component.DaggerMigrationComponent
 import javax.inject.Inject
 
 class ObjectBoxMigrationHandler @Inject constructor(
@@ -30,13 +28,7 @@ class ObjectBoxMigrationHandler @Inject constructor(
   private val objectBoxToLibkiwixMigrator: ObjectBoxToLibkiwixMigrator
 ) : ObjectBoxDataMigrationHandler {
   override suspend fun migrate() {
-    val migrationComponent = DaggerMigrationComponent.builder()
-      .coreComponent(CoreApp.coreComponent)
-      .build()
-
     // Inject dependencies into migrators
-    migrationComponent.inject(objectBoxToRoomMigrator)
-    migrationComponent.inject(objectBoxToLibkiwixMigrator)
     objectBoxToRoomMigrator.migrateObjectBoxDataToRoom()
     objectBoxToLibkiwixMigrator.migrateObjectBoxDataToLibkiwix()
   }

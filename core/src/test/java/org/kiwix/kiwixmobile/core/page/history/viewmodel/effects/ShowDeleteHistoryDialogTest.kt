@@ -1,6 +1,5 @@
 package org.kiwix.kiwixmobile.core.page.history.viewmodel.effects
 
-import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
@@ -37,7 +36,6 @@ internal class ShowDeleteHistoryDialogTest {
           viewModelScope,
           dialogShower
         )
-      mockkActivityInjection(showDeleteHistoryDialog)
       val lambdaSlot = slot<() -> Unit>()
       showDeleteHistoryDialog.invokeWith(activity)
       verify { dialogShower.show(any(), capture(lambdaSlot)) }
@@ -56,7 +54,6 @@ internal class ShowDeleteHistoryDialogTest {
           viewModelScope,
           dialogShower
         )
-      mockkActivityInjection(showDeleteHistoryDialog)
       showDeleteHistoryDialog.invokeWith(activity)
       verify { dialogShower.show(DeleteSelectedHistory, any()) }
     }
@@ -72,15 +69,7 @@ internal class ShowDeleteHistoryDialogTest {
           viewModelScope,
           dialogShower
         )
-      mockkActivityInjection(showDeleteHistoryDialog)
       showDeleteHistoryDialog.invokeWith(activity)
       verify { dialogShower.show(DeleteAllHistory, any()) }
     }
-
-  private fun mockkActivityInjection(showDeleteHistoryDialog: ShowDeleteHistoryDialog) {
-    every { activity.cachedComponent.inject(showDeleteHistoryDialog) } answers {
-      showDeleteHistoryDialog.dialogShower = dialogShower
-      Unit
-    }
-  }
 }

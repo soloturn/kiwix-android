@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Before
 import org.junit.Test
 import org.kiwix.kiwixmobile.core.base.SideEffect
-import org.kiwix.kiwixmobile.core.di.components.CoreActivityComponent
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.note.AddNoteViewModel
 import org.kiwix.kiwixmobile.core.page.adapter.Page
@@ -41,7 +40,6 @@ class ShowOpenNoteDialogTest {
   private lateinit var dialogShower: AlertDialogShower
   private lateinit var addNoteViewModel: AddNoteViewModel
   private lateinit var activity: CoreMainActivity
-  private lateinit var component: CoreActivityComponent
 
   @Before
   fun setup() {
@@ -49,9 +47,6 @@ class ShowOpenNoteDialogTest {
     dialogShower = mockk(relaxed = true)
     addNoteViewModel = mockk(relaxed = true)
     activity = mockk(relaxed = true)
-    component = mockk(relaxed = true)
-
-    every { activity.cachedComponent } returns component
   }
 
   @Test

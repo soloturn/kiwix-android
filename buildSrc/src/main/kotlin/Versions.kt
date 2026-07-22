@@ -16,7 +16,7 @@ object Versions {
 
   const val org_jetbrains_kotlinx_kotlinx_coroutines: String = "1.10.1"
 
-  const val androidx_test_espresso: String = "3.6.1"
+  const val androidx_test_espresso: String = "3.7.0"
 
   const val tracing: String = "1.2.0"
 
@@ -30,11 +30,9 @@ object Versions {
 
   const val com_google_dagger: String = "2.53.1"
 
-  const val androidx_test: String = "1.6.1"
-
-  const val androidx_test_core: String = "1.6.1"
-
-  const val androidx_test_orchestrator: String = "1.5.1"
+  const val androidx_test: String = "1.7.0"
+  const val androidx_test_core: String = "1.7.0"
+  const val androidx_test_orchestrator: String = "1.6.1"
 
   const val io_objectbox: String = "4.1.0"
 
@@ -89,7 +87,7 @@ object Versions {
 
   const val webkit: String = "1.12.1"
 
-  const val junit: String = "1.1.5"
+  const val junit: String = "1.3.0"
 
   const val roomVersion = "2.5.2"
 

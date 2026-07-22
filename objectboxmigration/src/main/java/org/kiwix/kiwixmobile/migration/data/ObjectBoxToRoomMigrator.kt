@@ -34,17 +34,13 @@ import org.kiwix.kiwixmobile.migration.entities.NotesEntity
 import org.kiwix.kiwixmobile.migration.entities.RecentSearchEntity
 import javax.inject.Inject
 
-class ObjectBoxToRoomMigrator {
-  @Inject lateinit var recentSearchRoomDao: RecentSearchRoomDao
-
-  @Inject lateinit var historyRoomDao: HistoryRoomDao
-
-  @Inject lateinit var notesRoomDao: NotesRoomDao
-
-  @Inject lateinit var boxStore: BoxStore
-
-  @Inject lateinit var kiwixDataStore: KiwixDataStore
-
+class ObjectBoxToRoomMigrator @Inject constructor(
+  private val recentSearchRoomDao: RecentSearchRoomDao,
+  private val historyRoomDao: HistoryRoomDao,
+  private val notesRoomDao: NotesRoomDao,
+  private val boxStore: BoxStore,
+  private val kiwixDataStore: KiwixDataStore
+) {
   suspend fun migrateObjectBoxDataToRoom() {
     if (!kiwixDataStore.isRecentSearchMigrated.first()) {
       migrateRecentSearch(boxStore.boxFor())
@@ -55,7 +51,6 @@ class ObjectBoxToRoomMigrator {
     if (!kiwixDataStore.isNotesMigrated.first()) {
       migrateNotes(boxStore.boxFor())
     }
-    // TODO we will migrate here for other entities
   }
 
   suspend fun migrateRecentSearch(box: Box<RecentSearchEntity>) {
