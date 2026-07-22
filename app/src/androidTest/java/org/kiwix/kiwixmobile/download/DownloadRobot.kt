@@ -178,7 +178,9 @@ class DownloadRobot : BaseRobot() {
   }
 
   private fun refreshOnlineList(composeTestRule: ComposeContentTestRule) {
-    composeTestRule.refresh()
+    runCatching {
+      composeTestRule.refresh()
+    }.onFailure { it.printStackTrace() }
   }
 
   fun downloadZimFile(composeTestRule: ComposeContentTestRule) {

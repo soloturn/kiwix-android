@@ -71,7 +71,8 @@ while [ $retry -le 3 ]; do
     if is_app_installed "$TEST_ORCHESTRATOR_PACKAGE"; then
       adb uninstall "${TEST_ORCHESTRATOR_PACKAGE}"
     fi
-    ./gradlew clean
+    ./gradlew --stop
+    ./gradlew clean cleanBuildCache
     retry=$(( retry + 1 ))
     if [ $retry -eq 3 ]; then
       adb exec-out screencap -p >screencap.png
