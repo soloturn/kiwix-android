@@ -257,7 +257,7 @@ class LibraryRobot : BaseRobot() {
   private fun assertZIMFileValidatingDialogDisplayed(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+        waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           onNodeWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG).isDisplayed()
         }
         onNodeWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG)

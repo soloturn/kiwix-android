@@ -34,12 +34,12 @@ import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.main.reader.READER_SCREEN_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.components.STORAGE_DEVICE_ITEM_TESTING_TAG
-import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FIVE_SECOND_DELAY
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_DISMISS_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_MESSAGE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.nav.destination.library.local.NO_FILE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.storage.STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG
+import org.kiwix.kiwixmobile.testutils.TestUtils.FIVE_SECOND_DELAY
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
@@ -53,7 +53,7 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
     isMultipleFiles: Boolean = false
   ) {
     composeTestRule.apply {
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(ALERT_DIALOG_MESSAGE_TEXT_TESTING_TAG).isDisplayed()
       }
       val copyMoveDialogMessage = if (isMultipleFiles) {
@@ -135,7 +135,7 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
 
   fun assertZimFileCopiedAndShowingIntoTheReader(composeTestRule: ComposeContentTestRule) {
     // Wait for copying the ZIM file and opening in the reader.
-    composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+    composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
       composeTestRule
         .onAllNodesWithTag(READER_SCREEN_TESTING_TAG)
         .fetchSemanticsNodes()
@@ -158,7 +158,7 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
     testFlakyView({
       try {
         composeTestRule.apply {
-          waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
+          waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
           mainClock.advanceTimeByFrame()
           composeTestRule.onNodeWithTag(NO_FILE_TEXT_TESTING_TAG).assertIsDisplayed()
           throw RuntimeException("ZimFile not added in the local library")
@@ -171,7 +171,7 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
 
   fun assertFileCopyMoveErrorDialogDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(ALERT_DIALOG_MESSAGE_TEXT_TESTING_TAG).isDisplayed()
       }
       // We are checking for text contains as ZIM file name is dynamic.

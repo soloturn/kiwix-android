@@ -67,8 +67,10 @@ object TestUtils {
 
   const val TEST_PAUSE_MS = 3000
   const val TEST_PAUSE_MS_FOR_SEARCH_TEST = 1000
-  const val TEST_PAUSE_MS_FOR_DOWNLOAD_TEST = 10000
+  const val TEST_PAUSE_MS_FOR_DOWNLOAD_TEST = 10000L
   const val TEST_PAUSE_MS_FOR_SNACKBAR = 6000L
+  const val FIVE_SECOND_DELAY = 5000L
+  const val FIFTEEN_SECOND_DELAY = 15_000L
   const val RETRY_COUNT_FOR_FLAKY_TEST = 3
   private const val READ_AND_CALL_TIMEOUT = 5L
   private const val CONNECTION_TIMEOUT = 1L

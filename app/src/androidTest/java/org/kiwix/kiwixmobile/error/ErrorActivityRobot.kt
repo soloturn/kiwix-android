@@ -30,8 +30,8 @@ import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.help.SEND_DIAGNOSTIC_REPORT_TESTING_TAG
-import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FIFTEEN_SECOND_DELAY
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_TAG
+import org.kiwix.kiwixmobile.testutils.TestUtils.FIFTEEN_SECOND_DELAY
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 
 fun errorActivity(func: ErrorActivityRobot.() -> Unit) = ErrorActivityRobot().apply(func)
