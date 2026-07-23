@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core.search.viewmodel.effects
 
+import android.content.Context
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import io.mockk.Runs
@@ -32,8 +33,10 @@ internal class ShowToastTest {
   fun `invoke with shows short toast`() {
     mockkStatic(Toast::class)
     val activity = mockk<AppCompatActivity>()
+    val context = mockk<Context>()
+    every { activity.applicationContext } returns context
     val stringId = 0
-    every { Toast.makeText(activity, stringId, Toast.LENGTH_SHORT).show() } just Runs
+    every { Toast.makeText(context, stringId, Toast.LENGTH_SHORT).show() } just Runs
     ShowToast(stringId).invokeWith(activity)
   }
 }

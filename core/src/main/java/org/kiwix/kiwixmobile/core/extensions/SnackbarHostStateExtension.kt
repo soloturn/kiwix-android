@@ -33,6 +33,7 @@ fun SnackbarHostState.snack(
   lifecycleScope: CoroutineScope,
   snackBarResult: (SnackbarResult) -> Unit = {}
 ) {
+  currentSnackbarData?.dismiss()
   lifecycleScope.launch {
     val result = showSnackbar(
       message = message,
