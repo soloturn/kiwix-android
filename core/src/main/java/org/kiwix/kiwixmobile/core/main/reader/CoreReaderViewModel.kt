@@ -1782,7 +1782,6 @@ abstract class CoreReaderViewModel(
 
   open fun onResume() {
     updateBottomToolbarVisibility()
-    setTtsCallback()
     if (readAloudManager.tts == null) {
       readAloudManager.setUpTTS()
     }

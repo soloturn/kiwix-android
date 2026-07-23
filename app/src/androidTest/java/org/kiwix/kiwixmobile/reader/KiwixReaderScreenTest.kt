@@ -371,6 +371,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     clickOnReadAloudMenuItem(composeTestRule)
     try {
       assertTTSLanguageIsNotSupportedDialogDisplayed(composeTestRule)
+      clickOnCancelButton(composeTestRule)
     } catch (_: ComposeTimeoutException) {
       assertTTSControlsVisible(composeTestRule)
       clickOnTTSStopButton(composeTestRule)
