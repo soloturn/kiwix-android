@@ -66,7 +66,7 @@ class LanguageViewModel @Inject constructor(
   private val kiwixDataStore: KiwixDataStore,
   @OPDSKiwixService private val kiwixService: KiwixService,
   private val connectivityBroadcastReceiver: ConnectivityBroadcastReceiver,
-  @IoDispatcher private val dispatcher: CoroutineDispatcher
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
   val state = MutableStateFlow<State>(Loading)
   val actions = MutableSharedFlow<Action>(extraBufferCapacity = Int.MAX_VALUE)
@@ -128,7 +128,7 @@ class LanguageViewModel @Inject constructor(
       emit(emptyList())
     }
 
-  private fun observeLanguages() = viewModelScope.launch(dispatcher) {
+  private fun observeLanguages() = viewModelScope.launch(ioDispatcher) {
     state.value = Loading
 
     val cachedLanguageList = kiwixDataStore.cachedLanguageList.first()

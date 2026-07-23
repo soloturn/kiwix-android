@@ -25,12 +25,18 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
+import org.kiwix.sharedFunctions.MainDispatcherRule
 
 class ZimFileManagerTest {
+  @Rule
+  @JvmField
+  val mainDispatcherRule = MainDispatcherRule()
+  private val testDispatcher = mainDispatcherRule.dispatcher
   private lateinit var manager: ZimFileManager
 
   private val zimReaderContainer = mockk<ZimReaderContainer>(relaxed = true)
@@ -38,7 +44,7 @@ class ZimFileManagerTest {
 
   @Before
   fun setup() {
-    manager = ZimFileManager(zimReaderContainer)
+    manager = ZimFileManager(zimReaderContainer, testDispatcher)
   }
 
   @Test
@@ -70,7 +76,7 @@ class ZimFileManagerTest {
   fun `invalid source returns InvalidFile`() = runTest {
     val source = mockk<ZimReaderSource>()
 
-    coEvery { source.canOpenInLibkiwix() } returns false
+    coEvery { source.canOpenInLibkiwix(testDispatcher) } returns false
 
     val result = manager.openZimFileInReader(source, false)
 
@@ -85,7 +91,7 @@ class ZimFileManagerTest {
   fun `success returns reader`() = runTest {
     val source = mockk<ZimReaderSource>()
 
-    coEvery { source.canOpenInLibkiwix() } returns true
+    coEvery { source.canOpenInLibkiwix(testDispatcher) } returns true
     every { zimReaderContainer.zimReaderSource } returns null
     every { zimReaderContainer.zimFileReader } returns zimReader
 
@@ -103,7 +109,7 @@ class ZimFileManagerTest {
   fun `returns InvalidFile when reader is null`() = runTest {
     val source = mockk<ZimReaderSource>()
 
-    coEvery { source.canOpenInLibkiwix() } returns true
+    coEvery { source.canOpenInLibkiwix(testDispatcher) } returns true
     every { zimReaderContainer.zimReaderSource } returns null
     every { zimReaderContainer.zimFileReader } returns null
 

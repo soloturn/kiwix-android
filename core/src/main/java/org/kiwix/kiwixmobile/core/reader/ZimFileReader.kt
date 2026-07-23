@@ -25,12 +25,12 @@ import androidx.core.net.toUri
 import eu.mhutti1.utils.storage.KB
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.CoreApp
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Companion.CONTENT_PREFIX
 import org.kiwix.kiwixmobile.core.utils.TAG_KIWIX
@@ -55,10 +55,11 @@ import javax.inject.Inject
 
 private const val TAG = "ZimFileReader"
 
-class ZimFileReader constructor(
+class ZimFileReader(
   val zimReaderSource: ZimReaderSource,
   val jniKiwixReader: Archive,
-  private val searcher: SuggestionSearcher
+  private val searcher: SuggestionSearcher,
+  private val ioDispatcher: CoroutineDispatcher
 ) {
   interface Factory {
     suspend fun create(
@@ -66,54 +67,54 @@ class ZimFileReader constructor(
       showSearchSuggestionsSpellChecked: Boolean
     ): ZimFileReader?
 
-    class Impl @Inject constructor() : Factory {
-      @Suppress("InjectDispatcher")
+    class Impl @Inject constructor(
+      @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+    ) : Factory {
       override suspend fun create(
         zimReaderSource: ZimReaderSource,
         showSearchSuggestionsSpellChecked: Boolean
       ): ZimFileReader? =
-        withContext(Dispatchers.IO) { // Bug Fix #3805
-          try {
-            zimReaderSource.createArchive()?.let {
-              ZimFileReader(
-                zimReaderSource,
-                jniKiwixReader = it,
-                searcher = SuggestionSearcher(it),
-              ).also { zimFileReader ->
-                Log.e(TAG, "create: ${zimReaderSource.toDatabase()}")
-                if (showSearchSuggestionsSpellChecked) {
-                  // Prepare the SpellingsDB asynchronously(when it configure to create) so that creating the
-                  // ZIM reader doesn’t block the user experience.
-                  CoroutineScope(Dispatchers.IO).launch {
-                    zimFileReader.prepareSpellingsDB(zimFileReader.jniKiwixReader)
-                  }
+        try {
+          zimReaderSource.createArchive(ioDispatcher)?.let { archive ->
+            ZimFileReader(
+              zimReaderSource,
+              jniKiwixReader = archive,
+              searcher = SuggestionSearcher(archive),
+              ioDispatcher = ioDispatcher
+            ).also { zimFileReader ->
+              Log.e(TAG, "create: ${zimReaderSource.toDatabase()}")
+              if (showSearchSuggestionsSpellChecked) {
+                // Prepare the SpellingsDB asynchronously(when it configure to create) so that creating the
+                // ZIM reader doesn’t block the user experience.
+                CoroutineScope(ioDispatcher).launch {
+                  zimFileReader.prepareSpellingsDB(archive)
                 }
               }
-            } ?: kotlin.run {
-              Log.e(
-                TAG,
-                "Error in creating ZimFileReader," +
-                  " because file does not exist on path: ${zimReaderSource.toDatabase()}"
-              )
-              null
             }
-          } catch (ignore: JNIKiwixException) {
+          } ?: run {
             Log.e(
               TAG,
               "Error in creating ZimFileReader," +
-                " there is an JNI exception happens: $ignore\n" +
-                "For ZIM file = ${zimReaderSource.toDatabase()}"
-            )
-            null
-          } catch (ignore: Exception) {
-            // for handing the error, if any zim file is corrupted
-            Log.e(
-              TAG,
-              "Error in creating ZimFileReader: $ignore\n" +
-                "For ZIM file = ${zimReaderSource.toDatabase()}"
+                " because file does not exist on path: ${zimReaderSource.toDatabase()}"
             )
             null
           }
+        } catch (ignore: JNIKiwixException) {
+          Log.e(
+            TAG,
+            "Error in creating ZimFileReader," +
+              " there is an JNI exception happens: $ignore\n" +
+              "For ZIM file = ${zimReaderSource.toDatabase()}"
+          )
+          null
+        } catch (ignore: Exception) {
+          // for handing the error, if any zim file is corrupted
+          Log.e(
+            TAG,
+            "Error in creating ZimFileReader: $ignore\n" +
+              "For ZIM file = ${zimReaderSource.toDatabase()}"
+          )
+          null
         }
     }
   }
@@ -201,7 +202,7 @@ class ZimFileReader constructor(
     spellingsDBCreationMutex.withLock {
       if (spellingsDB != null) {
         Log.d(TAG_KIWIX, "SpellingsDB already initialized, skipping.")
-        return
+        return@withLock
       }
       runCatching {
         Log.d(TAG_KIWIX, "Initializing SpellingsDB")
@@ -255,14 +256,13 @@ class ZimFileReader constructor(
 
   @Suppress("UnreachableCode")
   suspend fun load(
-    uri: String,
-    dispatcher: CoroutineDispatcher = Dispatchers.IO
+    uri: String
   ): InputStream? =
-    withContext(dispatcher) {
+    withContext(ioDispatcher) {
       val extension = uri.substringAfterLast(".")
       if (assetExtensions.any { it == extension }) {
         try {
-          return@withContext loadAsset(uri, dispatcher)
+          return@withContext loadAsset(uri)
         } catch (ioException: IOException) {
           Log.e(TAG, "failed to write video for $uri", ioException)
         }
@@ -332,10 +332,9 @@ class ZimFileReader constructor(
 
   @Suppress("InjectDispatcher")
   private suspend fun loadAsset(
-    uri: String,
-    dispatcher: CoroutineDispatcher
+    uri: String
   ): InputStream? =
-    withContext(dispatcher) {
+    withContext(ioDispatcher) {
       val item =
         try {
           jniKiwixReader.getEntryByPath(uri.filePath).getItem(true)
@@ -370,7 +369,7 @@ class ZimFileReader constructor(
   ): InputStream? =
     item?.itemSize()?.let {
       AssetFileDescriptor(
-        infoPair.parcelFileDescriptor(file),
+        parcelFileDescriptor(file),
         infoPair.offset,
         it
       ).createInputStream()
@@ -395,7 +394,7 @@ class ZimFileReader constructor(
 
   @Suppress("InjectDispatcher")
   private suspend fun generateZimContentBytes(item: Item?, uri: String): ByteArrayInputStream =
-    withContext(Dispatchers.IO) {
+    withContext(ioDispatcher) {
       runCatching {
         val output = ByteArrayOutputStream()
         if (item != null) {
@@ -465,8 +464,7 @@ class ZimFileReader constructor(
      * these uris aren't actually nullable but unit tests fail to compile as
      * Uri.parse returns null without android dependencies loaded
      */
-    @JvmField
-    val UI_URI: Uri? = "content://org.kiwix.ui/".toUri()
+    const val UI_URI_STRING = "content://org.kiwix.ui/"
 
     const val CONTENT_PREFIX = "https://kiwix.app/"
     private val assetExtensions =
@@ -506,7 +504,7 @@ val String.truncateMimeType: String
 val String.replaceWithEncodedString: String
   get() = replace("?", "%3F")
 
-private fun DirectAccessInfo.parcelFileDescriptor(file: File): ParcelFileDescriptor? =
+private fun parcelFileDescriptor(file: File): ParcelFileDescriptor? =
   ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
 
 // Default illustration size for ZIM file favicons

@@ -92,12 +92,12 @@ abstract class NotesRoomDao : PageDao {
    */
   private fun removeNoteFileFromStorage(
     noteFilePath: String,
-    dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO
   ) {
-    CoroutineScope(dispatcher).launch {
+    CoroutineScope(ioDispatcher).launch {
       val noteFile = File(noteFilePath)
-      if (noteFile.isFileExist()) {
-        noteFile.deleteFile()
+      if (noteFile.isFileExist(ioDispatcher)) {
+        noteFile.deleteFile(ioDispatcher)
       }
     }
   }

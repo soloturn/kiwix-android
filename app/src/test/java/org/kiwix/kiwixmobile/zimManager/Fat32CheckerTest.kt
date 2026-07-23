@@ -42,7 +42,7 @@ class Fat32CheckerTest {
 
     @Rule
     @JvmField
-    val dispatcherRule = MainDispatcherRule()
+    val mainDispatcherRule = MainDispatcherRule()
 
     protected val pathWithSpace: String = File(System.getProperty("java.io.tmpdir")!!).absolutePath
     protected val pathWithoutSpace: String = File("/nonexistent_kiwix_test_storage_path").absolutePath
@@ -69,7 +69,7 @@ class Fat32CheckerTest {
       selectedStorage = MutableStateFlow(initialPath)
       every { kiwixDataStore.selectedStorage } returns selectedStorage
 
-      return Fat32Checker(kiwixDataStore, checkers, dispatcherRule.dispatcher)
+      return Fat32Checker(kiwixDataStore, checkers, mainDispatcherRule.dispatcher)
         .also { fat32Checker = it }
     }
   }
@@ -83,7 +83,7 @@ class Fat32CheckerTest {
   class LowSpaceTests : BaseTest() {
     @Test
     fun `emits detecting then NotEnoughSpace when free space is less than 4GB`() =
-      runTest(dispatcherRule.dispatcher) {
+      runTest(mainDispatcherRule.dispatcher) {
         val checker = createChecker(pathWithoutSpace)
 
         checker.fileSystemStates.test {
@@ -95,7 +95,7 @@ class Fat32CheckerTest {
 
     @Test
     fun `does not invoke file system checker when space is insufficient`() =
-      runTest(dispatcherRule.dispatcher) {
+      runTest(mainDispatcherRule.dispatcher) {
         val checker = createChecker(pathWithoutSpace)
 
         checker.fileSystemStates.test {
@@ -119,7 +119,7 @@ class Fat32CheckerTest {
   class CoreBehaviorTests : BaseTest() {
     @Test
     fun `emits CanWrite4GbFile when checker returns CAN_WRITE_4GB`() =
-      runTest(dispatcherRule.dispatcher) {
+      runTest(mainDispatcherRule.dispatcher) {
         every { fileSystemChecker.checkFilesystemSupports4GbFiles(any()) } returns CAN_WRITE_4GB
 
         val checker = createChecker(pathWithSpace)
@@ -132,7 +132,7 @@ class Fat32CheckerTest {
 
     @Test
     fun `emits CannotWrite4GbFile when checker returns CANNOT_WRITE_4GB`() =
-      runTest(dispatcherRule.dispatcher) {
+      runTest(mainDispatcherRule.dispatcher) {
         every { fileSystemChecker.checkFilesystemSupports4GbFiles(any()) } returns CANNOT_WRITE_4GB
 
         val checker = createChecker(pathWithSpace)
@@ -145,7 +145,7 @@ class Fat32CheckerTest {
 
     @Test
     fun `emits CannotWrite4GbFile when checker returns INCONCLUSIVE`() =
-      runTest(dispatcherRule.dispatcher) {
+      runTest(mainDispatcherRule.dispatcher) {
         every { fileSystemChecker.checkFilesystemSupports4GbFiles(any()) } returns INCONCLUSIVE
 
         val checker = createChecker(pathWithSpace)
@@ -165,7 +165,7 @@ class Fat32CheckerTest {
   )
   class CheckerChainTests : BaseTest() {
     @Test
-    fun `returns CanWrite when second checker succeeds`() = runTest(dispatcherRule.dispatcher) {
+    fun `returns CanWrite when second checker succeeds`() = runTest(mainDispatcherRule.dispatcher) {
       val c1 = mockk<FileSystemChecker>()
       val c2 = mockk<FileSystemChecker>()
 
@@ -182,7 +182,7 @@ class Fat32CheckerTest {
 
     @Test
     fun `short-circuits when first checker returns CAN_WRITE`() =
-      runTest(dispatcherRule.dispatcher) {
+      runTest(mainDispatcherRule.dispatcher) {
         val c1 = mockk<FileSystemChecker>()
         val c2 = mockk<FileSystemChecker>()
 
@@ -200,7 +200,7 @@ class Fat32CheckerTest {
 
     @Test
     fun `returns CannotWrite when all checkers inconclusive`() =
-      runTest(dispatcherRule.dispatcher) {
+      runTest(mainDispatcherRule.dispatcher) {
         val c1 = mockk<FileSystemChecker>()
         val c2 = mockk<FileSystemChecker>()
 
@@ -224,7 +224,7 @@ class Fat32CheckerTest {
   )
   class FlowTests : BaseTest() {
     @Test
-    fun `re-evaluates when storage changes`() = runTest(dispatcherRule.dispatcher) {
+    fun `re-evaluates when storage changes`() = runTest(mainDispatcherRule.dispatcher) {
       every { fileSystemChecker.checkFilesystemSupports4GbFiles(any()) } returns CAN_WRITE_4GB
 
       val checker = createChecker(pathWithSpace)
@@ -249,7 +249,7 @@ class Fat32CheckerTest {
   )
   class InteractionTests : BaseTest() {
     @Test
-    fun `invokes checker with correct path`() = runTest(dispatcherRule.dispatcher) {
+    fun `invokes checker with correct path`() = runTest(mainDispatcherRule.dispatcher) {
       every { fileSystemChecker.checkFilesystemSupports4GbFiles(pathWithSpace) } returns CAN_WRITE_4GB
 
       val checker = createChecker(pathWithSpace)
@@ -303,7 +303,7 @@ class Fat32CheckerTest {
   class FileObserverTests : BaseTest() {
     @Test
     fun `starts observing when storage has insufficient space`() =
-      runTest(dispatcherRule.dispatcher) {
+      runTest(mainDispatcherRule.dispatcher) {
         val checker = createChecker(pathWithoutSpace)
 
         checker.fileSystemStates.test {
@@ -314,7 +314,7 @@ class Fat32CheckerTest {
       }
 
     @Test
-    fun `stops observing when storage becomes valid`() = runTest(dispatcherRule.dispatcher) {
+    fun `stops observing when storage becomes valid`() = runTest(mainDispatcherRule.dispatcher) {
       every {
         fileSystemChecker.checkFilesystemSupports4GbFiles(any())
       } returns CAN_WRITE_4GB

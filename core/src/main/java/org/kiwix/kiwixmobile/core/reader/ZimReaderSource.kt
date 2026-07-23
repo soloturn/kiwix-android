@@ -23,6 +23,8 @@ import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.extensions.canReadFile
@@ -57,9 +59,9 @@ class ZimReaderSource(
       }
   }
 
-  suspend fun exists(): Boolean {
-    return when {
-      file != null -> file.isFileExist()
+  suspend fun exists(ioDispatcher: CoroutineDispatcher): Boolean = withContext(ioDispatcher) {
+    when {
+      file != null -> file.isFileExist(ioDispatcher)
       assetFileDescriptorList?.isNotEmpty() == true ->
         assetFileDescriptorList.first().parcelFileDescriptor.fileDescriptor.valid()
 
@@ -67,36 +69,38 @@ class ZimReaderSource(
     }
   }
 
-  suspend fun canOpenInLibkiwix(): Boolean {
-    return when {
-      file?.canReadFile() == true -> true
-      assetFileDescriptorList?.isNotEmpty() == true &&
-        assetFileDescriptorList.first().parcelFileDescriptor?.fd
-          ?.let(::isFileDescriptorCanOpenWithLibkiwix) == true -> true
+  suspend fun canOpenInLibkiwix(ioDispatcher: CoroutineDispatcher): Boolean =
+    withContext(ioDispatcher) {
+      when {
+        file?.canReadFile(ioDispatcher) == true -> true
+        assetFileDescriptorList?.isNotEmpty() == true &&
+          assetFileDescriptorList.first().parcelFileDescriptor?.fd
+            ?.let(::isFileDescriptorCanOpenWithLibkiwix) == true -> true
 
-      else -> false
-    }
-  }
-
-  suspend fun createArchive(): Archive? {
-    if (canOpenInLibkiwix()) {
-      return when {
-        file != null -> Archive(file.canonicalPath)
-        assetFileDescriptorList?.isNotEmpty() == true -> {
-          val fdInputArray = getFdInputArrayFromAssetFileDescriptorList(assetFileDescriptorList)
-          if (fdInputArray.size == 1) {
-            Archive(fdInputArray[0])
-          } else {
-            Archive(fdInputArray)
-          }
-        }
-
-        else -> null
+        else -> false
       }
     }
 
-    return null
-  }
+  suspend fun createArchive(ioDispatcher: CoroutineDispatcher): Archive? =
+    withContext(ioDispatcher) {
+      if (canOpenInLibkiwix(ioDispatcher)) {
+        when {
+          file != null -> Archive(file.canonicalPath)
+          assetFileDescriptorList?.isNotEmpty() == true -> {
+            val fdInputArray = getFdInputArrayFromAssetFileDescriptorList(assetFileDescriptorList)
+            if (fdInputArray.size == 1) {
+              Archive(fdInputArray[0])
+            } else {
+              Archive(fdInputArray)
+            }
+          }
+
+          else -> null
+        }
+      } else {
+        null
+      }
+    }
 
   private fun getFdInputArrayFromAssetFileDescriptorList(
     assetFileDescriptorList: List<AssetFileDescriptor>
@@ -109,7 +113,7 @@ class ZimReaderSource(
       )
     }.toTypedArray()
 
-  fun toDatabase(): String = file?.canonicalPath ?: uri.toString()
+  fun toDatabase(): String = file?.canonicalPath ?: "$uri"
 
   /**
    * Compares two sources for equality based on the underlying file, URI,

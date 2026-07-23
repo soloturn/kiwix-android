@@ -51,15 +51,15 @@ class ZimIntegrityChecker @Inject constructor(private val zimReaderContainer: Zi
   suspend fun validateZIMFile(
     zimReaderSource: ZimReaderSource,
     isBrandedApp: Boolean,
-    dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO
   ): ZimFileValidationResult =
-    withContext(dispatcher) {
+    withContext(ioDispatcher) {
       var archive: Archive? = null
       try {
         archive = if (isBrandedApp) {
-          zimReaderContainer.zimFileReader?.zimReaderSource?.createArchive()
+          zimReaderContainer.zimFileReader?.zimReaderSource?.createArchive(ioDispatcher)
         } else {
-          zimReaderSource.createArchive()
+          zimReaderSource.createArchive(ioDispatcher)
         }
         var isZIMFileValid = archive?.check() == true
         if (archive?.isMultiPart == true || isBrandedApp || !isZIMFileValid) {

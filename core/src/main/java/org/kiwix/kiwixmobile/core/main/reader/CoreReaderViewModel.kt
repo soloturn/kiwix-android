@@ -899,7 +899,7 @@ abstract class CoreReaderViewModel(
         handleEvent = true
       }
 
-      url.startsWith(ZimFileReader.UI_URI.toString()) -> {
+      url.startsWith(ZimFileReader.UI_URI_STRING) -> {
         handleEvent = true
       }
     }

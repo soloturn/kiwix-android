@@ -18,6 +18,8 @@
 
 package org.kiwix.kiwixmobile.core.main.reader.helper
 
+import kotlinx.coroutines.CoroutineDispatcher
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.main.reader.helper.ZimFileManager.OpenZimResult.InvalidFile
 import org.kiwix.kiwixmobile.core.main.reader.helper.ZimFileManager.OpenZimResult.Success
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
@@ -25,12 +27,15 @@ import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import javax.inject.Inject
 
-class ZimFileManager @Inject constructor(private val zimReaderContainer: ZimReaderContainer) {
+class ZimFileManager @Inject constructor(
+  private val zimReaderContainer: ZimReaderContainer,
+  @IoDispatcher private val ioDispatcher: CoroutineDispatcher
+) {
   suspend fun openZimFileInReader(
     source: ZimReaderSource,
     showSearchSuggestionsSpellChecked: Boolean
   ): OpenZimResult {
-    if (!source.canOpenInLibkiwix()) return InvalidFile
+    if (!source.canOpenInLibkiwix(ioDispatcher)) return InvalidFile
     zimReaderContainer.setZimReaderSource(source, showSearchSuggestionsSpellChecked)
     return zimReaderContainer.zimFileReader?.let {
       Success(it)

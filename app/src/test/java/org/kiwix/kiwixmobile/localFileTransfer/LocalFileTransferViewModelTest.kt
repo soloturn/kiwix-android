@@ -48,7 +48,7 @@ class LocalFileTransferViewModelTest {
 
   @RegisterExtension
   @JvmField
-  val dispatcherRule = MainDispatcherRule()
+  val mainDispatcherRule = MainDispatcherRule()
 
   @BeforeEach
   fun setUp() {
@@ -376,7 +376,7 @@ class LocalFileTransferViewModelTest {
   fun `onShowCaseDisplayed marks showcase as shown in data store`() = runTest {
     coEvery { kiwixDataStore.setShowCaseViewForFileTransferShown() } returns Unit
     viewModel.onShowCaseDisplayed()
-    dispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+    mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
     coVerify { kiwixDataStore.setShowCaseViewForFileTransferShown() }
   }
 

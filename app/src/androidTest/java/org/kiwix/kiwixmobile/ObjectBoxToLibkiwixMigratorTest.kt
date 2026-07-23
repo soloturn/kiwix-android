@@ -23,6 +23,7 @@ import androidx.test.espresso.IdlingRegistry
 import androidx.test.platform.app.InstrumentationRegistry
 import io.objectbox.Box
 import io.objectbox.BoxStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -132,7 +133,8 @@ class ObjectBoxToLibkiwixMigratorTest : BaseActivityTest() {
       boxStore = boxStore!!,
       kiwixDataStore = kiwixDataStore,
       libkiwixBookmarks = libkiwixBookmarks,
-      libkiwixBookOnDisk = libkiwixBookOnDisk
+      libkiwixBookOnDisk = libkiwixBookOnDisk,
+      ioDispatcher = Dispatchers.IO
     )
     setUpObjectBoxAndData()
   }

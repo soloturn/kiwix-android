@@ -34,8 +34,8 @@ object StorageDeviceUtils {
   @JvmStatic
   suspend fun getWritableStorage(
     context: Context,
-    dispatcher: CoroutineDispatcher
-  ) = withContext(dispatcher) {
+    ioDispatcher: CoroutineDispatcher
+  ) = withContext(ioDispatcher) {
     validate(externalMediaFilesDirsDevices(context), true)
   }
 

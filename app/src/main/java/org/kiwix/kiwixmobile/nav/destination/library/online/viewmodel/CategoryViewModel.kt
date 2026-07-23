@@ -63,7 +63,7 @@ class CategoryViewModel @Inject constructor(
   private val kiwixDataStore: KiwixDataStore,
   @OPDSKiwixService private val kiwixService: KiwixService,
   private val connectivityBroadcastReceiver: ConnectivityBroadcastReceiver,
-  @IoDispatcher val dispatcher: CoroutineDispatcher
+  @IoDispatcher val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
   sealed class Action {
     data class UpdateCategory(val categories: List<Category>) : Action()
@@ -97,7 +97,7 @@ class CategoryViewModel @Inject constructor(
       .onEach { newState -> state.value = newState }
       .launchIn(viewModelScope)
 
-  private fun observeCategories() = viewModelScope.launch(dispatcher) {
+  private fun observeCategories() = viewModelScope.launch(ioDispatcher) {
     state.value = Loading
 
     val cachedCategoryList = kiwixDataStore.cachedOnlineCategoryList.first()
