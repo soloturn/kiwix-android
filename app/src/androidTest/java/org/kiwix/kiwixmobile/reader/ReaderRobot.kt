@@ -45,7 +45,7 @@ import org.kiwix.kiwixmobile.core.ui.components.OVERFLOW_MENU_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.main.BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils
-import org.kiwix.kiwixmobile.testutils.TestUtils.FIVE_SECOND_DELAY
+import org.kiwix.kiwixmobile.testutils.TestUtils.FIFTEEN_SECOND_DELAY
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
@@ -137,7 +137,8 @@ class ReaderRobot : BaseRobot() {
   }
 
   fun assertTabsRestored(composeTestRule: ComposeContentTestRule) {
-    composeTestRule.waitUntil(FIVE_SECOND_DELAY) {
+    composeTestRule.waitForIdle()
+    composeTestRule.waitUntil(FIFTEEN_SECOND_DELAY) {
       composeTestRule.onAllNodesWithTag(TABS_SIZE_TEXT_TESTING_TAG, useUnmergedTree = true)
         .fetchSemanticsNodes().isNotEmpty()
     }
