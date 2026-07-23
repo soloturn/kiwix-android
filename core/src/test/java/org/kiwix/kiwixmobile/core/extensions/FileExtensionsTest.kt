@@ -18,13 +18,14 @@
 
 package org.kiwix.kiwixmobile.core.extensions
 
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.sharedFunctions.MainDispatcherRule
 import java.io.File
@@ -33,19 +34,16 @@ class FileExtensionsTest {
   @RegisterExtension
   @JvmField
   val mainDispatcherRule = MainDispatcherRule()
-  private val testDispatcher = mainDispatcherRule.dispatcher
+
+  @TempDir
+  lateinit var tempDir: File
+
+  private val testDispatcher = StandardTestDispatcher()
   private lateinit var tempFile: File
 
   @BeforeEach
   fun setUp() {
-    tempFile = File.createTempFile("kiwix_test", ".tmp")
-  }
-
-  @AfterEach
-  fun tearDown() {
-    if (tempFile.exists()) {
-      tempFile.delete()
-    }
+    tempFile = File(tempDir, "kiwix_test.tmp").apply { createNewFile() }
   }
 
   @Test

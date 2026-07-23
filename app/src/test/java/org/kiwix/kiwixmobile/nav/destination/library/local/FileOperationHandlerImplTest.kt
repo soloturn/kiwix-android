@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.sharedFunctions.MainDispatcherRule
@@ -49,6 +50,9 @@ import java.io.FileNotFoundException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FileOperationHandlerImplTest {
+  @TempDir
+  lateinit var tempDir: File
+
   private val context: Context = mockk()
 
   @RegisterExtension
@@ -104,8 +108,7 @@ class FileOperationHandlerImplTest {
 
     @Test
     fun whenFileEmpty_emitsHundredProgress() = runTest {
-      val emptyFile =
-        File.createTempFile("empty", ".txt")
+      val emptyFile = File(tempDir, "empty.txt").apply { createNewFile() }
 
       val parcelFileDescriptor =
         mockk<ParcelFileDescriptor>()
@@ -122,7 +125,7 @@ class FileOperationHandlerImplTest {
 
       fileOperationHandler.copy(
         sourceUri = sourceUri,
-        destinationFile = File.createTempFile("destination", ".txt"),
+        destinationFile = File(tempDir, "destination.txt").apply { createNewFile() },
         onProgress = {
           progress = it
         }
@@ -133,13 +136,13 @@ class FileOperationHandlerImplTest {
 
     @Test
     fun whenFileHasContent_updatesProgress() = runTest {
-      val sourceFile =
-        File.createTempFile("source", ".txt").apply {
-          writeText("Kiwix testing content")
-        }
+      val sourceFile = File(tempDir, "source.txt").apply {
+        writeText("Kiwix testing content")
+      }
 
-      val destinationFile =
-        File.createTempFile("destination", ".txt")
+      val destinationFile = File(tempDir, "destination.txt").apply {
+        createNewFile()
+      }
 
       val sourceUri: Uri = mockk()
 

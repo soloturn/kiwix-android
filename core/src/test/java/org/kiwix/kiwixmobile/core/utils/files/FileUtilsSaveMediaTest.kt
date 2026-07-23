@@ -34,9 +34,10 @@ import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.After
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.robolectric.RobolectricTestRunner
@@ -50,6 +51,9 @@ import java.io.IOException
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.Q])
 class FileUtilsSaveMediaTest {
+  @TempDir
+  lateinit var tempDir: File
+
   private lateinit var mockContext: Application
   private lateinit var mockZimReaderContainer: ZimReaderContainer
 
@@ -67,7 +71,7 @@ class FileUtilsSaveMediaTest {
     "data:image/svg+xml;base64,$encoded"
   }
 
-  @Before
+  @BeforeEach
   fun setUp() {
     clearAllMocks()
     mockContext = ApplicationProvider.getApplicationContext()
@@ -80,7 +84,7 @@ class FileUtilsSaveMediaTest {
     shadowMimeTypeMap.addExtensionMimeTypeMapping("pdf", "application/pdf")
   }
 
-  @After
+  @AfterEach
   fun tearDown() {
     unmockkAll()
   }
@@ -196,8 +200,8 @@ class FileUtilsSaveMediaTest {
       every { mockZimReaderContainer.load(any(), any()) } returns response
 
       val context = mockk<Context>(relaxed = true)
-      val dummyDir = File(System.getProperty("java.io.tmpdir"))
-      every { context.externalMediaDirs } returns arrayOf(dummyDir)
+      val subTempDir = File(tempDir, "media").apply { mkdirs() }
+      every { context.externalMediaDirs } returns arrayOf(subTempDir)
 
       val result = FileUtils.downloadFileFromUrl(
         context = context,
@@ -315,8 +319,8 @@ class FileUtilsSaveMediaTest {
       every { mockZimReaderContainer.load(any(), any()) } throws IOException("load failed")
 
       val localMockContext = mockk<Context>(relaxed = true)
-      val dummyDir = File(System.getProperty("java.io.tmpdir"))
-      every { localMockContext.externalMediaDirs } returns arrayOf(dummyDir)
+      val subTempDir = File(tempDir, "media_error").apply { mkdirs() }
+      every { localMockContext.externalMediaDirs } returns arrayOf(subTempDir)
       val result = FileUtils.downloadFileFromUrl(
         context = localMockContext,
         url = "https://kiwix.org/files/document.pdf",
@@ -390,8 +394,8 @@ class FileUtilsSaveMediaTest {
       every { mockZimReaderContainer.load(any(), any()) } returns response
 
       val localMockContext = mockk<Context>(relaxed = true)
-      val dummyDir = File(System.getProperty("java.io.tmpdir"))
-      every { localMockContext.externalMediaDirs } returns arrayOf(dummyDir)
+      val subTempDir = File(tempDir, "pdf_save").apply { mkdirs() }
+      every { localMockContext.externalMediaDirs } returns arrayOf(subTempDir)
 
       val result = FileUtils.downloadFileFromUrl(
         context = localMockContext,

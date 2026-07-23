@@ -32,10 +32,11 @@ import io.mockk.unmockkObject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Before
-import org.junit.Rule
-import org.junit.Test
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.api.extension.RegisterExtension
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -50,13 +51,15 @@ import org.kiwix.kiwixmobile.core.utils.StorageUtils
 import org.kiwix.kiwixmobile.core.utils.StorageUtils.isExternalStorageWritable
 import org.kiwix.sharedFunctions.MainDispatcherRule
 import java.io.File
-import kotlin.io.path.createTempDirectory
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AddNoteViewModelTest {
-  @Rule
+  @RegisterExtension
   @JvmField
   val mainDispatcherRule = MainDispatcherRule()
+
+  @TempDir
+  lateinit var tempDir: File
   private lateinit var activity: Activity
   private lateinit var noteRepository: NoteRepository
   private lateinit var zimReaderContainer: ZimReaderContainer
@@ -66,7 +69,7 @@ class AddNoteViewModelTest {
 
   private lateinit var noteMetadata: NoteMetadata
 
-  @Before
+  @BeforeEach
   fun setUp() {
     mockkObject(StorageUtils)
     activity = mockk()
@@ -85,7 +88,7 @@ class AddNoteViewModelTest {
     )
   }
 
-  @After
+  @AfterEach
   fun tearDown() {
     unmockkObject(StorageUtils)
     unmockkAll()
@@ -341,7 +344,6 @@ class AddNoteViewModelTest {
   @Test
   fun `shareNote emits ShareNote when file exists`() = runTest {
     initializeViewModel()
-    val tempDir = createTempDirectory().toFile()
     val tempFile = File(tempDir, "article.txt")
     tempFile.writeText("note")
 

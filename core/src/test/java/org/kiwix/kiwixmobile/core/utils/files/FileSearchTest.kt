@@ -38,11 +38,15 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.sharedFunctions.MainDispatcherRule
 import java.io.File
 
 class FileSearchTest {
+  @TempDir
+  lateinit var tempDir: File
+
   private val context: Context = mockk()
   private lateinit var fileSearch: FileSearch
 
@@ -58,7 +62,6 @@ class FileSearchTest {
   @BeforeEach
   fun init() {
     clearAllMocks()
-    deleteTempDirectory()
     mockkStatic(StorageDeviceUtils::class)
     mockkStatic(Environment::class)
     every { Environment.getExternalStorageDirectory() } returns externalStorageDirectory
@@ -89,11 +92,11 @@ class FileSearchTest {
 
     @Test
     fun `scan of directory that has files returns files`() = runTest {
-      val zimFile = File.createTempFile("fileToFind", ".zim")
-      val zimaaFile = File.createTempFile("fileToFind2", ".zimaa")
-      File.createTempFile("willNotFind", ".txt")
+      val zimFile = File(tempDir, "fileToFind.zim").apply { createNewFile() }
+      val zimaaFile = File(tempDir, "fileToFind2.zimaa").apply { createNewFile() }
+      File(tempDir, "willNotFind.txt").apply { createNewFile() }
       every { contentResolver.query(any(), any(), any(), any(), any()) } returns null
-      every { storageDevice.name } returns zimFile.parent
+      every { storageDevice.name } returns tempDir.absolutePath
       fileSearch.scan(scanningProgressListener).test {
         assertThat(awaitItem()).containsExactlyInAnyOrder(zimFile, zimaaFile)
         awaitComplete()
@@ -102,17 +105,10 @@ class FileSearchTest {
 
     @Test
     fun `scan of directory recursively traverses filesystem`() = runTest {
-      val tempRoot =
-        File.createTempFile("tofindroot", "extension")
-          .parentFile.absolutePath
-      val zimFile =
-        File.createTempFile(
-          "fileToFind",
-          ".zim",
-          File("$tempRoot${File.separator}dir").apply(File::mkdirs)
-        )
+      val subDir = File(tempDir, "dir").apply { mkdirs() }
+      val zimFile = File(subDir, "fileToFind.zim").apply { createNewFile() }
       every { contentResolver.query(any(), any(), any(), any(), any()) } returns null
-      every { storageDevice.name } returns zimFile.parentFile.parent
+      every { storageDevice.name } returns tempDir.absolutePath
       fileSearch.scan(scanningProgressListener).test {
         assertThat(awaitItem()[0]).isEqualTo(zimFile)
         awaitComplete()
@@ -124,7 +120,7 @@ class FileSearchTest {
   inner class MediaStore {
     @Test
     fun `scan media store, if files are readable they are returned`() = runTest {
-      val fileToFind = File.createTempFile("fileToFind", ".zim")
+      val fileToFind = File(tempDir, "fileToFind_media.zim").apply { createNewFile() }
       expectFromMediaStore(fileToFind)
       fileSearch.scan(scanningProgressListener).test {
         assertThat(awaitItem()).isEqualTo(listOf(fileToFind))
@@ -134,7 +130,7 @@ class FileSearchTest {
 
     @Test
     fun `scan media store, if files are not readable they are not returned`() = runTest {
-      val unreadableFile = File.createTempFile("fileToFind", ".zim")
+      val unreadableFile = File(tempDir, "fileToFind_unreadable.zim").apply { createNewFile() }
       expectFromMediaStore(unreadableFile)
       unreadableFile.delete()
       fileSearch.scan(scanningProgressListener).test {
@@ -146,8 +142,6 @@ class FileSearchTest {
     @Test
     fun `scan media store, if files are in trash folder they are not returned even if readable`() =
       runTest {
-        val tempDir = File(System.getProperty("java.io.tmpdir"), "kiwix_trash_test}")
-        tempDir.mkdirs()
         val trashDir = File(tempDir, ".Trash").apply { mkdirs() }
         val trashFile = File(trashDir, "trash_file.zim").apply { createNewFile() }
 
@@ -156,7 +150,6 @@ class FileSearchTest {
           assertThat(awaitItem()).isEmpty()
           awaitComplete()
         }
-        tempDir.deleteRecursively()
       }
 
     private fun expectFromMediaStore(fileToFind: File) {
@@ -174,15 +167,6 @@ class FileSearchTest {
       every { cursor.columnNames } returns arrayOf(MediaColumns.DATA)
       every { cursor.getColumnIndex(MediaColumns.DATA) } returns 0
       every { cursor.getString(0) } returns fileToFind.absolutePath
-    }
-  }
-
-  private fun deleteTempDirectory() {
-    try {
-      File.createTempFile("temp", ".txt")
-        .parentFile.deleteRecursively()
-    } catch (ignore: Exception) {
-      ignore.printStackTrace()
     }
   }
 }

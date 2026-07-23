@@ -62,6 +62,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
+import org.junit.jupiter.api.io.TempDir
 import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ThemeConfig
@@ -155,7 +156,10 @@ internal class CoreSettingsViewModelTest {
   private val storageDeviceProvider: StorageDeviceProvider = mockk(relaxed = true)
   private val activity: CoreMainActivity = mockk(relaxed = true)
   private val contentResolver: ContentResolver = mockk(relaxed = true)
-  private val tempDir = File(System.getProperty("java.io.tmpdir"))
+
+  @TempDir
+  lateinit var tempDir: File
+
   private val alertDialogShower: AlertDialogShower = mockk(relaxed = true)
   private lateinit var viewModel: TestCoreSettingsViewModel
 
@@ -1048,10 +1052,8 @@ internal class CoreSettingsViewModelTest {
       every { contentResolver.getType(uri) } returns "application/xml"
 
       // Create a valid XML temp file
-      val tempDir = File(System.getProperty("java.io.tmpdir"), "kiwix_test_cache")
-      if (tempDir.exists()) tempDir.delete()
-      tempDir.mkdirs()
-      every { context.externalCacheDir } returns tempDir
+      val cacheDir = File(tempDir, "kiwix_test_cache").apply { mkdirs() }
+      every { context.externalCacheDir } returns cacheDir
 
       val xmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><bookmarks></bookmarks>"
       every { contentResolver.openInputStream(uri) } returns xmlContent.byteInputStream()
@@ -1061,9 +1063,6 @@ internal class CoreSettingsViewModelTest {
       viewModel.onBookmarkFileSelected(result)
       advanceUntilIdle()
       coVerify { libkiwixBookmarks.importBookmarks(any()) }
-
-      // Clean up
-      tempDir.deleteRecursively()
     }
 
     @Test
@@ -1079,10 +1078,8 @@ internal class CoreSettingsViewModelTest {
       every { contentResolver.getType(uri) } returns "text/xml"
 
       // Create temp dir for the temp file
-      val tempDir = File(System.getProperty("java.io.tmpdir"), "kiwix_test_cache2")
-      if (tempDir.exists()) tempDir.delete()
-      tempDir.mkdirs()
-      every { context.externalCacheDir } returns tempDir
+      val cacheDir2 = File(tempDir, "kiwix_test_cache2").apply { mkdirs() }
+      every { context.externalCacheDir } returns cacheDir2
 
       // Not valid XML
       val invalidXml = "this is not valid xml <><>!!!"
@@ -1091,9 +1088,6 @@ internal class CoreSettingsViewModelTest {
       viewModel.onBookmarkFileSelected(result)
       advanceUntilIdle()
       coVerify(exactly = 0) { libkiwixBookmarks.importBookmarks(any()) }
-
-      // Clean up
-      tempDir.deleteRecursively()
     }
 
     @Test
