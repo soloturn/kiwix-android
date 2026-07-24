@@ -27,6 +27,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -48,6 +49,7 @@ import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.nav.destination.library.local.SELECT_FILE_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.RetryRule
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
 import org.kiwix.kiwixmobile.ui.KiwixDestination
 import java.io.File
@@ -62,7 +64,6 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
   @Rule(order = COMPOSE_TEST_RULE_ORDER)
   @JvmField
   val composeTestRule = createComposeRule()
-  private lateinit var kiwixMainActivity: KiwixMainActivity
   private val fileName = "testzim.zim"
 
   @Before
@@ -77,7 +78,6 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
   fun testOpeningFileWithFilePicker() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
       activityScenario.onActivity {
-        kiwixMainActivity = it
         it.navigate(KiwixDestination.Library.route)
       }
       composeTestRule.waitForIdle()
@@ -92,6 +92,11 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
             )
           )
         // open file picker to select a file to test the real scenario.
+        composeTestRule.waitUntil(timeoutMillis = TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+          composeTestRule
+            .onNodeWithTag(SELECT_FILE_BUTTON_TESTING_TAG)
+            .isDisplayed()
+        }
         composeTestRule.onNodeWithTag(SELECT_FILE_BUTTON_TESTING_TAG).performClick()
         copyMoveFileHandler {
           assertCopyMoveDialogDisplayed(composeTestRule)
@@ -115,19 +120,13 @@ class OpeningFilesFromStorageTest : BaseActivityTest() {
   fun testOpeningFileFromFileManager() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
       activityScenario.onActivity {
-        kiwixMainActivity = it
         it.navigate(KiwixDestination.Library.route)
       }
       composeTestRule.waitForIdle()
       val uri = copyFileToDownloadsFolder(context, fileName)
       try {
         updateKiwixDataStore { setShowStorageSelectionDialogOnCopyMove(true) }
-        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-          setDataAndType(uri, "application/octet-stream")
-          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-          setPackage(context.packageName)
-        }
-        ActivityScenario.launch<KiwixMainActivity>(viewIntent).onActivity {}
+        ActivityScenario.launch<KiwixMainActivity>(createDeepLinkIntent(uri)).onActivity {}
         composeTestRule.waitForIdle()
         copyMoveFileHandler {
           assertCopyMoveDialogDisplayed(composeTestRule)

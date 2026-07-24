@@ -46,6 +46,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
@@ -65,7 +66,6 @@ import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState
 import org.kiwix.libzim.Archive
 import org.kiwix.sharedFunctions.MainDispatcherRule
 import java.io.File
-import kotlin.io.path.createTempDirectory
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CopyMoveFileHandlerTest {
@@ -81,9 +81,12 @@ class CopyMoveFileHandlerTest {
   @JvmField
   val mainDispatcherRule = MainDispatcherRule()
 
+  @TempDir
+  lateinit var tempDir: File
+
   private lateinit var fileHandler: CopyMoveFileHandler
 
-  private var storageFile: File = File(System.getProperty("java.io.tmpdir"))
+  private var storageFile: File = File("")
   private val destinationFile: File = mockk()
   private val selectedFile: DocumentFile = mockk()
   private val sourceUri: Uri = mockk()
@@ -91,6 +94,7 @@ class CopyMoveFileHandlerTest {
 
   @BeforeEach
   fun setup() {
+    storageFile = tempDir
     mockkStatic(DocumentFile::class)
     every { DocumentFile.fromFile(any()) } returns mockk(relaxed = true)
     fileHandler = CopyMoveFileHandler(
@@ -1120,9 +1124,7 @@ class CopyMoveFileHandlerTest {
   inner class GetDestinationFile {
     @Test
     fun destinationFileDoesNotExist_returnsOriginalFileName() = runTest {
-      val root = createTempDirectory().toFile()
-
-      fileHandler.setStorageFileForUnitTest(root)
+      fileHandler.setStorageFileForUnitTest(tempDir)
 
       every { selectedFile.name } returns "test.zim"
 
@@ -1134,11 +1136,9 @@ class CopyMoveFileHandlerTest {
 
     @Test
     fun destinationFileExists_returnsIncrementedFileName() = runTest {
-      val root = createTempDirectory().toFile()
+      File(tempDir, "test.zim").createNewFile()
 
-      File(root, "test.zim").createNewFile()
-
-      fileHandler.setStorageFileForUnitTest(root)
+      fileHandler.setStorageFileForUnitTest(tempDir)
 
       every { selectedFile.name } returns "test.zim"
 
@@ -1150,13 +1150,11 @@ class CopyMoveFileHandlerTest {
 
     @Test
     fun multipleDestinationFilesExist_returnsNextAvailableFileName() = runTest {
-      val root = createTempDirectory().toFile()
+      File(tempDir, "test.zim").createNewFile()
+      File(tempDir, "test_1.zim").createNewFile()
+      File(tempDir, "test_2.zim").createNewFile()
 
-      File(root, "test.zim").createNewFile()
-      File(root, "test_1.zim").createNewFile()
-      File(root, "test_2.zim").createNewFile()
-
-      fileHandler.setStorageFileForUnitTest(root)
+      fileHandler.setStorageFileForUnitTest(tempDir)
 
       every { selectedFile.name } returns "test.zim"
 

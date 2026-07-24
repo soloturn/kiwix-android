@@ -68,6 +68,7 @@ while [ $retry -le 3 ]; do
     if is_app_installed "$TEST_ORCHESTRATOR_PACKAGE"; then
       adb uninstall "${TEST_ORCHESTRATOR_PACKAGE}"
     fi
+    ./gradlew --stop
     ./gradlew clean
     retry=$(( retry + 1 ))
     if [ $retry -eq 3 ]; then

@@ -158,7 +158,7 @@ class SettingsRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
-        waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+        waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG, true)
             .fetchSemanticsNodes()[position]
             .config[SemanticsProperties.Selected]

@@ -21,26 +21,29 @@ package org.kiwix.kiwixmobile.error
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.adevinta.android.barista.interaction.BaristaSleepInteractions
 import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.help.SEND_DIAGNOSTIC_REPORT_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_TAG
-import org.kiwix.kiwixmobile.testutils.TestUtils
+import org.kiwix.kiwixmobile.testutils.TestUtils.FIFTEEN_SECOND_DELAY
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 
 fun errorActivity(func: ErrorActivityRobot.() -> Unit) = ErrorActivityRobot().apply(func)
 
 class ErrorActivityRobot : BaseRobot() {
   fun assertSendDiagnosticReportDisplayed(composeTestRule: ComposeContentTestRule) {
-    // Wait a bit for properly visible the HelpScreen.
-    BaristaSleepInteractions.sleep(TestUtils.TEST_PAUSE_MS.toLong())
     composeTestRule.apply {
-      waitForIdle()
+      waitUntil(FIFTEEN_SECOND_DELAY) {
+        onAllNodesWithTag(SEND_DIAGNOSTIC_REPORT_TESTING_TAG)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+      }
       onNodeWithTag(SEND_DIAGNOSTIC_REPORT_TESTING_TAG).assertIsDisplayed()
     }
   }
@@ -53,10 +56,15 @@ class ErrorActivityRobot : BaseRobot() {
   }
 
   fun assertErrorActivityDisplayed(composeTestRule: ComposeContentTestRule) {
-    // Wait a bit for properly visible the ErrorActivity.
-    BaristaSleepInteractions.sleep(TestUtils.TEST_PAUSE_MS.toLong())
-    composeTestRule.onNodeWithText(context.getString(R.string.diagnostic_report))
-      .assertIsDisplayed()
+    composeTestRule.apply {
+      waitUntil(FIFTEEN_SECOND_DELAY) {
+        onAllNodesWithText(context.getString(R.string.diagnostic_report))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+      }
+      onNodeWithText(context.getString(R.string.diagnostic_report))
+        .assertExists()
+    }
   }
 
   fun clickOnNoThanksButton(composeTestRule: ComposeContentTestRule) {

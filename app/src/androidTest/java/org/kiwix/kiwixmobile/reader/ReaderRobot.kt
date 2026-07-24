@@ -41,10 +41,14 @@ import org.kiwix.kiwixmobile.core.main.reader.TAB_TITLE_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.reader.TTS_CONTROL_STOP_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.page.PAGE_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.OPEN_ITEM_IN_NEW_TAB_ICON_TESTING_TAG
+import org.kiwix.kiwixmobile.core.ui.components.NAVIGATION_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.components.OVERFLOW_MENU_BUTTON_TESTING_TAG
+import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_DISMISS_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.main.BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.main.BOTTOM_NAV_READER_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils
+import org.kiwix.kiwixmobile.testutils.TestUtils.FIFTEEN_SECOND_DELAY
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
@@ -54,10 +58,21 @@ fun reader(func: ReaderRobot.() -> Unit) = ReaderRobot().applyWithViewHierarchyP
 class ReaderRobot : BaseRobot() {
   private var retryCountForClickOnUndoButton = 5
 
-  fun checkZimFileLoadedSuccessful(composeTestRule: ComposeContentTestRule) {
+  fun checkZimFileLoadedSuccessful(
+    composeTestRule: ComposeContentTestRule,
+    articlePageContent: String? = null
+  ) {
     composeTestRule.apply {
+      waitUntil(FIFTEEN_SECOND_DELAY) {
+        onNodeWithTag(READER_SCREEN_TESTING_TAG).isDisplayed()
+      }
+      // Wait for a few second to fully load the article in reader.
       waitUntilTimeout()
-      onNodeWithTag(READER_SCREEN_TESTING_TAG).assertExists()
+      articlePageContent?.let {
+        assertArticleLoaded(it)
+      }
+      // Wait for saving the tabs history.
+      waitUntilTimeout()
     }
   }
 
@@ -111,7 +126,7 @@ class ReaderRobot : BaseRobot() {
           )
         )
         .perform(webClick())
-    })
+    }, 10)
   }
 
   fun assertArticleLoaded(articlePageContent: String) {
@@ -123,7 +138,7 @@ class ReaderRobot : BaseRobot() {
             "//*[contains(text(), '$articlePageContent')]"
           )
         )
-    })
+    }, 10)
   }
 
   fun openAndroidArticleInNewTab(composeTestRule: ComposeContentTestRule) {
@@ -136,6 +151,12 @@ class ReaderRobot : BaseRobot() {
   }
 
   fun assertTabsRestored(composeTestRule: ComposeContentTestRule) {
+    composeTestRule.waitForIdle()
+    composeTestRule.waitUntil(FIFTEEN_SECOND_DELAY) {
+      composeTestRule.onAllNodesWithTag(TABS_SIZE_TEXT_TESTING_TAG, useUnmergedTree = true)
+        .fetchSemanticsNodes().isNotEmpty()
+    }
+
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
@@ -159,9 +180,22 @@ class ReaderRobot : BaseRobot() {
     })
   }
 
+  fun clickOnReaderScreenInBottomAppBar(composeTestRule: ComposeContentTestRule) {
+    testFlakyView({
+      composeTestRule.apply {
+        waitForIdle()
+        onNodeWithTag(BOTTOM_NAV_READER_ITEM_TESTING_TAG).performClick()
+      }
+    })
+  }
+
+  fun clickOnNavigationIcon(composeTestRule: ComposeContentTestRule) {
+    composeTestRule.onNodeWithTag(NAVIGATION_ICON_TESTING_TAG).performClick()
+  }
+
   fun clickOnReadAloudMenuItem(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).performClick()
@@ -177,6 +211,16 @@ class ReaderRobot : BaseRobot() {
     ) {
       composeTestRule.onNodeWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG)
         .isDisplayed()
+    }
+  }
+
+  fun clickOnCancelButton(composeTestRule: ComposeContentTestRule) {
+    composeTestRule.apply {
+      waitForIdle()
+      waitUntil(TestUtils.TEST_PAUSE_MS.toLong()) {
+        onNodeWithTag(ALERT_DIALOG_DISMISS_BUTTON_TESTING_TAG).isDisplayed()
+      }
+      onNodeWithTag(ALERT_DIALOG_DISMISS_BUTTON_TESTING_TAG).performClick()
     }
   }
 

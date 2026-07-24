@@ -67,7 +67,7 @@ class LocalFileTransferRobot : BaseRobot() {
   }
 
   fun assertLocalFileTransferScreenVisible(composeContentTestRule: ComposeContentTestRule) {
-    BaristaSleepInteractions.sleep(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
+    BaristaSleepInteractions.sleep(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
     closeEnableWifiP2PDialogIfVisible(composeContentTestRule)
     assertReceiveFileTitleVisible(composeContentTestRule)
   }

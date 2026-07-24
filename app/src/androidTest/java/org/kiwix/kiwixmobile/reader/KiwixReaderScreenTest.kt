@@ -108,18 +108,19 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     val zimFile = getZimFileFromResourceFolder(context, "testzim.zim")
     openKiwixReaderScreenWithFile(zimFile)
     reader {
-      checkZimFileLoadedSuccessful(composeTestRule)
+      checkZimFileLoadedSuccessful(composeTestRule, "Android_(operating_system)")
       // open a new tab
       openSearchWithQuery("Android", zimFile)
       openAndroidArticleInNewTab(composeTestRule)
-      checkZimFileLoadedSuccessful(composeTestRule)
+      checkZimFileLoadedSuccessful(composeTestRule, "Android_(operating_system)")
       // open bookmark screen.
       bookmarks {
         openBookmarkScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
         assertBookMarksDisplayed(composeTestRule)
       }
       composeTestRule.waitForIdle()
-      pressBack()
+      // Click on back button showing in navigation bar to come back to previous screen.
+      clickOnNavigationIcon(composeTestRule)
       assertTabsRestored(composeTestRule)
     }
   }
@@ -134,16 +135,16 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     val zimFile = getZimFileFromResourceFolder(context, "testzim.zim")
     openKiwixReaderScreenWithFile(zimFile)
     reader {
-      checkZimFileLoadedSuccessful(composeTestRule)
+      checkZimFileLoadedSuccessful(composeTestRule, "Android_(operating_system)")
       // open a new tab
       openSearchWithQuery("Android", zimFile)
       openAndroidArticleInNewTab(composeTestRule)
-      checkZimFileLoadedSuccessful(composeTestRule)
+      checkZimFileLoadedSuccessful(composeTestRule, "Android_(operating_system)")
       // open local library screen.
       openLocalLibraryScreenViaBottomAppBar(composeTestRule)
       composeTestRule.waitForIdle()
-      // press back to come back to reader screen.
-      pressBack()
+      // click reader bottomAppBar icon to come back to reader screen.
+      clickOnReaderScreenInBottomAppBar(composeTestRule)
       assertTabsRestored(composeTestRule)
     }
   }
@@ -370,6 +371,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     clickOnReadAloudMenuItem(composeTestRule)
     try {
       assertTTSLanguageIsNotSupportedDialogDisplayed(composeTestRule)
+      clickOnCancelButton(composeTestRule)
     } catch (_: ComposeTimeoutException) {
       assertTTSControlsVisible(composeTestRule)
       clickOnTTSStopButton(composeTestRule)

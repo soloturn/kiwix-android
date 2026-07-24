@@ -31,6 +31,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.runner.RunWith
@@ -53,6 +54,10 @@ class KiwixDataStoreTest {
   @Rule
   @JvmField
   val mainDispatcherRule = MainDispatcherRule()
+
+  @Rule
+  @JvmField
+  val tempFolder = TemporaryFolder()
 
   @Before
   fun setUp() = runTest {
@@ -690,26 +695,17 @@ class KiwixDataStoreTest {
 
   @Test
   fun `setSelectedStorage persists path when directory exists`() = runTest {
-    val tempDir = java.io.File.createTempFile("kiwix_test", "").apply {
-      delete()
-      mkdirs()
-    }
-    try {
-      kiwixDataStore.setSelectedStorage(tempDir.absolutePath)
-      val stored = kiwixDataStore.selectedStorage.first()
-      assertThat(stored).isEqualTo(tempDir.absolutePath)
-    } finally {
-      tempDir.deleteRecursively()
-    }
+    val subTempDir = tempFolder.newFolder("kiwix_test")
+    kiwixDataStore.setSelectedStorage(subTempDir.absolutePath)
+    val stored = kiwixDataStore.selectedStorage.first()
+    assertThat(stored).isEqualTo(subTempDir.absolutePath)
   }
 
   @Test
   fun `selectedStorage falls back to default public storage when stored path does not exist`() =
     runTest {
       val (storageContext, storageDataStore) = storageAwareDataStore()
-      val missingStorage = java.io.File.createTempFile("missing_storage", "").apply {
-        delete()
-      }
+      val missingStorage = File(tempFolder.root, "missing_storage")
       storageDataStore.setSelectedStorage(missingStorage.absolutePath)
       val selectedStorage = storageDataStore.selectedStorage.first()
       assertThat(selectedStorage).isEqualTo(expectedDefaultPublicStorage(storageContext))
@@ -719,9 +715,7 @@ class KiwixDataStoreTest {
   fun `selectedStorage resets selectedStoragePosition to zero when stored path is invalid`() =
     runTest {
       val (_, storageDataStore) = storageAwareDataStore()
-      val missingStorage = java.io.File.createTempFile("missing_storage", "").apply {
-        delete()
-      }
+      val missingStorage = File(tempFolder.root, "missing_storage_invalid")
       storageDataStore.setSelectedStorage(missingStorage.absolutePath)
       storageDataStore.setSelectedStoragePosition(3)
       storageDataStore.selectedStorage.first()
@@ -731,9 +725,7 @@ class KiwixDataStoreTest {
   @Test
   fun `selectedStorage keeps invalid stored path in preferences when falling back`() = runTest {
     val (storageContext, storageDataStore) = storageAwareDataStore()
-    val missingStorage = java.io.File.createTempFile("missing_storage", "").apply {
-      delete()
-    }
+    val missingStorage = File(tempFolder.root, "missing_storage_fallback")
 
     storageDataStore.setSelectedStorage(missingStorage.absolutePath)
 

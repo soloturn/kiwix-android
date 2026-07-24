@@ -172,6 +172,6 @@ class SearchWidgetRobot : BaseRobot() {
   }
 
   private fun pauseForBetterTestPerformance() {
-    BaristaSleepInteractions.sleep(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
+    BaristaSleepInteractions.sleep(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
   }
 }

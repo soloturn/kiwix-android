@@ -81,7 +81,7 @@ class LanguageScreenTest : BaseActivityTest() {
       clickOnSaveLanguageIcon(composeTestRule)
       // test if the selected language filter is applied on the online library or not.
       downloadRobot {
-        composeTestRule.waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
+        composeTestRule.waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
         waitForDataToLoad(composeTestRule = composeTestRule)
         checkLanguageFilterAppliedToOnlineContent(
           composeTestRule,
@@ -104,7 +104,7 @@ class LanguageScreenTest : BaseActivityTest() {
 
       // test if the selected language filter is applied on the online library or not.
       downloadRobot {
-        composeTestRule.waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
+        composeTestRule.waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
         waitForDataToLoad(composeTestRule = composeTestRule)
         checkLanguageFilterAppliedToOnlineContent(
           composeTestRule,

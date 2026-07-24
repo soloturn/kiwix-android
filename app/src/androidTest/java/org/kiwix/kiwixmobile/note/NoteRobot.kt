@@ -83,7 +83,7 @@ class NoteRobot : BaseRobot() {
 
   fun clickOnNoteMenuItem(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).performClick()
@@ -253,7 +253,7 @@ class NoteRobot : BaseRobot() {
             "//*[contains(text(), 'Android_(operating_system)')]"
           )
         )
-    })
+    }, 20)
   }
 
   fun clickOnAndroidArticle(composeTestRule: ComposeContentTestRule) {
@@ -275,7 +275,7 @@ class NoteRobot : BaseRobot() {
   fun clickOnBackwardButton(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitForIdle()
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(READER_BOTTOM_BAR_PREVIOUS_SCREEN_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(READER_BOTTOM_BAR_PREVIOUS_SCREEN_BUTTON_TESTING_TAG)

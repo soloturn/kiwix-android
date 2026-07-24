@@ -19,19 +19,19 @@
 package org.kiwix.kiwixmobile.initial.download
 
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import applyWithViewHierarchyPrinting
-import com.adevinta.android.barista.interaction.BaristaSleepInteractions
 import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.ui.components.STORAGE_DEVICE_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.main.BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.nav.destination.library.online.DOWNLOADING_STOP_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.storage.STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG
-import org.kiwix.kiwixmobile.testutils.TestUtils
+import org.kiwix.kiwixmobile.testutils.TestUtils.FIVE_SECOND_DELAY
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 
@@ -41,16 +41,20 @@ fun initialDownload(func: InitialDownloadRobot.() -> Unit) =
 class InitialDownloadRobot : BaseRobot() {
   fun clickDownloadOnBottomNav(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntilTimeout()
+      waitUntil(FIVE_SECOND_DELAY) {
+        onNodeWithTag(BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG).isDisplayed()
+      }
       onNodeWithTag(BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG).performClick()
     }
   }
 
   fun assertStorageConfigureDialogDisplayed(composeTestRule: ComposeContentTestRule) {
-    pauseForBetterTestPerformance()
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
+        waitUntil(FIVE_SECOND_DELAY) {
+          onNodeWithTag(STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG).isDisplayed()
+        }
         onNodeWithTag(STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG)
           .assertTextEquals(context.getString(string.choose_storage_to_download_book))
       }
@@ -58,10 +62,12 @@ class InitialDownloadRobot : BaseRobot() {
   }
 
   fun clickOnInternalStorage(composeTestRule: ComposeContentTestRule) {
-    pauseForBetterTestPerformance()
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
+        waitUntil(FIVE_SECOND_DELAY) {
+          onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
         onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG)[0].performClick()
       }
     })
@@ -77,9 +83,5 @@ class InitialDownloadRobot : BaseRobot() {
         // no nothing if the stop button is not visible.
       }
     }
-  }
-
-  private fun pauseForBetterTestPerformance() {
-    BaristaSleepInteractions.sleep(TestUtils.TEST_PAUSE_MS.toLong())
   }
 }

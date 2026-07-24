@@ -65,7 +65,7 @@ class DownloadRobot : BaseRobot() {
   private val searchZIMFileTitle = "D3 js docs"
   fun clickLibraryOnBottomNav(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG).performClick()
@@ -74,7 +74,7 @@ class DownloadRobot : BaseRobot() {
 
   fun clickDownloadOnBottomNav(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG).performClick()
@@ -89,7 +89,7 @@ class DownloadRobot : BaseRobot() {
   ) {
     repeat(maxRetries) { attempt ->
       try {
-        composeTestRule.waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+        composeTestRule.waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           composeTestRule.onAllNodesWithTag(ONLINE_BOOK_ITEM_TESTING_TAG)
             .fetchSemanticsNodes().isNotEmpty()
         }
@@ -172,13 +172,15 @@ class DownloadRobot : BaseRobot() {
           performTextClearance()
           performTextInput(searchZIMFileTitle)
         }
-        waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
+        waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
       }
     })
   }
 
   private fun refreshOnlineList(composeTestRule: ComposeContentTestRule) {
-    composeTestRule.refresh()
+    runCatching {
+      composeTestRule.refresh()
+    }.onFailure { it.printStackTrace() }
   }
 
   fun downloadZimFile(composeTestRule: ComposeContentTestRule) {
@@ -195,7 +197,7 @@ class DownloadRobot : BaseRobot() {
   fun assertDownloadStart(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+        waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
             .fetchSemanticsNodes().isNotEmpty()
         }
@@ -206,7 +208,7 @@ class DownloadRobot : BaseRobot() {
   fun pauseDownload(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       runCatching {
-        waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+        waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           onAllNodesWithTag(DOWNLOADING_PAUSE_BUTTON_TESTING_TAG)
             .fetchSemanticsNodes().isNotEmpty()
         }
@@ -224,7 +226,7 @@ class DownloadRobot : BaseRobot() {
   fun resumeDownload(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       runCatching {
-        waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+        waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           val resumeNodes = onAllNodesWithTag(DOWNLOADING_PAUSE_BUTTON_TESTING_TAG)
             .fetchSemanticsNodes()
           val stopNodes = onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
@@ -255,7 +257,7 @@ class DownloadRobot : BaseRobot() {
 
       // Wait for the state text to NO LONGER be "paused"
       // Or for the node to disappear entirely (meaning it finished downloading!)
-      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         try {
           val nodes = onAllNodesWithTag(DOWNLOADING_STATE_TEXT_TESTING_TAG).fetchSemanticsNodes()
           if (nodes.isEmpty()) {
@@ -295,7 +297,7 @@ class DownloadRobot : BaseRobot() {
       val pauseState = kiwixMainActivity.getString(org.kiwix.kiwixmobile.core.R.string.paused_state)
 
       // Wait for the state text to BE "paused"
-      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         try {
           onAllNodesWithTag(DOWNLOADING_STATE_TEXT_TESTING_TAG)
             .onFirst()
@@ -423,7 +425,7 @@ class DownloadRobot : BaseRobot() {
 
   fun stopDownload(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
           .fetchSemanticsNodes().isNotEmpty()
       }

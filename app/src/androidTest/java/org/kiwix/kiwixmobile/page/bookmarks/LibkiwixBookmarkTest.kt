@@ -155,7 +155,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       clickOnSaveBookmarkImage(composeTestRule)
       composeTestRule.waitUntilTimeout(TEST_PAUSE_MS_FOR_SNACKBAR)
       assertBookmarkButtonShowNotBookmarked(composeTestRule)
-      longClickOnSaveBookmarkImage(composeTestRule, TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
+      longClickOnSaveBookmarkImage(composeTestRule, TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
       assertNoBookMarkTextDisplayed(composeTestRule)
       pressBack()
       waitComposeToSettleViews()

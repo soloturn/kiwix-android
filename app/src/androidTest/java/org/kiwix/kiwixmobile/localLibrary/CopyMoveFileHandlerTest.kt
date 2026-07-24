@@ -90,6 +90,7 @@ class CopyMoveFileHandlerTest : BaseActivityTest() {
       }
       // test with first launch
       updateKiwixDataStore { setShowStorageSelectionDialogOnCopyMove(true) }
+      composeTestRule.waitForIdle()
       showMoveFileToPublicDirectoryDialog(listOf(Uri.fromFile(selectedFile)))
       // should show the permission dialog.
       copyMoveFileHandler {
@@ -157,6 +158,7 @@ class CopyMoveFileHandlerTest : BaseActivityTest() {
       }
       // test with first launch
       updateKiwixDataStore { setShowStorageSelectionDialogOnCopyMove(true) }
+      composeTestRule.waitForIdle()
       showMoveFileToPublicDirectoryDialog(listOf(Uri.fromFile(selectedFile)))
       // should show the permission dialog.
       copyMoveFileHandler {

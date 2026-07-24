@@ -118,7 +118,7 @@ class BookmarksRobot : BaseRobot() {
     composeTestRule.apply {
       waitForIdle()
       waitUntilTimeout()
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
@@ -134,7 +134,7 @@ class BookmarksRobot : BaseRobot() {
       waitForIdle()
       // wait for disappearing the snack-bar after removing the bookmark
       waitUntilTimeout(timeout)
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
@@ -261,8 +261,8 @@ class BookmarksRobot : BaseRobot() {
     composeTestRule.apply {
       waitForIdle()
       // wait for disappearing the snack-bar after removing the bookmark
-      waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(READER_BOTTOM_BAR_PREVIOUS_SCREEN_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(READER_BOTTOM_BAR_PREVIOUS_SCREEN_BUTTON_TESTING_TAG)
@@ -274,8 +274,8 @@ class BookmarksRobot : BaseRobot() {
     composeTestRule.apply {
       waitForIdle()
       // wait for disappearing the snack-bar after removing the bookmark
-      waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(READER_BOTTOM_BAR_HOME_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(READER_BOTTOM_BAR_HOME_BUTTON_TESTING_TAG)

@@ -78,7 +78,7 @@ class OnlineCategoryRobot : BaseRobot() {
   ) {
     repeat(retryCount) { attempt ->
       try {
-        composeTestRule.waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+        composeTestRule.waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           composeTestRule
             .onAllNodesWithContentDescription(context.getString(R.string.select_category_content_description))
             .fetchSemanticsNodes()

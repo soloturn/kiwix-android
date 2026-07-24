@@ -36,7 +36,6 @@ object ComposeDimens {
   val CRASH_IMAGE_SIZE = 70.dp
 
   // KiwixAppBar(Toolbar) dimens
-  val ACTION_MENU_TEXTVIEW_BUTTON_PADDING = 13.dp
   val KIWIX_TOOLBAR_HEIGHT = 56.dp
   val KIWIX_TOOLBAR_SHADOW_ELEVATION = 4.dp
 
@@ -188,7 +187,6 @@ object ComposeDimens {
   const val TTS_BUTTONS_CONTROL_ALPHA = 0.9f
   val CLOSE_ALL_TAB_BUTTON_BOTTOM_PADDING = 24.dp
   val TAB_SWITCHER_TEXT_SIZE = 12.sp
-  const val TAB_SWITCHER_ICON_CORNER_RADIUS = 15
   val CLOSE_TAB_ICON_SIZE = 20.dp
   const val CLOSE_TAB_ICON_ANIMATION_TIMEOUT = 1200L
   const val BACK_TO_TOP_PULSE_MAX_SCALE = 1.08f

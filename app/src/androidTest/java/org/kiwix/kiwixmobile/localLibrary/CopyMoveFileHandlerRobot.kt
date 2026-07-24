@@ -39,6 +39,7 @@ import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_DISMISS_BUTTON_TESTI
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_MESSAGE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.nav.destination.library.local.NO_FILE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.storage.STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG
+import org.kiwix.kiwixmobile.testutils.TestUtils.FIVE_SECOND_DELAY
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
@@ -52,7 +53,7 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
     isMultipleFiles: Boolean = false
   ) {
     composeTestRule.apply {
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(ALERT_DIALOG_MESSAGE_TEXT_TESTING_TAG).isDisplayed()
       }
       val copyMoveDialogMessage = if (isMultipleFiles) {
@@ -79,7 +80,9 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
-        waitUntilTimeout()
+        waitUntil(FIVE_SECOND_DELAY) {
+          onNodeWithTag(STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG).isDisplayed()
+        }
         onNodeWithTag(STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG)
           .assertTextEquals(context.getString(R.string.choose_storage_to_copy_move_zim_file))
       }
@@ -89,7 +92,9 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
   fun clickOnInternalStorage(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitUntil(FIVE_SECOND_DELAY) {
+          onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
         onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG)[0].performClick()
       }
     })
@@ -98,7 +103,9 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
   fun clickOnCopy(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitUntil(FIVE_SECOND_DELAY) {
+          onNodeWithTag(ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG).isDisplayed()
+        }
         onNodeWithTag(ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG)
           .assertTextEquals(context.getString(R.string.action_copy).uppercase())
           .performClick()
@@ -128,7 +135,7 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
 
   fun assertZimFileCopiedAndShowingIntoTheReader(composeTestRule: ComposeContentTestRule) {
     // Wait for copying the ZIM file and opening in the reader.
-    composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+    composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
       composeTestRule
         .onAllNodesWithTag(READER_SCREEN_TESTING_TAG)
         .fetchSemanticsNodes()
@@ -151,7 +158,7 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
     testFlakyView({
       try {
         composeTestRule.apply {
-          waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong())
+          waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
           mainClock.advanceTimeByFrame()
           composeTestRule.onNodeWithTag(NO_FILE_TEXT_TESTING_TAG).assertIsDisplayed()
           throw RuntimeException("ZimFile not added in the local library")
@@ -164,7 +171,7 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
 
   fun assertFileCopyMoveErrorDialogDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST.toLong()) {
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(ALERT_DIALOG_MESSAGE_TEXT_TESTING_TAG).isDisplayed()
       }
       // We are checking for text contains as ZIM file name is dynamic.
