@@ -1424,17 +1424,15 @@ abstract class CoreReaderViewModel(
 
         BookmarkSaveResult.BookmarkAdded -> {
           emitEffect(
-            ReaderEffect.ShowSnackbar(
-              message = context.getString(string.bookmark_added),
-              actionLabel = context.getString(string.open),
-              actionClick = { openBookmarkScreen() }
+            ReaderEffect.ShowToast(
+              message = context.getString(string.bookmark_added)
             )
           )
         }
 
         BookmarkSaveResult.BookmarkRemoved -> {
           emitEffect(
-            ReaderEffect.ShowSnackbar(
+            ReaderEffect.ShowToast(
               message = context.getString(string.bookmark_removed)
             )
           )

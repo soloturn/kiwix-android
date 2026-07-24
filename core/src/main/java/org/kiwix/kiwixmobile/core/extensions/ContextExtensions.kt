@@ -30,13 +30,17 @@ import androidx.annotation.RequiresApi
 import org.kiwix.kiwixmobile.core.base.BaseBroadcastReceiver
 import java.util.Locale
 
+private var activeToast: Toast? = null
+
 fun Context?.toast(
   stringId: Int,
   length: Int = Toast.LENGTH_LONG
 ) {
   this?.let {
-    Toast.makeText(this, stringId, length)
-      .show()
+    activeToast?.cancel()
+    activeToast = Toast.makeText(this.applicationContext, stringId, length).apply {
+      show()
+    }
   }
 }
 
@@ -45,8 +49,10 @@ fun Context?.toast(
   length: Int = Toast.LENGTH_LONG
 ) {
   this?.let {
-    Toast.makeText(this, text, length)
-      .show()
+    activeToast?.cancel()
+    activeToast = Toast.makeText(this.applicationContext, text, length).apply {
+      show()
+    }
   }
 }
 
