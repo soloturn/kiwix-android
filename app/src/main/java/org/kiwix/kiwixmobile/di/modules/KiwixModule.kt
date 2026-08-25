@@ -24,8 +24,7 @@ import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pManager
 import dagger.Module
 import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
+import dagger.hilt.migration.DisableInstallInCheck
 import kotlinx.coroutines.CoroutineDispatcher
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
@@ -39,7 +38,11 @@ import org.kiwix.kiwixmobile.zimManager.Fat32Checker
 import org.kiwix.kiwixmobile.zimManager.FileWritingFileSystemChecker
 import org.kiwix.kiwixmobile.zimManager.MountFileSystemChecker
 
-@InstallIn(SingletonComponent::class)
+// #5023: legacy singleton graph - see HiltKiwixComponentBridgeModule for the Hilt-side bindings.
+// (Its @Provides methods use the app's own @KiwixScope, which is a different scope annotation
+// than Hilt's own @Singleton - installing this module directly in Hilt's SingletonComponent
+// would be an IncompatiblyScopedBindings error.)
+@DisableInstallInCheck
 @Module
 object KiwixModule {
   @Provides
