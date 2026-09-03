@@ -567,6 +567,7 @@ private fun TabSwitcherAnimated(state: ReaderUiState, onReaderAction: (ReaderAct
   ) {
     TabSwitcherView(
       state.tabsState,
+      state.showTabSwitcher,
       onReaderAction
     )
   }
@@ -1213,6 +1214,7 @@ private fun ShowDonationLayout(state: ReaderUiState, onReaderAction: (ReaderActi
 @Composable
 fun TabSwitcherView(
   tabsState: TabsManager.TabsState,
+  showTabSwitcher: Boolean = true,
   onReaderAction: (ReaderAction) -> Unit
 ) {
   val state = rememberLazyGridState()
@@ -1242,6 +1244,7 @@ fun TabSwitcherView(
           title = title,
           isSelected = index == tabsState.selectedIndex,
           webView = webView,
+          showTabSwitcher = showTabSwitcher,
           onReaderAction = onReaderAction,
         )
       }
@@ -1320,6 +1323,7 @@ fun TabItemView(
   isSelected: Boolean,
   webView: KiwixWebView,
   modifier: Modifier = Modifier,
+  showTabSwitcher: Boolean = true,
   onReaderAction: (ReaderAction) -> Unit
 ) {
   val cardElevation = if (isSelected) EIGHT_DP else TWO_DP
@@ -1343,6 +1347,7 @@ fun TabItemView(
       TabItemHeader(title, index, webView, onReaderAction)
       TabItemCard(
         webView,
+        showTabSwitcher,
         onReaderAction,
         index
       )
@@ -1400,6 +1405,7 @@ private fun TabItemHeader(
 @Composable
 private fun ColumnScope.TabItemCard(
   webView: KiwixWebView,
+  showTabSwitcher: Boolean,
   onReaderAction: (ReaderAction) -> Unit,
   index: Int
 ) {
@@ -1408,27 +1414,29 @@ private fun ColumnScope.TabItemCard(
       .fillMaxWidth()
       .weight(1f)
   ) {
-    AndroidView(
-      factory = { context ->
-        FrameLayout(context).apply {
-          (webView.parent as? ViewGroup)?.removeView(webView)
-          addView(
-            webView,
-            FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
-          )
-          val clickableView = View(context).apply {
-            layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
-            // Prevent clicking inside the webView when tabs are active.
-            setOnClickListener { onReaderAction(SelectTab(index)) }
-            contentDescription = "${webView.contentDescription}${webView.hashCode()}"
+    if (showTabSwitcher) {
+      AndroidView(
+        factory = { context ->
+          FrameLayout(context).apply {
+            (webView.parent as? ViewGroup)?.removeView(webView)
+            addView(
+              webView,
+              FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+            )
+            val clickableView = View(context).apply {
+              layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+              // Prevent clicking inside the webView when tabs are active.
+              setOnClickListener { onReaderAction(SelectTab(index)) }
+              contentDescription = "${webView.contentDescription}${webView.hashCode()}"
+            }
+            addView(clickableView)
           }
-          addView(clickableView)
-        }
-      },
-      modifier = Modifier
-        .fillMaxSize()
-        .semantics { hideFromAccessibility() }
-    )
+        },
+        modifier = Modifier
+          .fillMaxSize()
+          .semantics { hideFromAccessibility() }
+      )
+    }
   }
 }
 
