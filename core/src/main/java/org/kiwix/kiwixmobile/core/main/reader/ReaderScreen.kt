@@ -1329,6 +1329,7 @@ fun TabItemView(
     elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
     border = BorderStroke(borderWidth, borderColor),
     shape = RoundedCornerShape(TWELVE_DP),
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     modifier = modifier
       .fillMaxWidth()
       .aspectRatio(TAB_CARD_ASPECT_RATIO)
@@ -1411,7 +1412,10 @@ private fun ColumnScope.TabItemCard(
       factory = { context ->
         FrameLayout(context).apply {
           (webView.parent as? ViewGroup)?.removeView(webView)
-          addView(webView)
+          addView(
+            webView,
+            FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+          )
           val clickableView = View(context).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
             // Prevent clicking inside the webView when tabs are active.
