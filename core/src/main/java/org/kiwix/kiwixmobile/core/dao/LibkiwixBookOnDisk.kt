@@ -19,6 +19,7 @@
 package org.kiwix.kiwixmobile.core.dao
 
 import android.os.Build
+import android.os.FileObserver
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,6 +42,7 @@ import org.kiwix.kiwixmobile.core.di.modules.LOCAL_BOOKS_MANAGER
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.utils.files.Log
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.libkiwix.Book
@@ -67,6 +69,8 @@ class LibkiwixBookOnDisk @Inject constructor(
   // consumers (e.g. the hotspot screen, see #4341) that only care about deletions and
   // would otherwise have to continuously collect+reprocess the full books() list - with
   // its per-book zimReaderSource.exists() I/O check - just to notice one disappearing.
+  // Emitted from delete() below regardless of whether the removal was driven by the app's
+  // own UI or detected externally by the FileObserver watchers (see registerFileObservers).
   private val _bookRemovedIds = MutableSharedFlow<String>(extraBufferCapacity = 64)
   val bookRemovedIds: SharedFlow<String> = _bookRemovedIds.asSharedFlow()
 
@@ -75,6 +79,17 @@ class LibkiwixBookOnDisk @Inject constructor(
    * return the previous data to avoid unnecessary data load on Libkiwix.
    */
   private var booksChanged: Boolean = false
+
+  private val fileObservers = mutableListOf<FileObserver>()
+
+  init {
+    // Catches ZIMs deleted outside the app (file manager, ADB, cloud sync) by routing
+    // them through the same delete(bookId) as an in-app deletion.
+    CoroutineScope(ioDispatcher).launch {
+      runCatching { registerFileObservers() }.onFailure { it.printStackTrace() }
+    }
+  }
+
   private suspend fun localBookFolderPath(): String =
     if (Build.DEVICE.contains("generic")) {
       // Workaround for emulators: Emulators have limited memory and
@@ -256,6 +271,59 @@ class LibkiwixBookOnDisk @Inject constructor(
       updateLocalBooksFlow()
       _bookRemovedIds.emit(bookId)
     }.onFailure { it.printStackTrace() }
+  }
+
+  // Watches the ZIM folder plus each known book's own directory - not all of external
+  // storage. A book added later at an unwatched location isn't covered until next app start.
+  private suspend fun registerFileObservers() {
+    val bookDirs = getBooksList().mapNotNull {
+      runCatching { File(it.zimReaderSource.toDatabase()).parentFile }.getOrNull()
+    }
+    val directories = (bookDirs + File(localBookFolderPath())).filter(File::isDirectory)
+    directories.toSet().forEach { directory ->
+      runCatching {
+        createFileObserver(directory).also {
+          fileObservers.add(it)
+          it.startWatching()
+        }
+      }.onFailure { it.printStackTrace() }
+    }
+  }
+
+  private fun createFileObserver(watchDir: File): FileObserver {
+    val mask = FileObserver.DELETE or FileObserver.MOVED_FROM
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      object : FileObserver(watchDir, mask) {
+        override fun onEvent(event: Int, path: String?) {
+          path?.let { handleFileSystemEvent(watchDir, it, event) }
+        }
+      }
+    } else {
+      @Suppress("DEPRECATION")
+      object : FileObserver(watchDir.path, mask) {
+        override fun onEvent(event: Int, path: String?) {
+          path?.let { handleFileSystemEvent(watchDir, it, event) }
+        }
+      }
+    }
+  }
+
+  internal fun handleFileSystemEvent(watchDir: File, path: String, event: Int) {
+    if (!FileUtils.isValidZimFile(path) && !FileUtils.isSplittedZimFile(path)) return
+    if (event != FileObserver.DELETE && event != FileObserver.MOVED_FROM) return
+    val file = File(watchDir, path)
+    CoroutineScope(ioDispatcher).launch {
+      runCatching { deleteFileIfKnown(file) }.onFailure { it.printStackTrace() }
+    }
+  }
+
+  internal suspend fun deleteFileIfKnown(file: File) {
+    val normalizedPath = runCatching { file.canonicalPath }.getOrDefault(file.path)
+    getBooksList().firstOrNull { book ->
+      runCatching {
+        File(book.zimReaderSource.toDatabase()).canonicalPath == normalizedPath
+      }.getOrDefault(false)
+    }?.let { delete(it.id) }
   }
 
   suspend fun bookMatching(downloadTitle: String) =
