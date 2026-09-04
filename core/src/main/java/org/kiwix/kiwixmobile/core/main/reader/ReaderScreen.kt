@@ -118,8 +118,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -201,7 +199,6 @@ import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FIFTY_SIX_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FIVE_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FOURTEEN_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FOUR_DP
-import org.kiwix.kiwixmobile.core.utils.ComposeDimens.KIWIX_TOOLBAR_HEIGHT
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.LARGE_BODY_TEXT_SIZE
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.NAVIGATION_DRAWER_WIDTH
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.ONE_DP
@@ -1438,20 +1435,6 @@ private fun ColumnScope.TabItemCard(
       )
     }
   }
-}
-
-@Composable
-fun getTabCardSize(toolbarHeightDp: Dp): Pair<Dp, Dp> {
-  val windowSize = LocalWindowInfo.current.containerSize
-  val density = LocalDensity.current
-
-  val screenWidth = with(density) { windowSize.width.toDp() }
-  val screenHeight = with(density) { windowSize.height.toDp() }
-
-  val cardWidth = screenWidth / 2
-  val cardHeight = ((screenHeight - toolbarHeightDp) / 2).coerceAtLeast(HUNDERED.dp)
-
-  return cardWidth to cardHeight
 }
 
 data class DocumentSection(var title: String, var id: String, var level: Int)
