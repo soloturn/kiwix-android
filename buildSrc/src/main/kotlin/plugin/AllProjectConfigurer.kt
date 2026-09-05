@@ -114,7 +114,7 @@ class AllProjectConfigurer {
       target.dependencies.add("coreLibraryDesugaring", Libs.DESUGAR_JDK_LIBS)
       target.extensions.configure<KotlinAndroidExtension> {
         compilerOptions {
-          freeCompilerArgs.add("-Xjvm-default=all-compatibility")
+          freeCompilerArgs.add("-jvm-default=enable")
         }
       }
       buildFeatures.apply {
