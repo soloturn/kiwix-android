@@ -24,7 +24,7 @@ object Versions {
 
   const val com_squareup_okhttp3: String = "4.12.0"
 
-  const val ORG_JETBRAINS_KOTLIN: String = "2.2.20"
+  const val ORG_JETBRAINS_KOTLIN: String = "2.4.10"
 
   const val XMLUTIL_SERIALIZATION: String = "0.90.2"
 
@@ -39,7 +39,7 @@ object Versions {
 
   const val io_mockk: String = "1.14.11"
 
-  const val com_android_tools_build_gradle: String = "9.3.0"
+  const val com_android_tools_build_gradle: String = "9.3.2"
 
   const val de_fayard_buildsrcversions_gradle_plugin: String = "0.7.0"
 
@@ -119,7 +119,7 @@ object Versions {
   const val ACCOMPANIST = "0.34.0"
   const val CORE_SPLASHSCREEN: String = "1.2.0"
   const val PLAYSTORE_REVIEW: String = "2.0.2"
-  const val KOTLIN_KSP: String = "2.3.4"
+  const val KOTLIN_KSP: String = "2.3.11"
 }
 
 /**
