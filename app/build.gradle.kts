@@ -17,6 +17,9 @@ apply(from = rootProject.file("jacoco.gradle"))
 fun generateVersionName() = "${Config.versionMajor}.${Config.versionMinor}.${Config.versionPatch}"
 
 val apkPrefix get() = System.getenv("TAG") ?: "kiwix"
+// Project.properties (Map) is deprecated (removed in Gradle 10); providers.gradleProperty
+// is the lazy Provider-API replacement for checking whether a project property is set.
+val disableSigningRequested = providers.gradleProperty("disableSigning").isPresent
 val autoModifiedTrackedFiles = listOf(
   File("$rootDir/core/src/main/res/values-b+be+tarask/strings.xml"),
   File("$rootDir/core/src/main/res/values-b+be+tarask+old/strings.xml"),
@@ -51,7 +54,7 @@ android {
     getByName("release") {
       buildConfigField("boolean", "KIWIX_ERROR_ACTIVITY", "true")
       buildConfigField("boolean", "IS_PLAYSTORE", "false")
-      if (properties.containsKey("disableSigning")) {
+      if (disableSigningRequested) {
         signingConfig = null
       }
     }
@@ -164,6 +167,45 @@ gradle.projectsEvaluated {
       if (path != ":app:renameTarakFile") {
         dependsOn(":app:renameTarakFile")
       }
+    }
+  }
+}
+
+abstract class RestoreTrackedFilesFlowAction : FlowAction<RestoreTrackedFilesFlowAction.Params> {
+  interface Params : FlowParameters {
+    @get:Input
+    val rootDirPath: Property<String>
+
+    @get:Input
+    val trackedFilePaths: ListProperty<String>
+
+    @get:Input
+    val backupDirPath: Property<String>
+  }
+
+  override fun execute(parameters: Params) {
+    val rootDir = File(parameters.rootDirPath.get())
+    val trackedFileBackupDir = File(parameters.backupDirPath.get())
+    parameters.trackedFilePaths.get().forEach { path ->
+      val file = File(path)
+      val fileKey = file.relativeTo(rootDir).path.replace(File.separator, "_")
+      val backupFile = File(trackedFileBackupDir, "$fileKey.bak")
+      val existsMarkerFile = File(trackedFileBackupDir, "$fileKey.exists")
+      if (!existsMarkerFile.exists()) return@forEach
+
+      val existedBeforeBuild = existsMarkerFile.readText().trim() == "1"
+      if (existedBeforeBuild && backupFile.exists()) {
+        if (!file.parentFile.exists()) file.parentFile.mkdirs()
+        backupFile.copyTo(file, overwrite = true)
+      } else if (!existedBeforeBuild && file.exists()) {
+        file.delete()
+      }
+
+      backupFile.delete()
+      existsMarkerFile.delete()
+    }
+    if (trackedFileBackupDir.exists() && trackedFileBackupDir.listFiles().isNullOrEmpty()) {
+      trackedFileBackupDir.delete()
     }
   }
 }
