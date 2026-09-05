@@ -11,7 +11,7 @@ if (!rootProject.hasProperty('resolvedGitHooksDir')) {
 def gitHooksDir = rootProject.resolvedGitHooksDir
 
 task copyGitHooks(type: Copy) {
-  description 'Copies the git hooks from team-props/git-hooks to the .git folder.'
+  description = 'Copies the git hooks from team-props/git-hooks to the .git folder.'
   from("${rootDir}/team-props/git-hooks/") {
     include '**/*.sh'
     rename '(.*).sh', '$1'
@@ -20,8 +20,8 @@ task copyGitHooks(type: Copy) {
 }
 
 task installGitHooks(type: Exec) {
-  description 'Installs the pre-commit git hooks from team-props/git-hooks.'
-  group 'git hooks'
+  description = 'Installs the pre-commit git hooks from team-props/git-hooks.'
+  group = 'git hooks'
   workingDir rootDir
   commandLine 'chmod'
   args '-R', '+x', gitHooksDir
