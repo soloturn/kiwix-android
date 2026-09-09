@@ -87,7 +87,8 @@ class ReaderScreenComposablesTest {
     videoView: FrameLayout? = null,
     shouldShowFullScreen: Boolean = false,
     showBackToTopButton: Boolean = false,
-    showTtsControls: Boolean = false,
+    ttsControlsItem: CoreReaderViewModel.TtsControlsItem =
+      CoreReaderViewModel.TtsControlsItem(),
     showTabSwitcher: Boolean = false,
     showBottomBar: Boolean = true,
     bookmarkButtonItem: CoreReaderViewModel.BookmarkButtonItem =
@@ -99,8 +100,6 @@ class ReaderScreenComposablesTest {
     searchPlaceHolderItemForBrandedApps: Boolean = false,
     isPreviousPageButtonEnable: Boolean = true,
     isNextPageButtonEnable: Boolean = true,
-    pauseTtsButtonText: String = "Pause",
-    ttsSpeedText: String = "1.0X",
     isTocButtonEnable: Boolean = true,
     showTableOfContentDrawer: Boolean = false,
     tableOfContentTitle: String = "Contents",
@@ -117,7 +116,7 @@ class ReaderScreenComposablesTest {
     videoView = videoView,
     shouldShowFullScreen = shouldShowFullScreen,
     showBackToTopButton = showBackToTopButton,
-    showTtsControls = showTtsControls,
+    ttsControlsItem = ttsControlsItem,
     showTabSwitcher = showTabSwitcher,
     showBottomBar = showBottomBar,
     bookmarkButtonItem = bookmarkButtonItem,
@@ -125,8 +124,6 @@ class ReaderScreenComposablesTest {
     searchPlaceHolderItemForBrandedApps = searchPlaceHolderItemForBrandedApps,
     isPreviousPageButtonEnable = isPreviousPageButtonEnable,
     isNextPageButtonEnable = isNextPageButtonEnable,
-    pauseTtsButtonText = pauseTtsButtonText,
-    ttsSpeedText = ttsSpeedText,
     isTocButtonEnable = isTocButtonEnable,
     showTableOfContentDrawer = showTableOfContentDrawer,
     tableOfContentTitle = tableOfContentTitle,
@@ -279,8 +276,9 @@ class ReaderScreenComposablesTest {
   fun readerScreen_ttsControls_visibleWhenActive() {
     renderReaderScreen(
       createTestState(
-        showTtsControls = true,
-        pauseTtsButtonText = "Pause"
+        ttsControlsItem = CoreReaderViewModel.TtsControlsItem(
+          isTtsPlaying = true
+        )
       )
     )
     composeTestRule
@@ -293,7 +291,13 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_ttsControls_hiddenWhenInactive() {
-    renderReaderScreen(createTestState(showTtsControls = false))
+    renderReaderScreen(
+      createTestState(
+        ttsControlsItem = CoreReaderViewModel.TtsControlsItem(
+          isTtsPlaying = false
+        )
+      )
+    )
     composeTestRule
       .onNodeWithTag(TTS_CONTROL_PLAY_PAUSE_BUTTON_TESTING_TAG)
       .assertDoesNotExist()
@@ -307,8 +311,9 @@ class ReaderScreenComposablesTest {
     var action: ReaderAction? = null
     renderReaderScreen(
       createTestState(
-        showTtsControls = true,
-        pauseTtsButtonText = "Pause"
+        ttsControlsItem = CoreReaderViewModel.TtsControlsItem(
+          isTtsPlaying = true
+        )
       ),
       onReaderAction = { action = it }
     )
@@ -322,7 +327,11 @@ class ReaderScreenComposablesTest {
   fun readerScreen_ttsControls_stopButton_triggersCallback() {
     var action: ReaderAction? = null
     renderReaderScreen(
-      createTestState(showTtsControls = true),
+      createTestState(
+        ttsControlsItem = CoreReaderViewModel.TtsControlsItem(
+          isTtsPlaying = true
+        )
+      ),
       onReaderAction = { action = it }
     )
     composeTestRule
@@ -615,7 +624,12 @@ class ReaderScreenComposablesTest {
 
   @Test
   fun readerScreen_ttsSpeedButton_isDisplayed() {
-    val state = createTestState(showTtsControls = true, ttsSpeedText = "1.0X")
+    val state = createTestState(
+      ttsControlsItem = CoreReaderViewModel.TtsControlsItem(
+        isTtsPlaying = true,
+        ttsSpeed = 1.0f
+      )
+    )
     renderReaderScreen(state)
     composeTestRule
       .onNodeWithTag(TTS_CONTROL_SPEED_BUTTON_TESTING_TAG)
@@ -855,7 +869,7 @@ class ReaderScreenComposablesTest {
     composeTestRule.waitForIdle()
 
     composeTestRule
-      .onNodeWithText("Normal")
+      .onNodeWithText(context.getString(R.string.tts_normal_speed))
       .assertIsDisplayed()
   }
 
@@ -881,8 +895,10 @@ class ReaderScreenComposablesTest {
   @Test
   fun readerScreen_ttsSpeedButton_displaysFormattedSpeed() {
     val state = createTestState(
-      showTtsControls = true,
-      ttsSpeedText = "1.50X"
+      ttsControlsItem = CoreReaderViewModel.TtsControlsItem(
+        isTtsPlaying = true,
+        ttsSpeed = 1.5f
+      )
     )
     renderReaderScreen(state)
     composeTestRule.waitForIdle()

@@ -3087,11 +3087,11 @@ internal class CoreReaderViewModelTest {
       donationDialogHandler,
       findInPageManager,
       mainDispatcher
+    ) {
     var openBookmarkScreenCalled = false
     fun testUpdateState(transform: ReaderUiState.() -> ReaderUiState) {
       updateState(transform)
     }
-
     override fun openLocalLibrary() {}
     override fun openSearch(
       searchString: String,
