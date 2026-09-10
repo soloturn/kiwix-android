@@ -49,7 +49,7 @@ import org.junit.Assume
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.jupiter.api.Assertions
+import org.junit.Assert
 import org.kiwix.kiwixmobile.BaseActivityTest
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -360,10 +360,10 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     }
     val savedFile = waitForDownloadedImageFile()
 
-    Assertions.assertNotNull(savedFile)
-    Assertions.assertTrue(savedFile.exists())
-    Assertions.assertTrue(savedFile.length() > 0)
-    Assertions.assertTrue(savedFile.extension == "png")
+    Assert.assertNotNull(savedFile)
+    Assert.assertTrue(savedFile.exists())
+    Assert.assertTrue(savedFile.length() > 0)
+    Assert.assertTrue(savedFile.extension == "png")
   }
 
   private fun waitForDownloadedImageFile(): File {
