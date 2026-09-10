@@ -71,8 +71,13 @@ fi
 # per retry, turning one flaky test into a 2-3 hour job for no real gain.
 # Emulator boot failures are still retried separately, one layer up, by
 # .github/actions/android-emulator-runner.
-if ./gradlew jacocoInstrumentationTestReport; then
-  echo "jacocoInstrumentationTestReport succeeded" >&2
+# Only the designated coverage job (INSTRUMENTATION_GRADLE_TASK set to the
+# jacoco-report task) needs the coverage-instrumented build/report; every
+# other API level in this matrix just runs the plain connected task, since
+# its report would never be uploaded anywhere.
+task="${INSTRUMENTATION_GRADLE_TASK:-connectedDebugAndroidTest}"
+if ./gradlew "$task"; then
+  echo "$task succeeded" >&2
 else
   adb exec-out screencap -p >screencap.png
   exit 1
