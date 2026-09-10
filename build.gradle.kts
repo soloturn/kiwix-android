@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import org.gradle.kotlin.dsl.register
 
 buildscript {
@@ -26,6 +27,13 @@ allprojects {
     google()
     mavenCentral()
     maven { setUrl("https://jitpack.io") }
+  }
+
+  // Reproducible archives: same source -> byte-identical jar/aar/apk, no
+  // embedded timestamps or filesystem-order-dependent entry ordering.
+  tasks.withType<AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
   }
 }
 
