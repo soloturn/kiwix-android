@@ -26,6 +26,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -114,6 +115,8 @@ class ZimHostViewModel @Inject constructor(
   private val _events = MutableSharedFlow<Event>(extraBufferCapacity = Int.MAX_VALUE)
   val events = _events.asSharedFlow()
 
+  private var booksCollectionJob: Job? = null
+
   init {
     viewModelScope.launch(ioDispatcher) {
       dataSource.bookRemoved().collect { loadBooks() }
@@ -121,7 +124,9 @@ class ZimHostViewModel @Inject constructor(
   }
 
   fun loadBooks() {
-    viewModelScope.launch(ioDispatcher) {
+    // Cancel any still-running load so overlapping calls can't interleave.
+    booksCollectionJob?.cancel()
+    booksCollectionJob = viewModelScope.launch(ioDispatcher) {
       val previouslyHostedBookIds = kiwixDataStore.hostedBookIds.first()
       val books = dataSource.getLanguageCategorizedBooks().first()
       val isBrandedApp = kiwixDataStore.isBrandedApp.first()
