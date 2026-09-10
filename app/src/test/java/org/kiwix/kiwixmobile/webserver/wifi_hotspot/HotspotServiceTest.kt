@@ -43,6 +43,7 @@ import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.data.DataSource
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.kiwixmobile.core.utils.ServerUtils
+import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.kiwixmobile.webserver.WebServerHelper
 import org.kiwix.kiwixmobile.webserver.ZimHostCallbacks
@@ -61,6 +62,7 @@ class HotspotServiceTest {
 
   private val webServerHelper: WebServerHelper = mockk(relaxed = true)
   private val dataSource: DataSource = mockk()
+  private val kiwixDataStore: KiwixDataStore = mockk(relaxed = true)
   private val zimHostCallbacks: ZimHostCallbacks = mockk(relaxed = true)
   private val toast: Toast = mockk(relaxed = true)
 
@@ -77,6 +79,7 @@ class HotspotServiceTest {
     hotspotService = spyk(HotspotService())
     hotspotService.webServerHelper = webServerHelper
     hotspotService.dataSource = dataSource
+    hotspotService.kiwixDataStore = kiwixDataStore
     hotspotService.ioDispatcher = Dispatchers.Unconfined
     hotspotService.mainDispatcher = Dispatchers.Main
     hotspotService.serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
@@ -102,6 +105,7 @@ class HotspotServiceTest {
 
     coVerify(exactly = 0) { webServerHelper.startServerHelper(any(), any()) }
     verify(exactly = 0) { webServerHelper.stopAndroidWebServer() }
+    coVerify(exactly = 0) { kiwixDataStore.setHostedBookIds(any()) }
   }
 
   @Test
@@ -116,6 +120,7 @@ class HotspotServiceTest {
 
     coVerify(exactly = 0) { webServerHelper.startServerHelper(any(), any()) }
     verify(exactly = 0) { webServerHelper.stopAndroidWebServer() }
+    coVerify(exactly = 0) { kiwixDataStore.setHostedBookIds(any()) }
   }
 
   @Test
@@ -139,6 +144,7 @@ class HotspotServiceTest {
     verify(exactly = 0) {
       Toast.makeText(any(), R.string.server_stopped_all_books_deleted_toast_message, any())
     }
+    coVerify(exactly = 1) { kiwixDataStore.setHostedBookIds(setOf("id1")) }
   }
 
   @Test
@@ -161,5 +167,6 @@ class HotspotServiceTest {
         )
       }
       verify(exactly = 1) { toast.show() }
+      coVerify(exactly = 1) { kiwixDataStore.setHostedBookIds(emptySet()) }
     }
 }
