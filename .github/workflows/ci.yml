@@ -24,6 +24,7 @@ jobs:
 
   automated-tests:
     name: Automated tests
+    needs: assemble
     strategy:
       matrix:
         api-level: [ 25, 30, 33, 34, 35, 36 ]
@@ -50,6 +51,15 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'gradle'
+
+      # Populated by the assemble job's own gradlew runs - lets this job's
+      # gradlew invocations skip re-compiling/re-assembling and go straight
+      # to install+run.
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.run_id }}
 
       - name: Enable KVM
         run: |
@@ -145,6 +155,7 @@ jobs:
 
   automated-tests-playstore:
     name: Automated tests for PlayStore variant
+    needs: assemble
     strategy:
       matrix:
         api-level: [ 25, 30, 33, 34, 35, 36 ]
@@ -171,6 +182,12 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'gradle'
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.run_id }}
 
       - name: Enable KVM
         run: |
@@ -221,6 +238,7 @@ jobs:
 
   automated-tests-branded-apps:
     name: Automated tests for Branded app
+    needs: assemble
     strategy:
       matrix:
         api-level: [ 25, 30, 33, 34, 35, 36 ]
@@ -247,6 +265,12 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'gradle'
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.run_id }}
 
       - name: Enable KVM
         run: |
@@ -297,6 +321,7 @@ jobs:
 
   automated-tests-on-tablet:
     name: Automated tests on Tablet
+    needs: assemble
     strategy:
       matrix:
         api-level: [ 25, 30, 33, 34, 35, 36 ]
@@ -323,6 +348,12 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'gradle'
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.run_id }}
 
       - name: Enable KVM
         run: |
@@ -486,3 +517,31 @@ jobs:
           name: kiwix-android
           path: |
             **/*.apk
+
+      # Every "Automated tests*" job group below compiles and assembles the
+      # same debug + androidTest sources independently per API level - up
+      # to 6x redundant per group for output that doesn't vary by API level
+      # at all. Build each variant's debug + androidTest APK once here and
+      # let Gradle's build cache (org.gradle.caching=true, gradle.properties)
+      # do the sharing: restoring this cache before a job's own gradlew
+      # invocation makes it skip re-compiling/re-assembling and go straight
+      # to install+run, since the task outputs are already present.
+      # :app:assembleDebug / :branded:assembleCustomexampleDebug are already
+      # covered by "Build all configurations" above - only add what that
+      # doesn't build: the androidTest APKs, unit tests, and the separately
+      # -PtestingMinimizedBuild-flagged variant (a different Keeper-wrapped
+      # config, so it needs its own full assembleDebug).
+      - name: Prime build cache for app androidTest (default, tablet)
+        run: ./gradlew :app:assembleDebugAndroidTest testDebugUnitTest testCustomexampleDebugUnitTest
+
+      - name: Prime build cache for app debug + androidTest (PlayStore, minimized)
+        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest -PtestingMinimizedBuild
+
+      - name: Prime build cache for branded androidTest
+        run: ./gradlew :branded:assembleCustomexampleDebugAndroidTest
+
+      - name: Save shared Gradle build cache
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.run_id }}
