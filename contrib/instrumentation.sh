@@ -67,43 +67,13 @@ fi
 if is_app_installed "$TEST_ORCHESTRATOR_PACKAGE"; then
   adb uninstall "${TEST_ORCHESTRATOR_PACKAGE}"
 fi
-retry=0
-while [ $retry -le 3 ]; do
-  if ./gradlew jacocoInstrumentationTestReport; then
-    echo "jacocoInstrumentationTestReport succeeded" >&2
-    break
-  else
-    adb kill-server
-    adb start-server
-    # Enable Wi-Fi on the emulator
-    adb shell svc wifi enable
-    adb logcat -c
-    # Check if the stylus_handwriting_enabled setting exists before disabling
-    if adb shell settings list secure | grep -q "stylus_handwriting_enabled"; then
-      adb shell settings put secure stylus_handwriting_enabled 0
-    fi
-    # shellcheck disable=SC2035
-    adb logcat *:E -v color &
-
-    if is_app_installed "$PACKAGE_NAME"; then
-      # Delete the application to properly run the test cases.
-      adb uninstall "${PACKAGE_NAME}"
-    fi
-    if is_app_installed "$TEST_PACKAGE_NAME"; then
-      # Delete the test application to properly run the test cases.
-      adb uninstall "${TEST_PACKAGE_NAME}"
-    fi
-    if is_app_installed "$TEST_SERVICES_PACKAGE"; then
-      adb uninstall "${TEST_SERVICES_PACKAGE}"
-    fi
-    if is_app_installed "$TEST_ORCHESTRATOR_PACKAGE"; then
-      adb uninstall "${TEST_ORCHESTRATOR_PACKAGE}"
-    fi
-    ./gradlew --stop
-    retry=$(( retry + 1 ))
-    if [ $retry -eq 3 ]; then
-      adb exec-out screencap -p >screencap.png
-      exit 1
-    fi
-  fi
-done
+# Single attempt: retrying the whole suite 3x on any failure cost ~45-50 min
+# per retry, turning one flaky test into a 2-3 hour job for no real gain.
+# Emulator boot failures are still retried separately, one layer up, by
+# .github/actions/android-emulator-runner.
+if ./gradlew jacocoInstrumentationTestReport; then
+  echo "jacocoInstrumentationTestReport succeeded" >&2
+else
+  adb exec-out screencap -p >screencap.png
+  exit 1
+fi
