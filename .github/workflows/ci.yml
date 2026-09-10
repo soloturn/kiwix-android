@@ -16,6 +16,9 @@ permissions:
 env:
   JAVA_VERSION: 21
   ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL: 720
+  # Hard cap on each emulator test step so a stuck emulator/teardown fails
+  # the job instead of running until the default 6h job timeout.
+  EMULATOR_STEP_TIMEOUT_MINUTES: 180
 
 jobs:
 
@@ -88,6 +91,7 @@ jobs:
 
       - name: Create instrumentation coverage
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: ${{ fromJSON(env.EMULATOR_STEP_TIMEOUT_MINUTES) }}
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -204,6 +208,7 @@ jobs:
 
       - name: Create instrumentation coverage for PlayStore variant
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: ${{ fromJSON(env.EMULATOR_STEP_TIMEOUT_MINUTES) }}
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -279,6 +284,7 @@ jobs:
 
       - name: Test branded app
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: ${{ fromJSON(env.EMULATOR_STEP_TIMEOUT_MINUTES) }}
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -354,6 +360,7 @@ jobs:
 
       - name: File Opening test on Tablet
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: ${{ fromJSON(env.EMULATOR_STEP_TIMEOUT_MINUTES) }}
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
