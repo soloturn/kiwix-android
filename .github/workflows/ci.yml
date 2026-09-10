@@ -92,6 +92,11 @@ jobs:
       - name: Create instrumentation coverage
         uses: ./.github/actions/android-emulator-runner
         timeout-minutes: ${{ fromJSON(env.EMULATOR_STEP_TIMEOUT_MINUTES) }}
+        env:
+          # Only the primary job's report gets uploaded (see the
+          # api-level==30 steps below) - every other level just runs the
+          # plain task instead of paying for coverage instrumentation.
+          INSTRUMENTATION_GRADLE_TASK: ${{ matrix.api-level == 30 && 'jacocoInstrumentationTestReport' || 'connectedDebugAndroidTest' }}
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
