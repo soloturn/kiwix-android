@@ -112,6 +112,12 @@ class FileExtensionsTest {
 
   @Test
   fun `totalSpace should be greater than or equal to freeSpace`() = runTest {
+    // Wrapper-vs-property equality is already covered by the two tests above;
+    // this test only needs the invariant itself, from a single pair of live
+    // reads. Reading totalSpace/freeSpace twice each (once directly, once via
+    // the wrapper) compares real filesystem state captured at different
+    // instants - free space can shift between those reads on a busy CI
+    // runner, which made this flaky.
     val actualTotalSpace = tempFile.totalSpace(mainDispatcherRule.dispatcher)
     val actualFreeSpace = tempFile.freeSpace(mainDispatcherRule.dispatcher)
     assertTrue(actualTotalSpace >= actualFreeSpace, "Total space should be >= free space")
