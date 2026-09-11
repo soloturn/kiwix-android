@@ -21,7 +21,7 @@ package org.kiwix.kiwixmobile.localLibrary
 import android.net.Uri
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.navigation.HiltViewModelFactory
 import androidx.lifecycle.ViewModelProvider

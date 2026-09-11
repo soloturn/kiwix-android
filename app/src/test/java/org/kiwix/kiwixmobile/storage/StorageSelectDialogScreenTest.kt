@@ -20,7 +20,7 @@ package org.kiwix.kiwixmobile.storage
 
 import android.os.Build
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import eu.mhutti1.utils.storage.StorageDevice
 import io.mockk.every
