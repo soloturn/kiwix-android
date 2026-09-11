@@ -21,7 +21,6 @@ package org.kiwix.kiwixmobile.core.settings
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.annotation.SuppressLint
 import android.app.Activity.RESULT_OK
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.LocalActivity
@@ -46,6 +45,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
@@ -67,8 +68,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -301,6 +302,12 @@ private fun showExportBookmarkDialog(coreSettingsViewModel: CoreSettingsViewMode
 @VisibleForTesting
 internal fun SettingsScreen(
   coreSettingsViewModel: CoreSettingsViewModel,
+  // Hoisted purely so tests can drive scroll position directly via
+  // LazyListState.scrollToItem(), bypassing performScrollToNode() - which hangs under
+  // Robolectric with this Compose version (see SettingsScreenTest). Production callers
+  // never pass this; the default is identical to before this parameter existed. Kept
+  // before navigationIcon so existing trailing-lambda call sites still bind correctly.
+  lazyListState: LazyListState = rememberLazyListState(),
   navigationIcon: @Composable() () -> Unit
 ) {
   val uiState by coreSettingsViewModel.uiState.collectAsStateWithLifecycle()
@@ -314,6 +321,7 @@ internal fun SettingsScreen(
     }
   ) { innerPadding ->
     LazyColumn(
+      state = lazyListState,
       modifier = Modifier
         .fillMaxSize()
         .padding(innerPadding)
@@ -572,16 +580,11 @@ private fun DisplayCategory(coreSettingsViewModel: CoreSettingsViewModel) {
 
 @Composable
 fun AppThemePreference(
-  context: Context = LocalContext.current,
   themeLabel: String,
   coreSettingsViewModel: CoreSettingsViewModel,
 ) {
-  val entries = remember {
-    context.resources.getStringArray(R.array.pref_themes_entries).toList()
-  }
-  val values = remember {
-    context.resources.getStringArray(R.array.pref_themes_values).toList()
-  }
+  val entries = stringArrayResource(R.array.pref_themes_entries).toList()
+  val values = stringArrayResource(R.array.pref_themes_values).toList()
 
   ListPreference(
     titleId = R.string.pref_theme,
