@@ -59,7 +59,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-private const val ITEMS_PER_SCROLL_STEP = 3
+private const val ITEMS_PER_SCROLL_STEP = 1
 
 /**
  * Behavior-driven UI tests for SettingsScreen.
@@ -160,7 +160,16 @@ class SettingsScreenTest {
    * actually composed (LazyColumn only composes items near the viewport) or the list ends.
    */
   private fun scrollToNode(matcher: SemanticsMatcher) {
-    while (composeTestRule.onAllNodes(matcher).fetchSemanticsNodes().isEmpty()) {
+    // LazyColumn prefetches items ahead of the visible range, so a match can exist in
+    // the semantics tree (satisfying a plain "does it exist" check) before it has
+    // actually been scrolled into view and positioned - fetchSemanticsNodes() would then
+    // return a node whose boundsInRoot is still the zeroed placeholder from before its
+    // real placement. Requiring non-zero bounds too ensures we keep scrolling until the
+    // node is actually laid out within the viewport, not just composed ahead of it.
+    fun isActuallyVisible() =
+      composeTestRule.onAllNodes(matcher).fetchSemanticsNodes().firstOrNull()
+        ?.boundsInRoot?.let { it.width > 0 && it.height > 0 } == true
+    while (!isActuallyVisible()) {
       val totalItems = lazyListState.layoutInfo.totalItemsCount
       val nextIndex = (lazyListState.firstVisibleItemIndex + ITEMS_PER_SCROLL_STEP)
         .coerceAtMost(totalItems - 1)
