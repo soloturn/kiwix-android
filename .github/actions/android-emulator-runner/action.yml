@@ -98,13 +98,11 @@ runs:
         fi
 
     # ---------------------------------------------------------
-    # Known upstream race (ReactiveCircus/android-emulator-runner#432,
-    # unresolved as of writing): the action sends `adb shell input
-    # keyevent 82` to dismiss the lock screen right after boot, which
-    # can outrace system_server registering the input service -
-    # "ServiceNotFoundException: No service published for: input".
-    # Reported at ~30% per-boot on affected runners; back-to-back
-    # retries give the runner no time to recover, so pause first.
+    # Works around ReactiveCircus/android-emulator-runner#432 (input
+    # keyevent outracing system_server after boot). Fixed upstream by
+    # https://github.com/ReactiveCircus/android-emulator-runner/pull/495 -
+    # once that's merged and released, this whole retry block can likely
+    # go back to a single attempt.
     # ---------------------------------------------------------
     - name: Wait before retry 2
       if: |
