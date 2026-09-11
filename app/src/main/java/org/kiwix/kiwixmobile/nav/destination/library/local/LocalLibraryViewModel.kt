@@ -294,7 +294,6 @@ class LocalLibraryViewModel @Inject constructor(
     onResumeJob = null
     processSelectedZimFilesForPlayStore.dispose()
     processSelectedZimFilesForStandalone.dispose()
-    super.onCleared()
   }
 
   @VisibleForTesting
