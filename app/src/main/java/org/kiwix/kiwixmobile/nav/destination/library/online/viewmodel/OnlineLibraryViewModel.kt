@@ -807,7 +807,6 @@ class OnlineLibraryViewModel @Inject constructor(
     coroutineJobs.clear()
     context.unregisterReceiver(connectivityBroadcastReceiver)
     observeOnlineLibraryItems.dispose()
-    super.onCleared()
   }
 
   fun onNotificationPermissionResult(isGranted: Boolean) {

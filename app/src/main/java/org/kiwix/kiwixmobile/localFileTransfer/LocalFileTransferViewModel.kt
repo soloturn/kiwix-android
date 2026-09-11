@@ -259,7 +259,6 @@ class LocalFileTransferViewModel @Inject constructor(
   }
 
   override fun onCleared() {
-    super.onCleared()
     wifiDirectManager.stopWifiDirectManager()
     wifiDirectManager.callbacks = null
   }
