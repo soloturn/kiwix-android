@@ -291,6 +291,9 @@ class AllProjectConfigurer {
       testImplementation(Libs.mockk)
       testImplementation(Libs.assertj_core)
       testImplementation(Libs.testing_ktx)
+      // Every module needs these - configureBaseExtensions sets ANDROIDX_TEST_ORCHESTRATOR execution for all of them, not just application modules.
+      androidTestUtil(Libs.orchestrator)
+      androidTestUtil(Libs.test_services)
       testImplementation(Libs.core_testing)
       compileOnly(Libs.javax_annotation_api)
       implementation(Libs.HILT_ANDROID)
