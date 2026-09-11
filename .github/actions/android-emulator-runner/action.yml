@@ -81,6 +81,10 @@ runs:
       run: |
         set -uo pipefail
 
+        # Only exported by reactivecircus/android-emulator-runner's own SDK
+        # install, which the "Create AVD..." step skips on an AVD cache hit -
+        # the common case. Default to the path the AVD cache step itself uses.
+        ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
         AVD_NAME="test"
         PORT=5554
         SERIAL="emulator-${PORT}"
