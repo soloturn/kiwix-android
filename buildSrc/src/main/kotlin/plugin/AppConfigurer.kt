@@ -190,7 +190,6 @@ class AppConfigurer {
         exclude(module = "stax-api")
         exclude(module = "xpp3")
       }
-      androidTestUtil(Libs.orchestrator)
       androidTestCompileOnly(Libs.javax_annotation_api)
       androidTestImplementation(Libs.HILT_ANDROID_TESTING)
       kspAndroidTest(Libs.HILT_ANDROID_COMPILER)
