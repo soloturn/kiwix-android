@@ -409,6 +409,7 @@ jobs:
 
   code-formatting-job:
     name: Code Formatting
+    needs: assemble
     runs-on: ubuntu-26.04
     continue-on-error: true
 
@@ -423,6 +424,12 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
           cache: 'gradle'
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.run_id }}
 
       - name: Static Analysis
         run: ./gradlew ktlintCheck
@@ -436,6 +443,7 @@ jobs:
 
   detekt:
     name: Detekt
+    needs: assemble
     runs-on: ubuntu-26.04
     continue-on-error: true
 
@@ -451,6 +459,12 @@ jobs:
           distribution: temurin
           cache: 'gradle'
 
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.run_id }}
+
       - name: Static Analysis
         run: ./gradlew detektDebug detektCustomExampleDebug
       - name: Upload Lint Reports
@@ -462,6 +476,7 @@ jobs:
 
   lint:
     name: Lint
+    needs: assemble
     runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
@@ -477,6 +492,12 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
           cache: 'gradle'
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ github.run_id }}
 
       - name: Run Debug Lint
         run: ./gradlew app:lintDebug branded:lintCustomexampleDebug
