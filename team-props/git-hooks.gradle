@@ -3,7 +3,12 @@ static def isLinuxOrMacOs() {
   return osName.contains('linux') || osName.contains('mac os') || osName.contains('macos')
 }
 
-def gitHooksDir = 'git rev-parse --path-format=absolute --git-path hooks'.execute().text.trim()
+// Compute once and share - avoids 5 racing subprocess spawns under --parallel.
+if (!rootProject.hasProperty('resolvedGitHooksDir')) {
+  rootProject.ext.resolvedGitHooksDir =
+    'git rev-parse --path-format=absolute --git-path hooks'.execute().text.trim()
+}
+def gitHooksDir = rootProject.resolvedGitHooksDir
 
 task copyGitHooks(type: Copy) {
   description 'Copies the git hooks from team-props/git-hooks to the .git folder.'
