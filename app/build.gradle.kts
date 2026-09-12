@@ -2,6 +2,7 @@ import com.slack.keeper.optInToKeeper
 import org.w3c.dom.Element
 import plugin.KiwixConfigurationPlugin
 import java.io.StringWriter
+import javax.inject.Inject
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory

@@ -21,6 +21,7 @@ jobs:
 
   automated-tests:
     name: Automated tests
+    needs: assemble
     strategy:
       matrix:
         api-level: [ 25, 30, 33, 34, 35, 36 ]
@@ -46,7 +47,32 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-          cache: 'gradle'
+      # actions/setup-java's own cache: 'gradle' always both restores and
+      # saves - it has no read-only mode, so a prior `cache-read-only` input
+      # here was a silently-ignored no-op (not a valid setup-java input).
+      # Driven directly instead: every branch restores, only main saves.
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      # Populated by the assemble job's own gradlew runs - lets this job's
+      # gradlew invocations skip re-compiling/re-assembling and go straight
+      # to install+run.
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
 
       - name: Enable KVM
         run: |
@@ -54,21 +80,11 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: AVD cache
-        uses: actions/cache@v6
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-${{ matrix.api-level }}-${{ matrix.target }}
-
       - name: Create unit test coverage
         if: ${{ matrix.api-level==30 }}
         run: ./gradlew testDebugUnitTest testCustomexampleDebugUnitTest
 
-      - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+      - name: Create AVD and generate snapshot
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
@@ -141,6 +157,7 @@ jobs:
 
   automated-tests-playstore:
     name: Automated tests for PlayStore variant
+    needs: assemble
     strategy:
       matrix:
         api-level: [ 25, 30, 33, 34, 35, 36 ]
@@ -166,7 +183,29 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-          cache: 'gradle'
+      # actions/setup-java's own cache: 'gradle' always both restores and
+      # saves - it has no read-only mode, so a prior `cache-read-only` input
+      # here was a silently-ignored no-op (not a valid setup-java input).
+      # Driven directly instead: every branch restores, only main saves.
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
 
       - name: Enable KVM
         run: |
@@ -174,17 +213,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: AVD cache
-        uses: actions/cache@v6
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-${{ matrix.api-level }}-${{ matrix.target }}
-
-      - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+      - name: Create AVD and generate snapshot
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
@@ -216,6 +245,7 @@ jobs:
 
   automated-tests-branded-apps:
     name: Automated tests for Branded app
+    needs: assemble
     strategy:
       matrix:
         api-level: [ 25, 30, 33, 34, 35, 36 ]
@@ -241,7 +271,29 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-          cache: 'gradle'
+      # actions/setup-java's own cache: 'gradle' always both restores and
+      # saves - it has no read-only mode, so a prior `cache-read-only` input
+      # here was a silently-ignored no-op (not a valid setup-java input).
+      # Driven directly instead: every branch restores, only main saves.
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
 
       - name: Enable KVM
         run: |
@@ -249,17 +301,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: AVD cache
-        uses: actions/cache@v6
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-${{ matrix.api-level }}-${{ matrix.target }}
-
-      - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+      - name: Create AVD and generate snapshot
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
@@ -291,6 +333,7 @@ jobs:
 
   automated-tests-on-tablet:
     name: Automated tests on Tablet
+    needs: assemble
     strategy:
       matrix:
         api-level: [ 25, 30, 33, 34, 35, 36 ]
@@ -316,7 +359,29 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-          cache: 'gradle'
+      # actions/setup-java's own cache: 'gradle' always both restores and
+      # saves - it has no read-only mode, so a prior `cache-read-only` input
+      # here was a silently-ignored no-op (not a valid setup-java input).
+      # Driven directly instead: every branch restores, only main saves.
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
 
       - name: Enable KVM
         run: |
@@ -324,17 +389,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: AVD cache
-        uses: actions/cache@v6
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-${{ matrix.api-level }}-${{ matrix.target }}
-
-      - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+      - name: Create AVD and generate snapshot
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
@@ -366,6 +421,7 @@ jobs:
 
   code-formatting-job:
     name: Code Formatting
+    needs: assemble
     runs-on: ubuntu-24.04
     continue-on-error: true
 
@@ -379,7 +435,29 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
-          cache: 'gradle'
+      # actions/setup-java's own cache: 'gradle' always both restores and
+      # saves - it has no read-only mode, so a prior `cache-read-only` input
+      # here was a silently-ignored no-op (not a valid setup-java input).
+      # Driven directly instead: every branch restores, only main saves.
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
 
       - name: Static Analysis
         run: ./gradlew ktlintCheck
@@ -393,6 +471,7 @@ jobs:
 
   detekt:
     name: Detekt
+    needs: assemble
     runs-on: ubuntu-24.04
     continue-on-error: true
 
@@ -406,10 +485,33 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
-          cache: 'gradle'
+      # actions/setup-java's own cache: 'gradle' always both restores and
+      # saves - it has no read-only mode, so a prior `cache-read-only` input
+      # here was a silently-ignored no-op (not a valid setup-java input).
+      # Driven directly instead: every branch restores, only main saves.
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
 
       - name: Static Analysis
         run: ./gradlew detektDebug detektCustomExampleDebug
+
       - name: Upload Lint Reports
         uses: actions/upload-artifact@v6
         if: ${{ always() }}
@@ -419,6 +521,7 @@ jobs:
 
   lint:
     name: Lint
+    needs: assemble
     runs-on: ubuntu-24.04
     continue-on-error: true
     steps:
@@ -433,7 +536,29 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
-          cache: 'gradle'
+      # actions/setup-java's own cache: 'gradle' always both restores and
+      # saves - it has no read-only mode, so a prior `cache-read-only` input
+      # here was a silently-ignored no-op (not a valid setup-java input).
+      # Driven directly instead: every branch restores, only main saves.
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
 
       - name: Run Debug Lint
         run: ./gradlew app:lintDebug branded:lintCustomexampleDebug
@@ -445,9 +570,64 @@ jobs:
           name: lint-report
           path: '**/build/reports/lint-results-*'
 
+  # Non-debug variants (assemble only builds assembleDebug - see that job's
+  # own comment). Runs alongside everything else, on no critical path.
+  # Own artifact name: two jobs can't upload to the same one concurrently.
+  assemble-other-variants:
+    name: Assemble Release/PlayStore/Standalone/Nightly
+    runs-on: ubuntu-26.04
+    continue-on-error: true
+    env:
+      APK_BUILD: "true"
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+      # actions/setup-java's own cache: 'gradle' always both restores and
+      # saves - it has no read-only mode, so a prior `cache-read-only` input
+      # here was a silently-ignored no-op (not a valid setup-java input).
+      # Driven directly instead: every branch restores, only main saves.
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      - name: Build release, playStore, standalone and nightly configurations
+        run: ./gradlew assembleRelease assemblePlayStore assembleStandalone assembleNightly
+
+      - name: Upload APK as Artifacts
+        uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: kiwix-android-other-variants
+          path: '**/*.apk'
+
   assemble:
-    name: Assemble
+    name: Assemble for test
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: write
+    # job-level timeout-minutes can't read the env context (only step-level
+    # can), so this can't reference EMULATOR_STEP_TIMEOUT_MINUTES - keep the
+    # literal in sync with it by hand.
+    timeout-minutes: 180
     continue-on-error: true
 
     steps:
@@ -460,6 +640,23 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
+      # actions/setup-java's own cache: 'gradle' always both restores and
+      # saves - it has no read-only mode, so a prior `cache-read-only` input
+      # here was a silently-ignored no-op (not a valid setup-java input).
+      # Driven directly instead: every branch restores, only main saves.
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
 
       - name: Set up Android NDK
         uses: nttld/setup-ndk@v1
@@ -467,10 +664,16 @@ jobs:
           ndk-version: r27d
           link-to-sdk: true
 
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
+          restore-keys: |
+            gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-
+
       - name: Build all configurations
-        env:
-          APK_BUILD: "true"
-        run: ./gradlew assemble
+        run: ./gradlew assembleDebug
 
       - name: Upload APK as Artifacts
         uses: actions/upload-artifact@v6
@@ -479,3 +682,80 @@ jobs:
           name: kiwix-android
           path: |
             **/*.apk
+
+      # Every "Automated tests*" job group below compiles and assembles the
+      # same debug + androidTest sources independently per API level - up
+      # to 6x redundant per group for output that doesn't vary by API level
+      # at all. Build each variant's debug + androidTest APK once here and
+      # let Gradle's build cache (org.gradle.caching=true, gradle.properties)
+      # do the sharing: restoring this cache before a job's own gradlew
+      # invocation makes it skip re-compiling/re-assembling and go straight
+      # to install+run, since the task outputs are already present.
+      # :app:assembleDebug / :branded:assembleCustomexampleDebug are already
+      # covered by "Build all configurations" above - only add what that
+      # doesn't build: the androidTest APKs, unit tests, and the separately
+      # -PtestingMinimizedBuild-flagged variant (a different Keeper-wrapped
+      # config, so it needs its own full assembleDebug).
+      - name: Prime build cache for app androidTest (default, tablet)
+        run: ./gradlew :app:assembleDebugAndroidTest testDebugUnitTest testCustomexampleDebugUnitTest
+
+      - name: Prime build cache for app debug + androidTest (PlayStore, minimized)
+        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest -PtestingMinimizedBuild
+
+      - name: Prime build cache for branded androidTest
+        run: ./gradlew :branded:assembleCustomexampleDebugAndroidTest
+
+      - name: Save shared Gradle build cache
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
+
+      - name: Save Gradle dependency cache
+        if: always() && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+
+      - name: Save Gradle wrapper cache
+        if: always() && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      - name: Prune older Gradle build caches
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list --key "gradle-build-cache-" \
+            --limit 100 --json id,key,createdAt \
+            --jq '[.[] | {id, createdAt, config: (.key | capture("(?<c>gradle-build-cache-[a-f0-9]+)-[0-9]+$").c)}] | group_by(.config) | map(sort_by(.createdAt) | reverse | .[1:]) | flatten | .[].id' | \
+            xargs -r -n1 gh cache delete
+
+      # Keep exactly one; --key here also prefix-matches the wrapper cache's
+      # key below, so exclude it explicitly.
+      - name: Prune older Gradle dependency caches
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list --key "setup-java-Linux-x64-gradle-" \
+            --limit 100 --json id,key,createdAt \
+            --jq '[.[] | select(.key | contains("wrapper") | not)] | sort_by(.createdAt) | reverse | .[1:] | .[].id' | \
+            xargs -r -n1 gh cache delete
+
+      - name: Prune older Gradle wrapper caches
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list --key "setup-java-Linux-x64-gradle-wrapper-" \
+            --limit 100 --json id,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[1:] | .[].id' | \
+            xargs -r -n1 gh cache delete
