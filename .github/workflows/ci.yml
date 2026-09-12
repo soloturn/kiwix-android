@@ -111,6 +111,15 @@ jobs:
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
           script: bash contrib/instrumentation.sh
 
+      - name: Upload JUnit test report
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: junit-report-automated-tests-${{ matrix.api-level }}
+          path: |
+            **/build/outputs/androidTest-results/connected/**
+            **/build/reports/androidTests/connected/**
+
       - name: Upload screenshot result
         uses: actions/upload-artifact@v6
         if: failure()
@@ -226,6 +235,15 @@ jobs:
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
           script: bash contrib/instrumentation-release.sh
 
+      - name: Upload JUnit test report
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: junit-report-playstore-${{ matrix.api-level }}
+          path: |
+            **/build/outputs/androidTest-results/connected/**
+            **/build/reports/androidTests/connected/**
+
   automated-tests-branded-apps:
     name: Automated tests for Branded app
     needs: assemble
@@ -300,6 +318,15 @@ jobs:
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
           script: bash contrib/instrumentation-brandedapps.sh
 
+      - name: Upload JUnit test report
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: junit-report-branded-${{ matrix.api-level }}
+          path: |
+            **/build/outputs/androidTest-results/connected/**
+            **/build/reports/androidTests/connected/**
+
   automated-tests-on-tablet:
     name: Automated tests on Tablet
     needs: assemble
@@ -373,6 +400,15 @@ jobs:
           cores: 4
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
           script: bash contrib/instrumentation-file-opening-on-tablet.sh
+
+      - name: Upload JUnit test report
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: junit-report-tablet-${{ matrix.api-level }}
+          path: |
+            **/build/outputs/androidTest-results/connected/**
+            **/build/reports/androidTests/connected/**
 
   code-formatting-job:
     name: Code Formatting
