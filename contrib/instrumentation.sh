@@ -75,7 +75,9 @@ if [ "${NUM_SHARDS:-1}" -gt 1 ]; then
     "-Pandroid.testInstrumentationRunnerArguments.shardIndex=${SHARD_INDEX:-0}"
   )
 fi
-task="${INSTRUMENTATION_GRADLE_TASK:-jacocoInstrumentationTestReport}"
+# Scoped to :app - the bare name also matches core, defaultmigration
+# and objectboxmigration, none of which have any tests.
+task="${INSTRUMENTATION_GRADLE_TASK:-:app:connectedDebugAndroidTest}"
 
 retry=0
 while [ $retry -le 4 ]; do

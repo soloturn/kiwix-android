@@ -112,6 +112,9 @@ jobs:
         timeout-minutes: 45
         env:
           # api-level 30's report is merged later in automated-tests-coverage-report.
+          # Both scoped to :app - the bare names also match core,
+          # defaultmigration and objectboxmigration, none of which have
+          # any tests.
           INSTRUMENTATION_GRADLE_TASK: ${{ matrix.api-level == 30 && ':app:createDebugCoverageReport' || ':app:connectedDebugAndroidTest' }}
           NUM_SHARDS: 6
           SHARD_INDEX: ${{ matrix.shard }}
