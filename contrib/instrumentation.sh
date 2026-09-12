@@ -78,7 +78,13 @@ fi
 # Scoped to :app - the bare name also matches core, defaultmigration
 # and objectboxmigration, none of which have any tests.
 task="${INSTRUMENTATION_GRADLE_TASK:-:app:connectedDebugAndroidTest}"
-if ./gradlew "$task"; then
+# Off-floor/ceiling matrix entries run only the @SmokeTest subset
+# instead of the full suite - see this job's matrix in ci.yml.
+extra_args=()
+if [ "${SMOKE_ONLY:-false}" = "true" ]; then
+  extra_args+=("-Pandroid.testInstrumentationRunnerArguments.annotation=org.kiwix.kiwixmobile.core.utils.SmokeTest")
+fi
+if ./gradlew "$task" "${extra_args[@]}"; then
   echo "$task succeeded" >&2
 else
   adb exec-out screencap -p >screencap.png
