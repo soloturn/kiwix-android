@@ -67,7 +67,11 @@ internal fun LocalFileTransferScreenRoute(
   uris: List<Uri>
 ) {
   val alertDialogShower = remember { AlertDialogShower() }
-  viewModel.initialize(uris, alertDialogShower)
+  // initialize() re-registers a broadcast receiver each call, so run it once per
+  // screen visit, not on every recomposition.
+  LaunchedEffect(Unit) {
+    viewModel.initialize(uris, alertDialogShower)
+  }
   val context = LocalContext.current
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val locationPermission = rememberPermissionState(viewModel.locationPermission)
