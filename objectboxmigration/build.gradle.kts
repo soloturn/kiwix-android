@@ -20,6 +20,11 @@ buildscript {
 plugins.apply(KiwixConfigurationPlugin::class)
 apply(plugin = "io.objectbox")
 
+// ObjectBox's own task isn't configuration-cache compatible yet - objectbox-java#948.
+tasks.withType<io.objectbox.gradle.PrepareTask>().configureEach {
+  notCompatibleWithConfigurationCache("ObjectBox does not yet support the Gradle Configuration Cache")
+}
+
 android {
   namespace = "org.kiwix.kiwixmobile.migration"
 
