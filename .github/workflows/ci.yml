@@ -5,6 +5,12 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: Open a tmate SSH session on the automated-tests runner after the instrumentation step, instead of tearing down normally
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -110,6 +116,14 @@ jobs:
           cores: 4
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
           script: bash contrib/instrumentation.sh
+
+      # Manual-dispatch only (see debug_enabled above). Opens an SSH session
+      # on this runner with the emulator left in whatever state the
+      # instrumentation step above ended in, instead of tearing down.
+      - name: Debug session (tmate)
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ always() && github.event.inputs.debug_enabled == 'true' }}
+        timeout-minutes: 30
 
       - name: Upload JUnit test report
         uses: actions/upload-artifact@v6
