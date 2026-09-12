@@ -31,10 +31,6 @@ touch /tmp/emulator_script_started
 # Kill it once this script exits, regardless of the test outcome.
 trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
 
-TEST_CLASSES="org.kiwix.kiwixmobile.download.DownloadTest,\
-org.kiwix.kiwixmobile.onlineCategory.OnlineCategoryTest,\
-org.kiwix.kiwixmobile.language.LanguageScreenTest"
-
 # Enable Wi-Fi on the emulator
 adb shell svc wifi enable
 adb logcat -c
@@ -72,7 +68,7 @@ fi
 
 retry=0
 while [ $retry -le 3 ]; do
-  if ./gradlew :app:connectedDebugAndroidTest -PtestingMinimizedBuild -Pandroid.testInstrumentationRunnerArguments.class="$TEST_CLASSES" -Dfile.encoding=UTF-8; then
+  if ./gradlew :app:connectedDebugAndroidTest -PtestingMinimizedBuild -Pandroid.testInstrumentationRunnerArguments.annotation=org.kiwix.kiwixmobile.core.utils.SmokeTest -Dfile.encoding=UTF-8; then
     echo "connectedDebugAndroidTest for release variant succeeded" >&2
     break
   else
