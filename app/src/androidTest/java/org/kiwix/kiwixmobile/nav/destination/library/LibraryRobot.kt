@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.nav.destination.library
 
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertTextEquals
@@ -107,21 +108,23 @@ class LibraryRobot : BaseRobot() {
   }
 
   fun refreshList(composeTestRule: ComposeContentTestRule) {
+    composeTestRule.waitForIdle()
+    // Poll for either steady state instead of two instantaneous
+    // assertIsDisplayed() snapshots, which could both catch the tree
+    // mid-recomposition and silently skip the refresh below.
     try {
-      composeTestRule.waitForIdle()
-      composeTestRule.onNodeWithTag(NO_FILE_TEXT_TESTING_TAG).assertIsDisplayed()
-      composeTestRule.refresh()
-    } catch (_: AssertionError) {
-      try {
-        composeTestRule.onNodeWithTag(BOOK_LIST_TESTING_TAG).assertIsDisplayed()
-        composeTestRule.refresh()
-      } catch (_: AssertionError) {
-        Log.i(
-          "LOCAL_LIBRARY",
-          "No need to refresh the data, since there is no files found"
-        )
+      composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+        composeTestRule.onNodeWithTag(NO_FILE_TEXT_TESTING_TAG).isDisplayed() ||
+          composeTestRule.onNodeWithTag(BOOK_LIST_TESTING_TAG).isDisplayed()
       }
+    } catch (_: ComposeTimeoutException) {
+      Log.i(
+        "LOCAL_LIBRARY",
+        "No need to refresh the data, since there is no files found"
+      )
+      return
     }
+    composeTestRule.refresh()
   }
 
   fun waitUntilZimFilesRefreshing(composeTestRule: ComposeContentTestRule) {
