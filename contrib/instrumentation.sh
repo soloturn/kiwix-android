@@ -75,7 +75,9 @@ fi
 # jacoco-report task) needs the coverage-instrumented build/report; every
 # other API level in this matrix just runs the plain connected task, since
 # its report would never be uploaded anywhere.
-task="${INSTRUMENTATION_GRADLE_TASK:-connectedDebugAndroidTest}"
+# Scoped to :app - the bare name also matches core, defaultmigration
+# and objectboxmigration, none of which have any tests.
+task="${INSTRUMENTATION_GRADLE_TASK:-:app:connectedDebugAndroidTest}"
 if ./gradlew "$task"; then
   echo "$task succeeded" >&2
 else

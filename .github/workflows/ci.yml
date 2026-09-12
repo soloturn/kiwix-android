@@ -107,7 +107,10 @@ jobs:
           # Only the primary job's report gets uploaded (see the
           # api-level==30 steps below) - every other level just runs the
           # plain task instead of paying for coverage instrumentation.
-          INSTRUMENTATION_GRADLE_TASK: ${{ matrix.api-level == 30 && 'jacocoInstrumentationTestReport' || 'connectedDebugAndroidTest' }}
+          # Both scoped to :app - the bare names also match core,
+          # defaultmigration and objectboxmigration, none of which have
+          # any tests.
+          INSTRUMENTATION_GRADLE_TASK: ${{ matrix.api-level == 30 && ':app:jacocoInstrumentationTestReport' || ':app:connectedDebugAndroidTest' }}
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
