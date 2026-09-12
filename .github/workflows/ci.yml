@@ -512,6 +512,9 @@ jobs:
   assemble:
     name: Assemble
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      actions: write
     # job-level timeout-minutes can't read the env context (only step-level
     # can), so this can't reference EMULATOR_STEP_TIMEOUT_MINUTES - keep the
     # literal in sync with it by hand.
@@ -585,3 +588,12 @@ jobs:
         with:
           path: ~/.gradle/caches/build-cache-1
           key: gradle-build-cache-${{ github.run_id }}
+
+      - name: Prune older Gradle build caches
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list --key gradle-build-cache- --limit 100 --json id,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[10:] | .[].id' | \
+            xargs -r -n1 gh cache delete
