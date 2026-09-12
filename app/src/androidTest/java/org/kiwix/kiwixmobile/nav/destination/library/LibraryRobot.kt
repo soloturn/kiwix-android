@@ -53,6 +53,7 @@ import org.kiwix.kiwixmobile.nav.destination.library.local.NO_FILE_TEXT_TESTING_
 import org.kiwix.kiwixmobile.nav.destination.library.local.SHOW_SWIPE_DOWN_TO_SCAN_FILE_SYSTEM_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.nav.destination.library.local.VALIDATE_ZIM_FILES_MENU_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.refresh
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
@@ -129,6 +130,15 @@ class LibraryRobot : BaseRobot() {
 
   fun waitUntilZimFilesRefreshing(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
+      // onRefresh fires async, after refresh()'s swipeDown() returns - wait for the
+      // indicator to appear before waiting for it to disappear.
+      try {
+        composeTestRule.waitUntil(TEST_PAUSE_MS.toLong()) {
+          composeTestRule.onNodeWithTag(CONTENT_LOADING_PROGRESS_BAR_TESTING_TAG).isDisplayed()
+        }
+      } catch (_: ComposeTimeoutException) {
+        Log.i("LOCAL_LIBRARY", "Refresh indicator never appeared, assuming it was too fast")
+      }
       composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         composeTestRule.onNodeWithTag(CONTENT_LOADING_PROGRESS_BAR_TESTING_TAG).isNotDisplayed()
       }
