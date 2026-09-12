@@ -45,11 +45,11 @@ import okhttp3.Request
 import okhttp3.ResponseBody
 import org.hamcrest.Matchers.anyOf
 import org.junit.After
+import org.junit.Assert
 import org.junit.Assume
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.Assert
 import org.kiwix.kiwixmobile.BaseActivityTest
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
