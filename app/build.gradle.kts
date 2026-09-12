@@ -1,20 +1,7 @@
 import com.slack.keeper.optInToKeeper
-import org.gradle.api.flow.FlowAction
-import org.gradle.api.flow.FlowParameters
-import org.gradle.api.flow.FlowScope
-import org.gradle.api.provider.ListProperty
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Input
-import org.gradle.kotlin.dsl.newInstance
-import org.w3c.dom.Element
 import plugin.KiwixConfigurationPlugin
-import java.io.StringWriter
-import javax.inject.Inject
-import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.transform.OutputKeys
-import javax.xml.transform.TransformerFactory
-import javax.xml.transform.dom.DOMSource
-import javax.xml.transform.stream.StreamResult
+import plugin.RenameTarakFileTask
+import plugin.TrackedFileRestoreRegistrar
 
 plugins {
   android
@@ -39,23 +26,6 @@ val autoModifiedTrackedFiles = listOf(
   File("$rootDir/objectboxmigration/objectbox-models/default.json")
 )
 val trackedFileBackupDir = File("$rootDir/build/tracked-file-backups")
-
-fun backupTrackedFile(file: File) {
-  if (!trackedFileBackupDir.exists()) trackedFileBackupDir.mkdirs()
-
-  val fileKey =
-    file.relativeTo(rootDir).path.replace(File.separator, "_")
-  val backupFile = File(trackedFileBackupDir, "$fileKey.bak")
-  val existsMarkerFile = File(trackedFileBackupDir, "$fileKey.exists")
-  if (existsMarkerFile.exists()) return
-
-  existsMarkerFile.writeText(if (file.exists()) "1" else "0")
-  if (file.exists()) {
-    file.copyTo(backupFile, overwrite = true)
-  } else if (backupFile.exists()) {
-    backupFile.delete()
-  }
-}
 
 android {
   // Added namespace in response to Gradle 8.0 and above.
@@ -181,103 +151,15 @@ tasks.register("generateVersionCodeAndName") {
   }
 }
 
-tasks.register("renameTarakFile") {
-  doFirst {
-    autoModifiedTrackedFiles.forEach(::backupTrackedFile)
-  }
-
-  doLast {
-    val taraskFile = File("$rootDir/core/src/main/res/values-b+be+tarask/strings.xml")
-    val mainStringsFile = File("$rootDir/core/src/main/res/values/strings.xml")
-
-    if (taraskFile.exists() && mainStringsFile.exists()) {
-      val taraskOldFile = File("$rootDir/core/src/main/res/values-b+be+tarask+old/strings.xml")
-      if (!taraskOldFile.exists()) taraskOldFile.createNewFile()
-
-      // Parse the main strings.xml file and extract the string tags
-      val mainTags = getStringTags(mainStringsFile)
-
-      // Parse the tarask file and filter strings based on tags present in the main strings file
-      // This ensures that any string removed from the main strings file will not be
-      // added to the old file, and it prevents lint errors.
-      val filteredContent = filterStringsByTags(taraskFile, mainTags)
-
-      // Write the filtered content to the taraskOldFile
-      taraskOldFile.printWriter().use { writer ->
-        writer.println("""<?xml version="1.0" encoding="utf-8"?>""")
-        writer.println("<resources>")
-        filteredContent.forEach { string ->
-          writer.println("  $string")
-        }
-        writer.println("</resources>")
-      }
-
-      taraskFile.delete()
-    }
-  }
+tasks.register<RenameTarakFileTask>("renameTarakFile") {
+  coreResDir.set(File("$rootDir/core/src/main/res"))
+  trackedFiles.set(autoModifiedTrackedFiles)
+  backupDir.set(trackedFileBackupDir)
+  repoRootDir.set(project.rootDir)
 }
 
-fun getStringTags(file: File): Set<String> {
-  val tags = mutableSetOf<String>()
-  val factory = DocumentBuilderFactory.newInstance()
-  val builder = factory.newDocumentBuilder()
-  val doc = builder.parse(file)
-  val nodeList = doc.getElementsByTagName("string")
-
-  (0 until nodeList.length)
-    .asSequence()
-    .map { nodeList.item(it) as Element }
-    .mapTo(tags) { it.getAttribute("name") }
-
-  return tags
-}
-
-fun filterStringsByTags(
-  file: File,
-  tags: Set<String>
-): List<String> {
-  val filteredStrings = mutableListOf<String>()
-  val factory = DocumentBuilderFactory.newInstance()
-  val builder = factory.newDocumentBuilder()
-  val doc = builder.parse(file)
-  val nodeList = doc.getElementsByTagName("string")
-
-  for (i in 0 until nodeList.length) {
-    val element = nodeList.item(i) as Element
-    val name = element.getAttribute("name")
-    if (name in tags) {
-      filteredStrings.add(elementToString(element))
-    }
-  }
-
-  return filteredStrings
-}
-
-fun elementToString(element: Element): String {
-  val transformer = TransformerFactory.newInstance().newTransformer().apply {
-    setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes")
-  }
-  val result = StreamResult(StringWriter())
-  val source = DOMSource(element)
-  transformer.transform(source, result)
-  return result.writer.toString()
-}
-
-// gradle.buildFinished(Action) is deprecated (removed in Gradle 10); the Flow API
-// (https://docs.gradle.org/current/userguide/dataflow_actions.html) is the replacement.
-// A FlowAction is isolated from the script - it can't see autoModifiedTrackedFiles/
-// rootDir/trackedFileBackupDir directly, so those go in via FlowParameters instead,
-// and the restore logic (previously restoreTrackedFile()) is reimplemented inline here.
-// FlowScope isn't reachable as a script-top-level service, so it's obtained through a
-// throwaway injected holder object instead.
-abstract class FlowServices @Inject constructor(val flowScope: FlowScope)
-objects.newInstance<FlowServices>().flowScope.always(RestoreTrackedFilesFlowAction::class) {
-  parameters {
-    rootDirPath.set(rootDir.path)
-    trackedFilePaths.set(autoModifiedTrackedFiles.map { it.path })
-    backupDirPath.set(trackedFileBackupDir.path)
-  }
-}
+project.objects.newInstance(TrackedFileRestoreRegistrar::class.java)
+  .register(autoModifiedTrackedFiles, trackedFileBackupDir, project.rootDir)
 
 gradle.projectsEvaluated {
   rootProject.allprojects.forEach { project ->
@@ -285,45 +167,6 @@ gradle.projectsEvaluated {
       if (path != ":app:renameTarakFile") {
         dependsOn(":app:renameTarakFile")
       }
-    }
-  }
-}
-
-abstract class RestoreTrackedFilesFlowAction : FlowAction<RestoreTrackedFilesFlowAction.Params> {
-  interface Params : FlowParameters {
-    @get:Input
-    val rootDirPath: Property<String>
-
-    @get:Input
-    val trackedFilePaths: ListProperty<String>
-
-    @get:Input
-    val backupDirPath: Property<String>
-  }
-
-  override fun execute(parameters: Params) {
-    val rootDir = File(parameters.rootDirPath.get())
-    val trackedFileBackupDir = File(parameters.backupDirPath.get())
-    parameters.trackedFilePaths.get().forEach { path ->
-      val file = File(path)
-      val fileKey = file.relativeTo(rootDir).path.replace(File.separator, "_")
-      val backupFile = File(trackedFileBackupDir, "$fileKey.bak")
-      val existsMarkerFile = File(trackedFileBackupDir, "$fileKey.exists")
-      if (!existsMarkerFile.exists()) return@forEach
-
-      val existedBeforeBuild = existsMarkerFile.readText().trim() == "1"
-      if (existedBeforeBuild && backupFile.exists()) {
-        if (!file.parentFile.exists()) file.parentFile.mkdirs()
-        backupFile.copyTo(file, overwrite = true)
-      } else if (!existedBeforeBuild && file.exists()) {
-        file.delete()
-      }
-
-      backupFile.delete()
-      existsMarkerFile.delete()
-    }
-    if (trackedFileBackupDir.exists() && trackedFileBackupDir.listFiles().isNullOrEmpty()) {
-      trackedFileBackupDir.delete()
     }
   }
 }
