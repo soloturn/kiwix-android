@@ -19,7 +19,9 @@
 package org.kiwix.kiwixmobile.core.settings
 
 import android.os.Build
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -27,18 +29,18 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -56,6 +58,8 @@ import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore.Companion.DEFAU
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+
+private const val ITEMS_PER_SCROLL_STEP = 1
 
 /**
  * Behavior-driven UI tests for SettingsScreen.
@@ -75,6 +79,10 @@ class SettingsScreenTest {
   val composeTestRule = createComposeRule()
 
   private val context get() = RuntimeEnvironment.getApplication()
+
+  // Hoisted so scrollToNode() can drive it directly instead of using
+  // performScrollToNode(), which hangs under Robolectric with this Compose version.
+  private val lazyListState = LazyListState()
 
   /**
    * Creates a mocked [CoreSettingsViewModel] with sensible defaults.
@@ -111,27 +119,29 @@ class SettingsScreenTest {
     composeTestRule.setContent {
       SettingsScreen(
         coreSettingsViewModel = viewModel,
-        navigationIcon = { NavigationIcon(onClick = onNavigationClick) }
+        navigationIcon = { NavigationIcon(onClick = onNavigationClick) },
+        lazyListState = lazyListState
       )
     }
+    // v2's StandardTestDispatcher queues the initial composition/layout-driving
+    // coroutines instead of running them eagerly (v1's UnconfinedTestDispatcher did) -
+    // without this, the first assertion/find after setContent() can see an unlaid-out
+    // tree.
+    composeTestRule.waitForIdle()
   }
 
   /**
    * Scrolls the settings LazyColumn to bring the node matching [text] into view.
    */
   private fun scrollToText(text: String) {
-    composeTestRule
-      .onNodeWithTag(SETTINGS_LIST_TESTING_TAG)
-      .performScrollToNode(hasText(text))
+    scrollToNode(hasText(text))
   }
 
   /**
    * Scrolls the settings LazyColumn to bring the node matching [testTag] into view.
    */
   private fun scrollToTag(testTag: String) {
-    composeTestRule
-      .onNodeWithTag(SETTINGS_LIST_TESTING_TAG)
-      .performScrollToNode(hasTestTag(testTag))
+    scrollToNode(hasTestTag(testTag))
   }
 
   /**
@@ -139,9 +149,34 @@ class SettingsScreenTest {
    * matching [contentDescription] into view.
    */
   private fun scrollToContentDescription(contentDescription: String) {
-    composeTestRule
-      .onNodeWithTag(SETTINGS_LIST_TESTING_TAG)
-      .performScrollToNode(hasContentDescription(contentDescription))
+    scrollToNode(hasContentDescription(contentDescription))
+  }
+
+  /**
+   * Drives [lazyListState] directly with instant (non-animated) jumps instead of
+   * performScrollToNode(), which hangs under Robolectric with this Compose version
+   * (see https://issuetracker.google.com/issues/341880461 - animation-driven Compose UI
+   * test synchronization hanging in Robolectric). Steps forward until the target node is
+   * actually composed (LazyColumn only composes items near the viewport) or the list ends.
+   */
+  private fun scrollToNode(matcher: SemanticsMatcher) {
+    // LazyColumn prefetches items ahead of the visible range, so a match can exist in
+    // the semantics tree (satisfying a plain "does it exist" check) before it has
+    // actually been scrolled into view and positioned - fetchSemanticsNodes() would then
+    // return a node whose boundsInRoot is still the zeroed placeholder from before its
+    // real placement. Requiring non-zero bounds too ensures we keep scrolling until the
+    // node is actually laid out within the viewport, not just composed ahead of it.
+    fun isActuallyVisible() =
+      composeTestRule.onAllNodes(matcher).fetchSemanticsNodes().firstOrNull()
+        ?.boundsInRoot?.let { it.width > 0 && it.height > 0 } == true
+    while (!isActuallyVisible()) {
+      val totalItems = lazyListState.layoutInfo.totalItemsCount
+      val nextIndex = (lazyListState.firstVisibleItemIndex + ITEMS_PER_SCROLL_STEP)
+        .coerceAtMost(totalItems - 1)
+      runBlocking { lazyListState.scrollToItem(nextIndex) }
+      composeTestRule.waitForIdle()
+      if (nextIndex >= totalItems - 1) break
+    }
   }
 
   /**
@@ -758,7 +793,6 @@ class SettingsScreenTest {
     val viewModel = createMockViewModel(themeLabel = "Dark")
     composeTestRule.setContent {
       AppThemePreference(
-        context = context,
         themeLabel = "Dark",
         coreSettingsViewModel = viewModel
       )
@@ -773,7 +807,6 @@ class SettingsScreenTest {
     val viewModel = createMockViewModel()
     composeTestRule.setContent {
       AppThemePreference(
-        context = context,
         themeLabel = "System default",
         coreSettingsViewModel = viewModel
       )

@@ -23,7 +23,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -44,6 +44,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.kiwix.kiwixmobile.BaseActivityTest
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
+import org.kiwix.kiwixmobile.core.utils.SmokeTest
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.HILT_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
@@ -60,6 +61,7 @@ import java.util.concurrent.TimeUnit
 const val TWO_MINUTES_IN_MILLISECONDS = 2 * 60 * 1000
 
 @LargeTest
+@SmokeTest
 @HiltAndroidTest
 class DownloadTest : BaseActivityTest() {
   @Rule(order = HILT_RULE_ORDER)

@@ -74,7 +74,13 @@ fi
 # tracking down, "package manager service unavailable" on a healthy-looking
 # emulator). Emulator boot failures are still retried separately, one layer
 # up, by .github/actions/android-emulator-runner.
-if ./gradlew connectedCustomexampleDebugAndroidTest; then
+# Off-floor/ceiling matrix entries run only the @SmokeTest subset
+# instead of the full suite - see this job's matrix in ci.yml.
+extra_args=()
+if [ "${SMOKE_ONLY:-false}" = "true" ]; then
+  extra_args+=("-Pandroid.testInstrumentationRunnerArguments.annotation=org.kiwix.kiwixmobile.core.utils.SmokeTest")
+fi
+if ./gradlew connectedCustomexampleDebugAndroidTest "${extra_args[@]}"; then
   echo "connectedCustomexampleDebugAndroidTest succeeded" >&2
 else
   adb exec-out screencap -p >screencap.png

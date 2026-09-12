@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.localFileTransfer
 
-import android.content.Context
 import android.net.wifi.p2p.WifiP2pDevice
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -47,7 +46,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -103,7 +101,10 @@ fun LocalFileTransferScreen(
   navigationIcon: @Composable () -> Unit
 ) {
   val targets = remember { mutableStateMapOf<String, ShowcaseProperty>() }
-  val context = LocalContext.current
+  val clickNearbyDevicesMessage = stringResource(string.click_nearby_devices_message)
+  val nearbyDevicesListMessage = stringResource(string.nearby_devices_list_message)
+  val transferZimFilesListMessage = stringResource(string.transfer_zim_files_list_message)
+  val yourDeviceNameMessage = stringResource(string.your_device_name_message)
   Scaffold(
     topBar = {
       KiwixAppBar(
@@ -115,7 +116,7 @@ fun LocalFileTransferScreen(
                 targets[SEARCH_ICON_TESTING_TAG] = ShowcaseProperty(
                   index = ZERO,
                   coordinates = coordinates,
-                  showCaseMessage = context.getString(string.click_nearby_devices_message)
+                  showCaseMessage = clickNearbyDevicesMessage
                 )
               }
           )
@@ -130,7 +131,7 @@ fun LocalFileTransferScreen(
         .padding(padding)
         .background(Color.Transparent)
     ) {
-      YourDeviceHeader(state.deviceName, context, targets)
+      YourDeviceHeader(state.deviceName, yourDeviceNameMessage, targets)
       HorizontalDivider(
         color = DodgerBlue,
         thickness = ONE_DP,
@@ -140,7 +141,7 @@ fun LocalFileTransferScreen(
         state.peers,
         state.isPeerSearching,
         onDeviceItemClick,
-        context,
+        nearbyDevicesListMessage,
         targets
       )
       HorizontalDivider(
@@ -149,7 +150,7 @@ fun LocalFileTransferScreen(
         modifier = Modifier
           .padding(horizontal = FIVE_DP)
       )
-      TransferFilesSection(state.transferFiles, context, targets)
+      TransferFilesSection(state.transferFiles, transferZimFilesListMessage, targets)
     }
   }
   ShowShowCaseToUserIfNotShown(targets, state.shouldShowShowCase, onShowCaseDisplayed)
@@ -180,7 +181,7 @@ fun NearbyDevicesSection(
   peerDeviceList: List<WifiP2pDevice>,
   isPeerSearching: Boolean,
   onDeviceItemClick: (WifiP2pDevice) -> Unit,
-  context: Context,
+  showCaseMessage: String,
   targets: SnapshotStateMap<String, ShowcaseProperty>
 ) {
   Column(
@@ -216,7 +217,7 @@ fun NearbyDevicesSection(
             targets[PEER_DEVICE_LIST_SHOW_CASE_TAG] = ShowcaseProperty(
               index = 2,
               coordinates = coordinates,
-              showCaseMessage = context.getString(string.nearby_devices_list_message),
+              showCaseMessage = showCaseMessage,
               customSizeForShowcaseViewCircle = NEARBY_DEVICES_SHOW_CASE_VIEW_SIZE
             )
           },
@@ -240,7 +241,7 @@ fun NearbyDevicesSection(
 @Composable
 private fun TransferFilesSection(
   transferFileList: List<FileItem>,
-  context: Context,
+  showCaseMessage: String,
   targets: SnapshotStateMap<String, ShowcaseProperty>
 ) {
   Column(modifier = Modifier.fillMaxWidth()) {
@@ -255,7 +256,7 @@ private fun TransferFilesSection(
           targets[FILE_FOR_TRANSFER_SHOW_CASE_TAG] = ShowcaseProperty(
             index = 3,
             coordinates = coordinates,
-            showCaseMessage = context.getString(string.transfer_zim_files_list_message),
+            showCaseMessage = showCaseMessage,
             customSizeForShowcaseViewCircle = FILE_FOR_TRANSFER_SHOW_CASE_VIEW_SIZE
           )
         },
@@ -274,7 +275,7 @@ private fun TransferFilesSection(
 @Composable
 private fun YourDeviceHeader(
   deviceName: String,
-  context: Context,
+  showCaseMessage: String,
   targets: SnapshotStateMap<String, ShowcaseProperty>
 ) {
   Column(modifier = Modifier.padding(horizontal = FIFTEEN_DP, vertical = FIVE_DP)) {
@@ -288,7 +289,7 @@ private fun YourDeviceHeader(
           targets[YOUR_DEVICE_SHOW_CASE_TAG] = ShowcaseProperty(
             index = 1,
             coordinates = coordinates,
-            showCaseMessage = context.getString(string.your_device_name_message)
+            showCaseMessage = showCaseMessage
           )
         },
       color = MaterialTheme.colorScheme.onSurface.copy(alpha = DEFAULT_TEXT_ALPHA)

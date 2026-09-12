@@ -184,7 +184,6 @@ abstract class PageViewModel<T : Page, S : PageState<T>>(
       it.cancel()
     }
     coroutineJobs.clear()
-    super.onCleared()
   }
 
   abstract fun createDeletePageDialogEffect(state: S, viewModelScope: CoroutineScope): SideEffect<*>

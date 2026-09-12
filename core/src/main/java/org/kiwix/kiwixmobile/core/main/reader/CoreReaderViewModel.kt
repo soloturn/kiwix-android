@@ -1792,7 +1792,6 @@ abstract class CoreReaderViewModel(
     hideBackToTopJob = null
     actionMode = null
     findInPageManager.stop()
-    super.onCleared()
   }
 
   protected fun mainDispatcherImmediate() = mainDispatcher.immediate

@@ -29,7 +29,7 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
@@ -46,6 +46,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.fail
 import org.kiwix.kiwixmobile.BaseActivityTest
+import org.kiwix.kiwixmobile.core.utils.SmokeTest
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.HILT_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
@@ -59,6 +60,7 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 
+@SmokeTest
 @HiltAndroidTest
 class OpeningFilesFromStorageTest : BaseActivityTest() {
   @Rule(order = HILT_RULE_ORDER)

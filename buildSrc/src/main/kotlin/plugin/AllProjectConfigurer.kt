@@ -326,6 +326,7 @@ class AllProjectConfigurer {
 
       // compose
       implementation(Libs.COMPOSE_MATERIAL3)
+      implementation(Libs.COMPOSE_MATERIAL_ICONS_CORE)
       implementation(Libs.ANDROIDX_ACTIVITY_COMPOSE)
       implementation(Libs.COMPOSE_TOOLING_PREVIEW)
       implementation(Libs.COMPOSE_LIVE_DATA)

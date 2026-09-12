@@ -20,7 +20,7 @@ package org.kiwix.kiwixmobile.page.history
 
 import android.os.Build
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.core.net.toUri
 import androidx.navigation.NavOptions
 import dagger.hilt.android.testing.HiltAndroidRule

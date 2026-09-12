@@ -210,6 +210,5 @@ open class CategoryViewModel @Inject constructor(
     coroutineJobs.clear()
     context.unregisterReceiver(connectivityBroadcastReceiver)
     onDismiss = null
-    super.onCleared()
   }
 }

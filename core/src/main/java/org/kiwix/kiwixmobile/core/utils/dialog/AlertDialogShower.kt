@@ -341,10 +341,9 @@ fun DialogTitle(title: Int?) {
 
 @Composable
 private fun DialogMessage(dialog: KiwixDialog) {
-  val context = LocalContext.current
   dialog.message?.let {
     Text(
-      text = context.getString(it, *bodyArguments(dialog)),
+      text = stringResource(it, *bodyArguments(dialog)),
       modifier = Modifier
         .fillMaxWidth()
         .padding(bottom = DIALOG_MESSAGE_BOTTOM_PADDING)

@@ -143,7 +143,6 @@ open class LanguageViewModel @Inject constructor(
     }
     coroutineJobs.clear()
     context.unregisterReceiver(connectivityBroadcastReceiver)
-    super.onCleared()
   }
 
   private fun reduce(
