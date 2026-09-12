@@ -1143,28 +1143,28 @@ internal class CoreReaderViewModelTest {
 
     @Test
     fun `navigationIcon should return back arrow icon when tab switcher is open`() {
-      viewModel.updateState { copy(showTabSwitcher = true) }
+      viewModel.updateUiStateForTest { copy(showTabSwitcher = true) }
       val icon = viewModel.navigationIcon()
       assertThat(icon).isEqualTo(IconItem.Vector(Icons.AutoMirrored.Filled.ArrowBack))
     }
 
     @Test
     fun `navigationIcon should return menu icon when tab switcher is closed`() {
-      viewModel.updateState { copy(showTabSwitcher = false) }
+      viewModel.updateUiStateForTest { copy(showTabSwitcher = false) }
       val icon = viewModel.navigationIcon()
       assertThat(icon).isEqualTo(IconItem.Vector(Icons.Filled.Menu))
     }
 
     @Test
     fun `navigationIconContentDescription should return back description when tab switcher is open`() {
-      viewModel.updateState { copy(showTabSwitcher = true) }
+      viewModel.updateUiStateForTest { copy(showTabSwitcher = true) }
       assertThat(viewModel.navigationIconContentDescription())
         .isEqualTo(R.string.toolbar_back_button_content_description)
     }
 
     @Test
     fun `navigationIconContentDescription should return open drawer description when tab switcher is closed`() {
-      viewModel.updateState { copy(showTabSwitcher = false) }
+      viewModel.updateUiStateForTest { copy(showTabSwitcher = false) }
       assertThat(viewModel.navigationIconContentDescription())
         .isEqualTo(R.string.open_drawer)
     }
@@ -1172,7 +1172,7 @@ internal class CoreReaderViewModelTest {
     @Test
     fun `navigationIconClick should hide tab switcher when tab switcher is open`() = runTest {
       viewModel = spyk(viewModel)
-      viewModel.updateState { copy(showTabSwitcher = true) }
+      viewModel.updateUiStateForTest { copy(showTabSwitcher = true) }
       viewModel.navigationIconClick(isNavigationDrawerOpen = false)
       advanceUntilIdle()
       assertThat(viewModel.uiState.value.showTabSwitcher).isFalse()

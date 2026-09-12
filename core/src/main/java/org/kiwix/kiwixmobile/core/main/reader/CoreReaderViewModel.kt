@@ -687,7 +687,7 @@ abstract class CoreReaderViewModel(
     // Do nothing here.
   }
 
-  open fun updateState(transform: ReaderUiState.() -> ReaderUiState) {
+  protected fun updateState(transform: ReaderUiState.() -> ReaderUiState) {
     _uiState.update(transform)
   }
 

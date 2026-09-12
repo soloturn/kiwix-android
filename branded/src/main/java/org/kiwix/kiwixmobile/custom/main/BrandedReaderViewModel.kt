@@ -339,7 +339,9 @@ class BrandedReaderViewModel @Inject constructor(
    * Otherwise, [White] is used as the default tint, which is suitable for vector icons.
    */
   override fun navigationIconTint(): Color =
-    if (BuildConfig.DISABLE_TITLE) {
+    if (uiState.value.showTabSwitcher) {
+      White
+    } else if (BuildConfig.DISABLE_TITLE) {
       Color.Unspecified
     } else {
       White
