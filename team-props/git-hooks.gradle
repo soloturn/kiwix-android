@@ -4,11 +4,13 @@ static def isLinuxOrMacOs() {
 }
 
 // Compute once and share - avoids 5 racing subprocess spawns under --parallel.
-if (!rootProject.hasProperty('resolvedGitHooksDir')) {
-  rootProject.ext.resolvedGitHooksDir =
-    'git rev-parse --path-format=absolute --git-path hooks'.execute().text.trim()
+// providers.exec (not raw .execute()) so this survives the configuration cache.
+if (!rootProject.hasProperty('resolvedGitHooksDirProvider')) {
+  rootProject.ext.resolvedGitHooksDirProvider = providers.exec {
+    commandLine 'git', 'rev-parse', '--path-format=absolute', '--git-path', 'hooks'
+  }.standardOutput.asText.map { it.trim() }
 }
-def gitHooksDir = rootProject.resolvedGitHooksDir
+def gitHooksDirProvider = rootProject.resolvedGitHooksDirProvider
 
 task copyGitHooks(type: Copy) {
   description = 'Copies the git hooks from team-props/git-hooks to the .git folder.'
@@ -16,20 +18,15 @@ task copyGitHooks(type: Copy) {
     include '**/*.sh'
     rename '(.*).sh', '$1'
   }
-  into gitHooksDir
+  into gitHooksDirProvider
 }
 
-task installGitHooks(type: Exec) {
+tasks.register('installGitHooks', plugin.InstallGitHooksTask) {
   description = 'Installs the pre-commit git hooks from team-props/git-hooks.'
   group = 'git hooks'
-  workingDir rootDir
-  commandLine 'chmod'
-  args '-R', '+x', gitHooksDir
-  onlyIf { isLinuxOrMacOs() }
+  enabled = isLinuxOrMacOs()
   dependsOn copyGitHooks
-  doLast {
-    logger.info('Git hook installed successfully.')
-  }
+  gitHooksDir.set(gitHooksDirProvider)
 }
 
 afterEvaluate {
