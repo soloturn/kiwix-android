@@ -136,7 +136,6 @@ class AllProjectConfigurer {
               testTask.useJUnitPlatform()
               testTask.testLogging {
                 setEvents(setOf("passed", "skipped", "failed", "standardOut", "standardError"))
-                testTask.outputs.upToDateWhen { false }
                 showStandardStreams = true
               }
               testTask.extensions
