@@ -547,7 +547,8 @@ jobs:
         with:
           name: kiwix-android
           path: |
-            **/*.apk
+            app/build/outputs/apk/debug/*.apk
+            branded/build/outputs/apk/customexample/debug/*.apk
 
       # Every "Automated tests*" job group below compiles and assembles the
       # same debug + androidTest sources independently per API level - up
