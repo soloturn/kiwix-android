@@ -27,8 +27,16 @@ jobs:
     needs: assemble
     strategy:
       matrix:
-        api-level: [ 25, 30, 33, 34, 35, 36 ]
-        target: [ default ]
+        # Full suite only at the floor/ceiling, plus 30 (needs the real
+        # suite for its own jacoco/benchmark/coverage steps below) - the
+        # rest run just the @SmokeTest subset instead of nothing.
+        include:
+          - { api-level: 25, target: default, full-suite: true }
+          - { api-level: 30, target: default, full-suite: true }
+          - { api-level: 33, target: default, full-suite: false }
+          - { api-level: 34, target: default, full-suite: false }
+          - { api-level: 35, target: default, full-suite: false }
+          - { api-level: 36, target: default, full-suite: true }
       fail-fast: true
     runs-on: ubuntu-26.04
     steps:
@@ -101,6 +109,7 @@ jobs:
           # defaultmigration and objectboxmigration, none of which have
           # any tests.
           INSTRUMENTATION_GRADLE_TASK: ${{ matrix.api-level == 30 && ':app:jacocoInstrumentationTestReport' || ':app:connectedDebugAndroidTest' }}
+          SMOKE_ONLY: ${{ !matrix.full-suite }}
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -231,8 +240,15 @@ jobs:
     needs: assemble
     strategy:
       matrix:
-        api-level: [ 25, 30, 33, 34, 35, 36 ]
-        target: [ default ]
+        # Full suite only at the floor/ceiling - the rest run just the
+        # @SmokeTest subset instead of nothing.
+        include:
+          - { api-level: 25, target: default, full-suite: true }
+          - { api-level: 30, target: default, full-suite: false }
+          - { api-level: 33, target: default, full-suite: false }
+          - { api-level: 34, target: default, full-suite: false }
+          - { api-level: 35, target: default, full-suite: false }
+          - { api-level: 36, target: default, full-suite: true }
       fail-fast: true
     runs-on: ubuntu-26.04
     steps:
@@ -290,6 +306,8 @@ jobs:
       - name: Test branded app
         uses: ./.github/actions/android-emulator-runner
         timeout-minutes: ${{ fromJSON(env.EMULATOR_STEP_TIMEOUT_MINUTES) }}
+        env:
+          SMOKE_ONLY: ${{ !matrix.full-suite }}
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
