@@ -42,8 +42,8 @@ import org.kiwix.kiwixmobile.core.read_aloud.ReadAloudService.Companion.ACTION_P
 import org.kiwix.kiwixmobile.core.read_aloud.ReadAloudService.Companion.ACTION_STOP_TTS
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.utils.TAG_KIWIX
-import org.kiwix.kiwixmobile.core.utils.files.Log
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.kiwix.kiwixmobile.core.utils.files.Log
 import javax.inject.Inject
 
 class ReadAloudManager @Inject constructor(
