@@ -1,5 +1,5 @@
 name: Android Emulator Test
-description: Run tests on an Android emulator, bounded by a timeout instead of an unbounded hang
+description: Run tests on an Android emulator, retrying the boot on the known input-service race
 
 inputs:
   api-level:
@@ -37,32 +37,160 @@ inputs:
     required: false
     default: 1024M
 
+  sdcard-path-or-size:
+    description: Emulator sdcard path or size
+    required: false
+    default: 1024M
+
   gradle-opts:
     description: Value for the GRADLE_OPTS environment variable during the emulator script
     required: false
     default: ""
 
+  max-attempts:
+    description: Number of boot attempts before giving up
+    required: false
+    default: "4"
+
 runs:
   using: composite
 
   steps:
-    - name: Emulator test
-      uses: reactivecircus/android-emulator-runner@v2
+    # ---------------------------------------------------------
+    # Boots the emulator, waits for it to be ready, runs the test
+    # script, and tears down - retrying the boot (not the test
+    # script) up to max-attempts times.
+    #
+    # SDK installation and the initial AVD are handled by the
+    # earlier "Create AVD and generate snapshot for caching" step
+    # (uses: reactivecircus/android-emulator-runner@v2) - this step
+    # only redoes AVD creation + launch, mirroring what that action
+    # does internally, so we can retry it in a real loop instead of
+    # one YAML block per attempt.
+    #
+    # Works around ReactiveCircus/android-emulator-runner#432 (input
+    # keyevent outracing system_server after boot). Fixed upstream by
+    # https://github.com/ReactiveCircus/android-emulator-runner/pull/495 -
+    # once that's merged and released, this can likely go back to a
+    # single reactivecircus/android-emulator-runner@v2 step.
+    # ---------------------------------------------------------
+    - name: Boot emulator and run test script
+      shell: bash
       env:
         GRADLE_OPTS: ${{ inputs.gradle-opts }}
-        ADB_INSTALL_TIMEOUT: "12"
+      run: |
+        set -uo pipefail
+
+        # Only exported by reactivecircus/android-emulator-runner's own SDK
+        # install, which the "Create AVD..." step skips on an AVD cache hit -
+        # the common case. Default to the path the AVD cache step itself uses.
+        ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
+        AVD_NAME="test"
+        PORT=5554
+        SERIAL="emulator-${PORT}"
+        MAX_ATTEMPTS=${{ inputs.max-attempts }}
+
+        kill_emulator() {
+          adb -s "$SERIAL" emu kill 2>/dev/null || true
+          kill "$emulator_pid" 2>/dev/null || true
+          wait "$emulator_pid" 2>/dev/null || true
+        }
+
+        # Fixed cmdline-tools path (actions/runner-images).
+        sdkmanager_bin="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+        avdmanager_bin="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+        if [ ! -x "$sdkmanager_bin" ]; then
+          echo "::error::sdkmanager not found at $sdkmanager_bin (ANDROID_HOME=$ANDROID_HOME)"
+          exit 1
+        fi
+        yes | "$sdkmanager_bin" --licenses > /dev/null || true
+        "$sdkmanager_bin" --install platform-tools emulator \
+          "system-images;android-${{ inputs.api-level }};${{ inputs.target }};${{ inputs.arch }}" > /dev/null
+
+        export PATH="$ANDROID_HOME/platform-tools:$PATH"
+        adb start-server
+
+        for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+          echo "::group::Boot attempt ${attempt}/${MAX_ATTEMPTS}"
+
+          # Attempt 1 reuses the AVD (and its cached snapshot) the earlier
+          # "AVD cache"/"Create AVD and generate snapshot" steps warmed up.
+          # Only force a genuinely fresh AVD + cold boot on retries, so we
+          # don't discard that cache on the common, non-retried path.
+          if [ "$attempt" -gt 1 ] || [ ! -d "$ANDROID_AVD_HOME/${AVD_NAME}.avd" ]; then
+            echo "Creating AVD."
+            echo no | "$avdmanager_bin" create avd --force -n "$AVD_NAME" \
+              --package "system-images;android-${{ inputs.api-level }};${{ inputs.target }};${{ inputs.arch }}" \
+              --device '${{ inputs.profile }}' --sdcard '${{ inputs.sdcard-path-or-size }}'
+            {
+              echo "hw.cpu.ncore=${{ inputs.cores }}"
+              echo "hw.ramSize=${{ inputs.ram-size }}"
+              echo "hw.heapSize=${{ inputs.heap-size }}"
+            } >> "$ANDROID_AVD_HOME/${AVD_NAME}.avd/config.ini"
+            snapshot_flag=-no-snapshot
+          else
+            snapshot_flag=-no-snapshot-save
+          fi
+
+          echo "Starting emulator."
+          # Capture the emulator's own host-side output, not just the guest's logcat.
+          "$ANDROID_HOME/emulator/emulator" -avd "$AVD_NAME" -port $PORT \
+            -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics "$snapshot_flag" \
+            > "/tmp/emulator-host-${attempt}.log" 2>&1 &
+          emulator_pid=$!
+
+          booted=false
+          input_ready=false
+          if timeout 60 adb -s "$SERIAL" wait-for-device; then
+            for _ in $(seq 1 600); do
+              if [ "$(adb -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+                booted=true
+                break
+              fi
+              sleep 2
+            done
+          fi
+
+          if [ "$booted" = true ]; then
+            for _ in $(seq 1 15); do
+              result="$(adb -s "$SERIAL" shell service check input 2>/dev/null)"
+              if echo "$result" | grep -q found && ! echo "$result" | grep -q "not found"; then
+                input_ready=true
+                break
+              fi
+              sleep 1
+            done
+          fi
+
+          if [ "$booted" = true ] && [ "$input_ready" = true ]; then
+            adb -s "$SERIAL" shell input keyevent 82
+            adb -s "$SERIAL" shell settings put global window_animation_scale 0.0
+            adb -s "$SERIAL" shell settings put global transition_animation_scale 0.0
+            adb -s "$SERIAL" shell settings put global animator_duration_scale 0.0
+            echo "::endgroup::"
+            echo "::group::Run test script"
+            set +e
+            EMULATOR_PORT="$PORT" ANDROID_SERIAL="$SERIAL" bash -c '${{ inputs.script }}'
+            script_exit=$?
+            set -e
+            echo "::endgroup::"
+            kill_emulator
+            exit $script_exit
+          fi
+
+          echo "Emulator did not become ready (booted=${booted}, input_ready=${input_ready})."
+          kill_emulator
+          sleep 15
+          echo "::endgroup::"
+        done
+
+        echo "Emulator failed to boot after ${MAX_ATTEMPTS} attempts."
+        exit 1
+
+    - name: Upload emulator host log on failure
+      if: failure()
+      uses: actions/upload-artifact@v6
       with:
-        api-level: ${{ inputs.api-level }}
-        target: ${{ inputs.target }}
-        arch: ${{ inputs.arch }}
-        profile: ${{ inputs.profile }}
-        ram-size: ${{ inputs.ram-size }}
-        cores: ${{ inputs.cores }}
-        heap-size: ${{ inputs.heap-size }}
-        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
-        sdcard-path-or-size: 1024M
-        disable-animations: true
-        force-avd-creation: false
-        emulator-boot-timeout: 1200
-        script: |
-          bash -c '${{ inputs.script }}'
+        name: emulator-host-log-${{ github.job }}-${{ strategy.job-index }}
+        path: /tmp/emulator-host-*.log
+        if-no-files-found: ignore
