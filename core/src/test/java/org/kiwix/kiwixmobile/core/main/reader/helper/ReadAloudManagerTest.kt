@@ -38,6 +38,7 @@ import org.kiwix.kiwixmobile.core.read_aloud.ReadAloudService
 import org.kiwix.kiwixmobile.core.read_aloud.ReadAloudService.Companion.ACTION_PAUSE_OR_RESUME_TTS
 import org.kiwix.kiwixmobile.core.read_aloud.ReadAloudService.Companion.ACTION_STOP_TTS
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
+import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -49,6 +50,7 @@ class ReadAloudManagerTest {
   private lateinit var readAloudManager: ReadAloudManager
 
   private val zimReaderContainer = mockk<ZimReaderContainer>(relaxed = true)
+  private val kiwixDataStore = mockk<KiwixDataStore>(relaxed = true)
   private lateinit var tts: KiwixTextToSpeech
 
   @Before
@@ -56,7 +58,7 @@ class ReadAloudManagerTest {
     clearAllMocks()
     tts = mockk<KiwixTextToSpeech>(relaxed = true)
     context = ApplicationProvider.getApplicationContext()
-    readAloudManager = ReadAloudManager(context, zimReaderContainer)
+    readAloudManager = ReadAloudManager(context, zimReaderContainer, kiwixDataStore)
     readAloudManager.tts = tts
   }
 
