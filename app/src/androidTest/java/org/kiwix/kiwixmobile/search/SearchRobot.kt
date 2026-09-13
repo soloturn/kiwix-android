@@ -106,9 +106,13 @@ class SearchRobot : BaseRobot() {
         waitUntil(
           timeoutMillis = TEST_PAUSE_MS.toLong(),
           condition = {
-            onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)
-              .fetchSemanticsNodes()
-              .isNotEmpty()
+            try {
+              onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+            } catch (_: IllegalStateException) {
+              false
+            }
           }
         )
         onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0]
