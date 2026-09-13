@@ -37,15 +37,14 @@ data class DeleteFilesUseCase @Inject constructor(
   suspend operator fun invoke(
     books: List<BooksOnDiskListItem.BookOnDisk>
   ): Boolean {
-    val sourceAtStart = zimReaderContainer.zimReaderSource
     var readerWebViewsDestroyed = false
     return books.fold(true) { acc, book ->
       if (!acc) {
         false
       } else {
-        val wasCurrentBookBeforeDelete = book.zimReaderSource == sourceAtStart
+        val isCurrentBook = book.zimReaderSource == zimReaderContainer.zimReaderSource
         if (
-          wasCurrentBookBeforeDelete &&
+          isCurrentBook &&
           hasDeletionTarget(book) &&
           !readerWebViewsDestroyed
         ) {
@@ -57,7 +56,6 @@ data class DeleteFilesUseCase @Inject constructor(
         val deleted = deleteBook(book)
         if (
           deleted &&
-          wasCurrentBookBeforeDelete &&
           book.zimReaderSource == zimReaderContainer.zimReaderSource
         ) {
           zimReaderContainer.setZimReaderSource(null)
