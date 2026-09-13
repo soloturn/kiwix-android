@@ -65,7 +65,11 @@ class InitialDownloadRobot : BaseRobot() {
       composeTestRule.apply {
         waitForIdle()
         waitUntil(FIVE_SECOND_DELAY) {
-          onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          try {
+            onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG)[0].performClick()
       }
