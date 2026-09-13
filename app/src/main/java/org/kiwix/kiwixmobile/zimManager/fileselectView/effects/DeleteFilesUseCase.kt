@@ -36,17 +36,18 @@ data class DeleteFilesUseCase @Inject constructor(
 ) {
   suspend operator fun invoke(
     books: List<BooksOnDiskListItem.BookOnDisk>
-  ): Boolean =
-    books.fold(true) { acc, book ->
+  ): Boolean {
+    val sourceAtStart = zimReaderContainer.zimReaderSource
+    if (books.any { it.zimReaderSource == sourceAtStart }) {
+      // Stop all WebViews first so Chromium workers no longer issue requests against
+      // the soon-to-be-disposed archive.
+      readerWebViewManager.destroyAllTabs()
+    }
+    return books.fold(true) { acc, book ->
       if (!acc) {
         false
       } else {
-        val wasCurrentBookBeforeDelete = book.zimReaderSource == zimReaderContainer.zimReaderSource
-        if (wasCurrentBookBeforeDelete) {
-          // Stop all WebViews first so Chromium workers no longer issue requests against
-          // the soon-to-be-disposed archive.
-          readerWebViewManager.destroyAllTabs()
-        }
+        val wasCurrentBookBeforeDelete = book.zimReaderSource == sourceAtStart
         val deleted = deleteBook(book)
         if (
           deleted &&
@@ -58,6 +59,7 @@ data class DeleteFilesUseCase @Inject constructor(
         deleted
       }
     }
+  }
 
   @Suppress("ReturnCount")
   private suspend fun deleteBook(
