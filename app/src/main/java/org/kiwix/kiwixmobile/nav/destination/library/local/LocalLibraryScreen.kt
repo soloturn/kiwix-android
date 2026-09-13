@@ -266,6 +266,19 @@ private fun BookItemList(
   }
 }
 
+/**
+ * Public entry point into [BookItemList], kept separate so it stays private, purely so that
+ * Compose Preview screenshot tests (which live in the `screenshotTest` source set, outside this
+ * package) can render the real book-list composable.
+ */
+@Composable
+fun BookItemListForPreview(
+  state: FileSelectListState,
+  lazyListState: LazyListState
+) {
+  BookItemList(state = state, lazyListState = lazyListState)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LocalLibraryBackToTopButton(
