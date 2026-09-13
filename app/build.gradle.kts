@@ -31,6 +31,8 @@ plugins {
 if (hasProperty("testingMinimizedBuild")) {
   apply(plugin = "io.github.usefulness.keeper")
 }
+// Compose Preview Screenshot Testing, see https://developer.android.com/studio/preview/compose-screenshot-testing
+apply(plugin = "com.android.compose.screenshot")
 plugins.apply(KiwixConfigurationPlugin::class)
 
 apply(from = rootProject.file("jacoco.gradle"))
@@ -90,6 +92,10 @@ android {
   // This is now specified in the Gradle configuration instead of declaring
   // it directly in the AndroidManifest file.
   namespace = "org.kiwix.kiwixmobile"
+  // Required by the Compose Preview Screenshot Testing plugin (still experimental upstream);
+  // the matching `android.experimental.enableScreenshotTest=true` in gradle.properties is also
+  // required (the plugin checks both).
+  experimentalProperties["android.experimental.enableScreenshotTest"] = true
   defaultConfig {
     // Distinct from upstream's org.kiwix.kiwixmobile so a personal fork build
     // never collides with the official Play Store app on the same device.
@@ -204,6 +210,12 @@ dependencies {
 
   // Document File
   implementation(Libs.select_folder_document_file)
+
+  // Compose Preview Screenshot Testing. `com.android.compose.screenshot` is applied dynamically
+  // (see above), so its `screenshotTestImplementation` configuration has no generated Kotlin DSL
+  // accessor here - add(...) is the same pattern already used below for the per-flavor configs.
+  add("screenshotTestImplementation", Libs.SCREENSHOT_VALIDATION_API)
+  add("screenshotTestImplementation", Libs.COMPOSE_TOOLING)
 }
 
 tasks.register("generateVersionCodeAndName") {
