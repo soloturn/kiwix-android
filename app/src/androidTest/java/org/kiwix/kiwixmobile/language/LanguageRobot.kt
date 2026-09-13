@@ -88,10 +88,14 @@ class LanguageRobot : BaseRobot() {
     repeat(retryCount) { attempt ->
       try {
         composeTestRule.waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-          composeTestRule
-            .onAllNodesWithContentDescription(context.getString(string.select_language_content_description))
-            .fetchSemanticsNodes()
-            .isNotEmpty()
+          try {
+            composeTestRule
+              .onAllNodesWithContentDescription(context.getString(string.select_language_content_description))
+              .fetchSemanticsNodes()
+              .isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         Log.d("LanguageTest", "Language list loaded")
         return
