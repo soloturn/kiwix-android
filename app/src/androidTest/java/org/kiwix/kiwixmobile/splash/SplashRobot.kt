@@ -20,6 +20,7 @@ package org.kiwix.kiwixmobile.splash
 
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.ComposeTestRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -40,6 +41,7 @@ import org.kiwix.kiwixmobile.intro.composable.INTRO_SUB_HEADING_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.main.TopLevelDestinationRobot
 import org.kiwix.kiwixmobile.main.topLevel
 import org.kiwix.kiwixmobile.nav.destination.library.local.THREE
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 
 fun splash(func: SplashRobot.() -> Unit) = SplashRobot().applyWithViewHierarchyPrinting(func)
@@ -98,6 +100,13 @@ class SplashRobot : BaseRobot() {
   private fun scrollToPage(index: Int, composeTestRule: ComposeTestRule) {
     composeTestRule.apply {
       waitForIdle()
+      // The pager can still be absent from the tree right after
+      // launchMainActivity() - performScrollToIndex() below only takes an
+      // instantaneous snapshot, so poll for the node instead of assuming
+      // waitForIdle() alone means it's there yet.
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+        onAllNodesWithTag(HORIZONTAL_PAGER_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+      }
       onNodeWithTag(HORIZONTAL_PAGER_TESTING_TAG)
         .performScrollToIndex(index)
       waitForIdle()
