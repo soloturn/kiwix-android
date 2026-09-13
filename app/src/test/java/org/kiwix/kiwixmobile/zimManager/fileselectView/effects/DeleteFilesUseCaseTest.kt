@@ -141,6 +141,26 @@ class DeleteFilesUseCaseTest {
   }
 
   @Test
+  fun invoke_whenCurrentBookHasNoFile_doesNotDestroyTabsOrClearSource() = runTest {
+    val currentWithoutFile =
+      BookOnDisk(
+        book = LibkiwixBook(_id = "book-id-no-file"),
+        zimReaderSource = ZimReaderSource()
+      )
+    every { zimReaderContainer.zimReaderSource } returns currentWithoutFile.zimReaderSource
+
+    val result = deleteFilesUseCase(listOf(currentWithoutFile))
+
+    assertFalse(result)
+    coVerify(exactly = 0) {
+      readerWebViewManager.destroyAllTabs()
+    }
+    coVerify(exactly = 0) {
+      zimReaderContainer.setZimReaderSource(null)
+    }
+  }
+
+  @Test
   fun invoke_whenCurrentBookIsOpenAndDeletesBook_clearsReaderSource() = runTest {
     val currentSource = book.zimReaderSource
 

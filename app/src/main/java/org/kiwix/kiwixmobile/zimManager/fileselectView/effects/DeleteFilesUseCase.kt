@@ -42,7 +42,8 @@ data class DeleteFilesUseCase @Inject constructor(
       if (!acc) {
         false
       } else {
-        val isCurrentBook = book.zimReaderSource == zimReaderContainer.zimReaderSource
+        val currentSourceForThisBook = zimReaderContainer.zimReaderSource
+        val isCurrentBook = book.zimReaderSource == currentSourceForThisBook
         if (
           isCurrentBook &&
           hasDeletionTarget(book) &&
@@ -54,10 +55,7 @@ data class DeleteFilesUseCase @Inject constructor(
           readerWebViewsDestroyed = true
         }
         val deleted = deleteBook(book)
-        if (
-          deleted &&
-          book.zimReaderSource == zimReaderContainer.zimReaderSource
-        ) {
+        if (deleted && isCurrentBook && book.zimReaderSource == currentSourceForThisBook) {
           zimReaderContainer.setZimReaderSource(null)
         }
         deleted
