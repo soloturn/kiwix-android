@@ -82,3 +82,20 @@
 -keep class com.tonyodev.fetch2.database.DownloadDatabase_Impl {
     <init>();
 }
+
+# Deprecated Android test-framework stubs referenced by androidx.test/UiAutomator
+# but never present on-device or actually called.
+-dontwarn android.test.AndroidTestRunner
+-dontwarn android.test.InstrumentationTestRunner
+-dontwarn android.test.mock.MockContentResolver
+-dontwarn androidx.test.espresso.core.internal.deps.guava.base.Preconditions
+-dontwarn androidx.test.internal.runner.hidden.ExposedInstrumentationApi
+
+# AutoValue is an annotation-processor-only dependency of the accessibility
+# testing library; its runtime classes are never packaged or called.
+-dontwarn com.google.auto.value.AutoValue
+-dontwarn com.google.auto.value.AutoValue$Builder
+
+# JNA is ByteBuddy/Mockito's optional desktop-JVM self-attach path, dead
+# weight on Android and never exercised there.
+-dontwarn com.sun.jna.**
