@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
+import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderWebViewManager
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem
@@ -29,25 +30,44 @@ import javax.inject.Inject
 
 data class DeleteFilesUseCase @Inject constructor(
   private val libkiwixBookOnDisk: LibkiwixBookOnDisk,
+  private val readerWebViewManager: ReaderWebViewManager,
   private val zimReaderContainer: ZimReaderContainer,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
   suspend operator fun invoke(
     books: List<BooksOnDiskListItem.BookOnDisk>
-  ): Boolean =
-    books.fold(true) { acc, book ->
-      acc &&
-        deleteBook(book).also {
-          if (it && book.zimReaderSource == zimReaderContainer.zimReaderSource) {
-            zimReaderContainer.setZimReaderSource(null)
-          }
+  ): Boolean {
+    var readerWebViewsDestroyed = false
+    return books.fold(true) { acc, book ->
+      if (!acc) {
+        false
+      } else {
+        val currentSourceForThisBook = zimReaderContainer.zimReaderSource
+        val isCurrentBook = book.zimReaderSource == currentSourceForThisBook
+        if (
+          isCurrentBook &&
+          hasDeletionTarget(book) &&
+          !readerWebViewsDestroyed
+        ) {
+          // Stop all WebViews first so Chromium workers no longer issue requests against
+          // the soon-to-be-disposed archive.
+          readerWebViewManager.destroyAllTabs()
+          readerWebViewsDestroyed = true
         }
+        val deleted = deleteBook(book)
+        if (deleted && isCurrentBook && book.zimReaderSource == currentSourceForThisBook) {
+          zimReaderContainer.setZimReaderSource(null)
+        }
+        deleted
+      }
     }
+  }
 
   @Suppress("ReturnCount")
   private suspend fun deleteBook(
     book: BooksOnDiskListItem.BookOnDisk
   ): Boolean {
+    if (!hasDeletionTarget(book)) return false
     val file = book.zimReaderSource.file ?: return false
 
     FileUtils.deleteZimFile(file.path, ioDispatcher)
@@ -59,4 +79,7 @@ data class DeleteFilesUseCase @Inject constructor(
     libkiwixBookOnDisk.delete(book.book.id)
     return true
   }
+
+  private fun hasDeletionTarget(book: BooksOnDiskListItem.BookOnDisk): Boolean =
+    book.zimReaderSource.file != null
 }

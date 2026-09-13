@@ -228,6 +228,25 @@ internal class SearchViewModelTest {
     }
 
     @Test
+    fun onSearchValueChanged_whenQueryHasExtraSpaces_trimsSearchTerm() = runTest {
+      val queryWithSpaces = "   Unit test   "
+      val trimmedQuery = "Unit test"
+      val suggestionSearch: SuggestionSearch = mockk()
+      coEvery {
+        searchResultGenerator.generateSearchResults(trimmedQuery, zimFileReader)
+      } returns suggestionSearch
+
+      viewModel.onSearchValueChanged(queryWithSpaces)
+      recentsFromDb.tryEmit(emptyList())
+      viewModel.actions.tryEmit(ScreenWasStartedFrom(FromWebView))
+      testScheduler.advanceTimeBy(DEBOUNCE_DELAY)
+      testScheduler.runCurrent()
+
+      assertThat(viewModel.uiState.value.searchText).isEqualTo(queryWithSpaces)
+      assertThat(viewModel.uiState.value.searchState.searchTerm).isEqualTo(trimmedQuery)
+    }
+
+    @Test
     fun onSearchClear_whenCalled_returnsEmptyText() = runTest {
       viewModel.onSearchValueChanged("hello")
       advanceUntilIdle()

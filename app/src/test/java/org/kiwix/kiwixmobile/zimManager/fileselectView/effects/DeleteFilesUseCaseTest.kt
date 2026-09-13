@@ -38,6 +38,7 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
+import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderWebViewManager
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
@@ -49,6 +50,7 @@ class DeleteFilesUseCaseTest {
   private lateinit var deleteFilesUseCase: DeleteFilesUseCase
 
   private val libkiwixBookOnDisk = mockk<LibkiwixBookOnDisk>(relaxed = true)
+  private val readerWebViewManager = mockk<ReaderWebViewManager>(relaxed = true)
   private val zimReaderContainer = mockk<ZimReaderContainer>(relaxed = true)
 
   private var file1 = File("/storage/kiwix.zim")
@@ -79,7 +81,12 @@ class DeleteFilesUseCaseTest {
     book = BookOnDisk(book = libkiwixBook, zimReaderSource = ZimReaderSource(file1))
 
     deleteFilesUseCase =
-      DeleteFilesUseCase(libkiwixBookOnDisk, zimReaderContainer, testDispatcher)
+      DeleteFilesUseCase(
+        libkiwixBookOnDisk,
+        readerWebViewManager,
+        zimReaderContainer,
+        testDispatcher
+      )
   }
 
   @AfterEach
@@ -134,6 +141,26 @@ class DeleteFilesUseCaseTest {
   }
 
   @Test
+  fun invoke_whenCurrentBookHasNoFile_doesNotDestroyTabsOrClearSource() = runTest {
+    val currentWithoutFile =
+      BookOnDisk(
+        book = LibkiwixBook(_id = "book-id-no-file"),
+        zimReaderSource = ZimReaderSource()
+      )
+    every { zimReaderContainer.zimReaderSource } returns currentWithoutFile.zimReaderSource
+
+    val result = deleteFilesUseCase(listOf(currentWithoutFile))
+
+    assertFalse(result)
+    coVerify(exactly = 0) {
+      readerWebViewManager.destroyAllTabs()
+    }
+    coVerify(exactly = 0) {
+      zimReaderContainer.setZimReaderSource(null)
+    }
+  }
+
+  @Test
   fun invoke_whenCurrentBookIsOpenAndDeletesBook_clearsReaderSource() = runTest {
     val currentSource = book.zimReaderSource
 
@@ -144,6 +171,25 @@ class DeleteFilesUseCaseTest {
     deleteFilesUseCase(listOf(book))
 
     coVerify {
+      readerWebViewManager.destroyAllTabs()
+    }
+    coVerify {
+      zimReaderContainer.setZimReaderSource(null)
+    }
+  }
+
+  @Test
+  fun invoke_whenCurrentBookIsOpenAndDeletionFails_keepsReaderSourceSet() = runTest {
+    every { zimReaderContainer.zimReaderSource } returns book.zimReaderSource
+    coEvery { file1.isFileExist(testDispatcher) } returns true
+
+    val result = deleteFilesUseCase(listOf(book))
+
+    assertFalse(result)
+    coVerify {
+      readerWebViewManager.destroyAllTabs()
+    }
+    coVerify(exactly = 0) {
       zimReaderContainer.setZimReaderSource(null)
     }
   }
@@ -158,6 +204,9 @@ class DeleteFilesUseCaseTest {
 
     deleteFilesUseCase(listOf(book))
 
+    coVerify(exactly = 0) {
+      readerWebViewManager.destroyAllTabs()
+    }
     coVerify(exactly = 0) {
       zimReaderContainer.setZimReaderSource(null)
     }
