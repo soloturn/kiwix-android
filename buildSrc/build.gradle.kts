@@ -28,6 +28,8 @@ dependencies {
   implementation("io.gitlab.arturbosch.detekt:detekt-gradle-plugin:1.23.8")
   implementation("com.googlecode.json-simple:json-simple:1.1.1")
   implementation("com.squareup.okhttp3:okhttp:4.12.0")
+  // Compose Preview Screenshot Testing, see https://developer.android.com/studio/preview/compose-screenshot-testing
+  implementation("com.android.compose.screenshot:screenshot-test-gradle-plugin:0.0.1-alpha16")
 
   implementation(gradleApi())
   implementation(localGroovy())
