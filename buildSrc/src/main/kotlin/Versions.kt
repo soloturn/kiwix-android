@@ -121,6 +121,11 @@ object Versions {
   const val PLAYSTORE_REVIEW: String = "2.0.2"
   const val KOTLIN_KSP: String = "2.3.11"
   const val ANDROIDX_MEDIA3: String = "1.11.0"
+
+  /**
+   * https://developer.android.com/studio/preview/compose-screenshot-testing-release-notes
+   */
+  const val COMPOSE_SCREENSHOT_TEST: String = "0.0.1-alpha16"
 }
 
 /**
