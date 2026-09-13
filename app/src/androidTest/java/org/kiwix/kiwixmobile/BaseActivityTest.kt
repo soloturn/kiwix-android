@@ -157,7 +157,25 @@ abstract class BaseActivityTest {
           AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(languageTag))
           onActivityLaunched?.invoke(it)
         }
+        waitUntilNavControllerInitialized()
       }
+  }
+
+  /**
+   * `navController` is only assigned during Compose's first composition
+   * (`rememberNavController()` in [KiwixMainActivity]'s content), which runs
+   * asynchronously relative to `onCreate()`/RESUMED. Poll for it so callers that
+   * navigate right after [launchMainActivity] don't race Compose's setup.
+   */
+  private fun ActivityScenario<KiwixMainActivity>.waitUntilNavControllerInitialized() {
+    val deadline = System.currentTimeMillis() + TestUtils.TEST_PAUSE_MS
+    while (System.currentTimeMillis() < deadline) {
+      var initialized = false
+      onActivity { initialized = it.isNavControllerInitialized }
+      if (initialized) return
+      Thread.sleep(50)
+    }
+    error("navController was not initialized within ${TestUtils.TEST_PAUSE_MS}ms of launching KiwixMainActivity")
   }
 
   /**
