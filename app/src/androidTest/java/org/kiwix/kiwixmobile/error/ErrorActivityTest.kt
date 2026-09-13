@@ -80,6 +80,7 @@ class ErrorActivityTest : BaseActivityTest() {
       // Click on "No, Thanks" button to see it's functionality working or not.
       clickOnNoThanksButton(composeTestRule)
       // Handle the app restart explicitly. Since test case does not handle the app restart.
+      activityScenario.close()
       activityScenario = ActivityScenario.launch(KiwixMainActivity::class.java).onActivity {
         it.navigate(KiwixDestination.Help.route)
       }
