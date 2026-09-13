@@ -46,7 +46,7 @@ data class DeleteFilesUseCase @Inject constructor(
         val wasCurrentBookBeforeDelete = book.zimReaderSource == sourceAtStart
         if (
           wasCurrentBookBeforeDelete &&
-          book.zimReaderSource.file != null &&
+          hasDeletionTarget(book) &&
           !readerWebViewsDestroyed
         ) {
           // Stop all WebViews first so Chromium workers no longer issue requests against
@@ -71,6 +71,7 @@ data class DeleteFilesUseCase @Inject constructor(
   private suspend fun deleteBook(
     book: BooksOnDiskListItem.BookOnDisk
   ): Boolean {
+    if (!hasDeletionTarget(book)) return false
     val file = book.zimReaderSource.file ?: return false
 
     FileUtils.deleteZimFile(file.path, ioDispatcher)
@@ -82,4 +83,7 @@ data class DeleteFilesUseCase @Inject constructor(
     libkiwixBookOnDisk.delete(book.book.id)
     return true
   }
+
+  private fun hasDeletionTarget(book: BooksOnDiskListItem.BookOnDisk): Boolean =
+    book.zimReaderSource.file != null
 }
