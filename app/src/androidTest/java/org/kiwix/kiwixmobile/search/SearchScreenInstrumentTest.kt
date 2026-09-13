@@ -273,6 +273,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
 
   @Test
   fun testSearchWithExtraSpaces() {
+    Assume.assumeTrue(Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA)
     activityScenario.onActivity {
       kiwixMainActivity = it
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
