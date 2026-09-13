@@ -26,6 +26,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
@@ -134,9 +135,17 @@ class KiwixReaderViewModel @Inject constructor(
   @Suppress("MagicNumber")
   private suspend fun openPageInBookFromNavigationArguments(coreMainActivity: CoreMainActivity) {
     showProgressBarWithProgress(30)
-    val zimFileUri = getNavigationResult(ZIM_FILE_URI_KEY, coreMainActivity)
-    val pageUrl = getNavigationResult(PAGE_URL_KEY, coreMainActivity)
-    val searchItemTitle = getNavigationResult(SEARCH_ITEM_TITLE_KEY, coreMainActivity)
+    // NavBackStackEntry#getSavedStateHandle lazily creates a SavedStateHandle-backed
+    // ViewModel on first access, which calls Lifecycle#addObserver — main-thread-only.
+    // Confine these calls to Main regardless of the dispatcher `initialize()` happens
+    // to be running on when it reaches here.
+    val (zimFileUri, pageUrl, searchItemTitle) = withContext(mainDispatcherImmediate()) {
+      Triple(
+        getNavigationResult(ZIM_FILE_URI_KEY, coreMainActivity),
+        getNavigationResult(PAGE_URL_KEY, coreMainActivity),
+        getNavigationResult(SEARCH_ITEM_TITLE_KEY, coreMainActivity)
+      )
+    }
 
     // Open the ZIM file with arguments.
     openZimFileWithArguments(zimFileUri, pageUrl, searchItemTitle)
