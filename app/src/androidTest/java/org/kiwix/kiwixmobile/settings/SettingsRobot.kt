@@ -166,9 +166,13 @@ class SettingsRobot : BaseRobot() {
       composeTestRule.apply {
         waitForIdle()
         waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-          onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG, true)
-            .fetchSemanticsNodes()[position]
-            .config[SemanticsProperties.Selected]
+          try {
+            onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG, true)
+              .fetchSemanticsNodes()[position]
+              .config[SemanticsProperties.Selected]
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG, true)[position]
           .assertIsSelected()

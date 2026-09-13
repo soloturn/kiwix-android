@@ -58,7 +58,11 @@ class SearchRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitUntil(FIVE_SECOND_DELAY) {
-          onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          try {
+            onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0].performClick()
       }
@@ -102,9 +106,13 @@ class SearchRobot : BaseRobot() {
         waitUntil(
           timeoutMillis = TEST_PAUSE_MS.toLong(),
           condition = {
-            onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)
-              .fetchSemanticsNodes()
-              .isNotEmpty()
+            try {
+              onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+            } catch (_: IllegalStateException) {
+              false
+            }
           }
         )
         onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0]

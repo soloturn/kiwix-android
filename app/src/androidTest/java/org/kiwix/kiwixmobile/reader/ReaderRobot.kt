@@ -163,10 +163,14 @@ class ReaderRobot : BaseRobot() {
   fun assertTabsRestored(composeTestRule: ComposeContentTestRule) {
     try {
       composeTestRule.waitUntil(FIFTEEN_SECOND_DELAY) {
-        composeTestRule
-          .onAllNodesWithTag(TABS_SIZE_TEXT_TESTING_TAG, useUnmergedTree = true)
-          .fetchSemanticsNodes()
-          .isNotEmpty()
+        try {
+          composeTestRule
+            .onAllNodesWithTag(TABS_SIZE_TEXT_TESTING_TAG, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+        } catch (_: IllegalStateException) {
+          false
+        }
       }
     } catch (e: ComposeTimeoutException) {
       Log.e(TAG, "The tab icon is not visible due to scroll. Original exception: $e")

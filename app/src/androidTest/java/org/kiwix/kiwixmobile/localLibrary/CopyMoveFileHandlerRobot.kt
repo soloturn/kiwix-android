@@ -93,7 +93,11 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitUntil(FIVE_SECOND_DELAY) {
-          onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          try {
+            onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         onAllNodesWithTag(STORAGE_DEVICE_ITEM_TESTING_TAG)[0].performClick()
       }
@@ -136,10 +140,14 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
   fun assertZimFileCopiedAndShowingIntoTheReader(composeTestRule: ComposeContentTestRule) {
     // Wait for copying the ZIM file and opening in the reader.
     composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-      composeTestRule
-        .onAllNodesWithTag(READER_SCREEN_TESTING_TAG)
-        .fetchSemanticsNodes()
-        .isNotEmpty()
+      try {
+        composeTestRule
+          .onAllNodesWithTag(READER_SCREEN_TESTING_TAG)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+      } catch (_: IllegalStateException) {
+        false
+      }
     }
     testFlakyView({
       composeTestRule.waitUntilTimeout()
