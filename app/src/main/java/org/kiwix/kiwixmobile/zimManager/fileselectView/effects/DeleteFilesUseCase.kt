@@ -41,13 +41,17 @@ data class DeleteFilesUseCase @Inject constructor(
       if (!acc) {
         false
       } else {
-        if (book.zimReaderSource == zimReaderContainer.zimReaderSource) {
+        val isCurrentBook = book.zimReaderSource == zimReaderContainer.zimReaderSource
+        if (isCurrentBook) {
           // Stop all WebViews first so Chromium workers no longer issue requests against
           // the soon-to-be-disposed archive.
           readerWebViewManager.destroyAllTabs()
+        }
+        val deleted = deleteBook(book)
+        if (deleted && isCurrentBook) {
           zimReaderContainer.setZimReaderSource(null)
         }
-        deleteBook(book)
+        deleted
       }
     }
 

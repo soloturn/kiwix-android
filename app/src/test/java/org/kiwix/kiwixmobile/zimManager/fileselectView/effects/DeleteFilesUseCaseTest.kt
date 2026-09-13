@@ -159,7 +159,7 @@ class DeleteFilesUseCaseTest {
   }
 
   @Test
-  fun invoke_whenCurrentBookIsOpenAndDeletionFails_stillClearsReaderSourceFirst() = runTest {
+  fun invoke_whenCurrentBookIsOpenAndDeletionFails_keepsReaderSourceSet() = runTest {
     every { zimReaderContainer.zimReaderSource } returns book.zimReaderSource
     coEvery { file1.isFileExist(testDispatcher) } returns true
 
@@ -169,7 +169,7 @@ class DeleteFilesUseCaseTest {
     coVerify {
       readerWebViewManager.destroyAllTabs()
     }
-    coVerify {
+    coVerify(exactly = 0) {
       zimReaderContainer.setZimReaderSource(null)
     }
   }
