@@ -159,6 +159,22 @@ class DeleteFilesUseCaseTest {
   }
 
   @Test
+  fun invoke_whenCurrentBookIsOpenAndDeletionFails_stillClearsReaderSourceFirst() = runTest {
+    every { zimReaderContainer.zimReaderSource } returns book.zimReaderSource
+    coEvery { file1.isFileExist(testDispatcher) } returns true
+
+    val result = deleteFilesUseCase(listOf(book))
+
+    assertFalse(result)
+    coVerify {
+      readerWebViewManager.destroyAllTabs()
+    }
+    coVerify {
+      zimReaderContainer.setZimReaderSource(null)
+    }
+  }
+
+  @Test
   fun invoke_whenDifferentBookIsOpenAndDeletesBook_doesNotClearReaderSource() = runTest {
     val file2Source = ZimReaderSource(file2)
 

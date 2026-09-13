@@ -38,15 +38,17 @@ data class DeleteFilesUseCase @Inject constructor(
     books: List<BooksOnDiskListItem.BookOnDisk>
   ): Boolean =
     books.fold(true) { acc, book ->
-      acc &&
-        deleteBook(book).also {
-          if (it && book.zimReaderSource == zimReaderContainer.zimReaderSource) {
-            // Stop all WebViews first so Chromium workers no longer issue requests against
-            // the soon-to-be-disposed archive.
-            readerWebViewManager.destroyAllTabs()
-            zimReaderContainer.setZimReaderSource(null)
-          }
+      if (!acc) {
+        false
+      } else {
+        if (book.zimReaderSource == zimReaderContainer.zimReaderSource) {
+          // Stop all WebViews first so Chromium workers no longer issue requests against
+          // the soon-to-be-disposed archive.
+          readerWebViewManager.destroyAllTabs()
+          zimReaderContainer.setZimReaderSource(null)
         }
+        deleteBook(book)
+      }
     }
 
   @Suppress("ReturnCount")
