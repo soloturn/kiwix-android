@@ -316,6 +316,12 @@ object Libs {
 
   const val COMPOSE_TOOLING = "androidx.compose.ui:ui-tooling:${Versions.COMPOSE_VERSION}"
 
+  /**
+   * https://developer.android.com/studio/preview/compose-screenshot-testing
+   */
+  const val SCREENSHOT_VALIDATION_API =
+    "com.android.tools.screenshot:screenshot-validation-api:${Versions.COMPOSE_SCREENSHOT_TEST}"
+
   const val COMPOSE_UI_TEST_JUNIT = "androidx.compose.ui:ui-test-junit4:${Versions.COMPOSE_VERSION}"
   const val COMPOSE_UI_TEST_JUNIT_ACCESSIBILITY =
     "androidx.compose.ui:ui-test-junit4-accessibility:${Versions.COMPOSE_ACCESSIBILITY_TEST_VERSION}"
