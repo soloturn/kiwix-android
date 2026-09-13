@@ -43,9 +43,14 @@ class ErrorActivityRobot : BaseRobot() {
   fun assertSendDiagnosticReportDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitUntil(FIFTEEN_SECOND_DELAY) {
-        onAllNodesWithTag(SEND_DIAGNOSTIC_REPORT_TESTING_TAG)
-          .fetchSemanticsNodes()
-          .isNotEmpty()
+        try {
+          onAllNodesWithTag(SEND_DIAGNOSTIC_REPORT_TESTING_TAG)
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+        } catch (_: IllegalStateException) {
+          // No compose hierarchy attached yet during the activity transition; keep polling.
+          false
+        }
       }
       onNodeWithTag(SEND_DIAGNOSTIC_REPORT_TESTING_TAG).assertIsDisplayed()
     }
@@ -61,9 +66,14 @@ class ErrorActivityRobot : BaseRobot() {
   fun assertErrorActivityDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitUntil(FIFTEEN_SECOND_DELAY) {
-        onAllNodesWithText(context.getString(R.string.diagnostic_report))
-          .fetchSemanticsNodes()
-          .isNotEmpty()
+        try {
+          onAllNodesWithText(context.getString(R.string.diagnostic_report))
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+        } catch (_: IllegalStateException) {
+          // No compose hierarchy attached yet during the activity transition; keep polling.
+          false
+        }
       }
       onNodeWithText(context.getString(R.string.diagnostic_report))
         .assertExists()
