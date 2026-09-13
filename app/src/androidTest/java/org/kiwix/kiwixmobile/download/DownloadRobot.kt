@@ -89,10 +89,14 @@ class DownloadRobot : BaseRobot() {
     repeat(maxRetries) { attempt ->
       try {
         composeTestRule.waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-          composeTestRule
-            .onAllNodesWithTag(ONLINE_BOOK_ITEM_TESTING_TAG)
-            .fetchSemanticsNodes()
-            .isNotEmpty()
+          try {
+            composeTestRule
+              .onAllNodesWithTag(ONLINE_BOOK_ITEM_TESTING_TAG)
+              .fetchSemanticsNodes()
+              .isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         Log.d(KIWIX_DOWNLOAD_TEST, "Online library loaded")
         return@waitForDataToLoad
@@ -220,7 +224,11 @@ class DownloadRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitUntil(TestUtils.TEST_PAUSE_MS.toLong()) {
-          onAllNodesWithTag(ONLINE_BOOK_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          try {
+            onAllNodesWithTag(ONLINE_BOOK_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         onAllNodesWithTag(ONLINE_BOOK_ITEM_TESTING_TAG).onFirst().performClick()
       }
@@ -231,9 +239,13 @@ class DownloadRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-          onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
-            .fetchSemanticsNodes()
-            .isNotEmpty()
+          try {
+            onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
+              .fetchSemanticsNodes()
+              .isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
       }
     })
@@ -243,9 +255,13 @@ class DownloadRobot : BaseRobot() {
     composeTestRule.apply {
       runCatching {
         waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-          onAllNodesWithTag(DOWNLOADING_PAUSE_BUTTON_TESTING_TAG)
-            .fetchSemanticsNodes()
-            .isNotEmpty()
+          try {
+            onAllNodesWithTag(DOWNLOADING_PAUSE_BUTTON_TESTING_TAG)
+              .fetchSemanticsNodes()
+              .isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         onAllNodesWithTag(DOWNLOADING_PAUSE_BUTTON_TESTING_TAG).onFirst().performClick()
       }.onFailure {
@@ -262,11 +278,15 @@ class DownloadRobot : BaseRobot() {
     composeTestRule.apply {
       runCatching {
         waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-          val resumeNodes = onAllNodesWithTag(DOWNLOADING_PAUSE_BUTTON_TESTING_TAG)
-            .fetchSemanticsNodes()
-          val stopNodes = onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
-            .fetchSemanticsNodes()
-          resumeNodes.isNotEmpty() || stopNodes.isEmpty()
+          try {
+            val resumeNodes = onAllNodesWithTag(DOWNLOADING_PAUSE_BUTTON_TESTING_TAG)
+              .fetchSemanticsNodes()
+            val stopNodes = onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
+              .fetchSemanticsNodes()
+            resumeNodes.isNotEmpty() || stopNodes.isEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         val nodes = onAllNodesWithTag(DOWNLOADING_PAUSE_BUTTON_TESTING_TAG).fetchSemanticsNodes()
         if (nodes.isNotEmpty()) {
@@ -308,6 +328,8 @@ class DownloadRobot : BaseRobot() {
               true // Text changed!
             }
           }
+        } catch (_: IllegalStateException) {
+          false // No compose hierarchy attached yet during the activity transition; keep polling.
         } catch (_: AssertionError) {
           true // Any other error, we treat as "it's not paused anymore" or "it's gone"
         }
@@ -359,10 +381,14 @@ class DownloadRobot : BaseRobot() {
       composeTestRule.waitUntil(timeoutMillis) {
         resumeDownloadIfPaused(composeTestRule, kiwixMainActivity)
         val downloadInProgress =
-          composeTestRule
-            .onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
-            .fetchSemanticsNodes()
-            .isNotEmpty()
+          try {
+            composeTestRule
+              .onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
+              .fetchSemanticsNodes()
+              .isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
 
         if (downloadInProgress) {
           Log.d(
@@ -421,7 +447,11 @@ class DownloadRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitUntil(TestUtils.TEST_PAUSE_MS.toLong()) {
-          onAllNodesWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          try {
+            onAllNodesWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         onNodeWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG)
           .assertTextEquals(kiwixMainActivity.getString(string.confirm_stop_download_title))
@@ -433,9 +463,13 @@ class DownloadRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitUntil(TestUtils.TEST_PAUSE_MS.toLong()) {
-          onAllNodesWithTag(ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG)
-            .fetchSemanticsNodes()
-            .isNotEmpty()
+          try {
+            onAllNodesWithTag(ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG)
+              .fetchSemanticsNodes()
+              .isNotEmpty()
+          } catch (_: IllegalStateException) {
+            false
+          }
         }
         onNodeWithTag(ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG).performClick()
       }
@@ -463,9 +497,13 @@ class DownloadRobot : BaseRobot() {
   fun stopDownload(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-        onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
-          .fetchSemanticsNodes()
-          .isNotEmpty()
+        try {
+          onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG)
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+        } catch (_: IllegalStateException) {
+          false
+        }
       }
       onAllNodesWithTag(DOWNLOADING_STOP_BUTTON_TESTING_TAG).onFirst().performClick()
       waitForIdle()

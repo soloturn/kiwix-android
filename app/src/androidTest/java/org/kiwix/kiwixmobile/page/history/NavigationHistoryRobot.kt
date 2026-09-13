@@ -127,11 +127,15 @@ class NavigationHistoryRobot : BaseRobot() {
 
   fun assertBackwardNavigationHistoryDialogDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.waitUntil(timeoutMillis = TEST_PAUSE_MS_FOR_SEARCH_TEST.toLong()) {
-      composeTestRule
-        .onAllNodesWithTag(TOOLBAR_TITLE_TESTING_TAG)
-        .filter(hasText(context.getString(R.string.backward_history), ignoreCase = true))
-        .fetchSemanticsNodes()
-        .isNotEmpty()
+      try {
+        composeTestRule
+          .onAllNodesWithTag(TOOLBAR_TITLE_TESTING_TAG)
+          .filter(hasText(context.getString(R.string.backward_history), ignoreCase = true))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+      } catch (_: IllegalStateException) {
+        false
+      }
     }
 
     composeTestRule
@@ -151,11 +155,15 @@ class NavigationHistoryRobot : BaseRobot() {
 
   fun assertForwardNavigationHistoryDialogDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.waitUntil(timeoutMillis = TEST_PAUSE_MS_FOR_SEARCH_TEST.toLong()) {
-      composeTestRule
-        .onAllNodesWithTag(TOOLBAR_TITLE_TESTING_TAG)
-        .filter(hasText(context.getString(R.string.forward_history), ignoreCase = true))
-        .fetchSemanticsNodes()
-        .isNotEmpty()
+      try {
+        composeTestRule
+          .onAllNodesWithTag(TOOLBAR_TITLE_TESTING_TAG)
+          .filter(hasText(context.getString(R.string.forward_history), ignoreCase = true))
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+      } catch (_: IllegalStateException) {
+        false
+      }
     }
 
     composeTestRule
@@ -177,10 +185,14 @@ class NavigationHistoryRobot : BaseRobot() {
 
   fun assertDeleteDialogDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.waitUntil(timeoutMillis = TEST_PAUSE_MS_FOR_SEARCH_TEST.toLong()) {
-      composeTestRule
-        .onAllNodesWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG)
-        .fetchSemanticsNodes()
-        .isNotEmpty()
+      try {
+        composeTestRule
+          .onAllNodesWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+      } catch (_: IllegalStateException) {
+        false
+      }
     }
 
     composeTestRule
