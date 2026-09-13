@@ -273,6 +273,8 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
 
   @Test
   fun testSearchWithExtraSpaces() {
+    // API 36+ emulator WebView crashes with SIGTRAP ("Detected dangling raw_ptr") in CI.
+    // Skip until the upstream system image/WebView issue is fixed.
     Assume.assumeTrue(Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA)
     activityScenario.onActivity {
       kiwixMainActivity = it
