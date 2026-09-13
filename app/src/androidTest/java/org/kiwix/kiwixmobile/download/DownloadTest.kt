@@ -269,6 +269,7 @@ class DownloadTest : BaseActivityTest() {
       context.startActivity(intent)
       InstrumentationRegistry.getInstrumentation().waitForIdleSync()
 
+      activityScenario.close()
       activityScenario = ActivityScenario.launch(KiwixMainActivity::class.java).apply {
         moveToState(Lifecycle.State.RESUMED)
         onActivity {
@@ -338,6 +339,7 @@ class DownloadTest : BaseActivityTest() {
       context.startActivity(intent)
       InstrumentationRegistry.getInstrumentation().waitForIdleSync()
 
+      activityScenario.close()
       activityScenario = ActivityScenario.launch(KiwixMainActivity::class.java).apply {
         moveToState(Lifecycle.State.RESUMED)
         onActivity {
