@@ -48,7 +48,7 @@ data class DeleteFilesUseCase @Inject constructor(
           readerWebViewManager.destroyAllTabs()
         }
         val deleted = deleteBook(book)
-        if (deleted && isCurrentBook) {
+        if (deleted && book.zimReaderSource == zimReaderContainer.zimReaderSource) {
           zimReaderContainer.setZimReaderSource(null)
         }
         deleted
