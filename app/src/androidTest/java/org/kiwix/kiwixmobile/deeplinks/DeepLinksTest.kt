@@ -25,7 +25,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.core.content.FileProvider

@@ -19,7 +19,7 @@
 package org.kiwix.kiwixmobile.onlineCategory
 
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.filters.LargeTest
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest

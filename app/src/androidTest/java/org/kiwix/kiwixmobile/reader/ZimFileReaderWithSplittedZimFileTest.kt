@@ -19,7 +19,7 @@
 package org.kiwix.kiwixmobile.reader
 
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.core.net.toUri
 import androidx.navigation.NavOptions
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement

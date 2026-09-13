@@ -93,19 +93,23 @@ object Versions {
 
   const val fetch: String = "3.4.1"
 
-  const val COMPOSE_ACTIVITY_VERSION = "1.10.0"
+  const val COMPOSE_ACTIVITY_VERSION = "1.13.0"
 
-  const val COMPOSE_VERSION = "1.7.8"
+  const val COMPOSE_VERSION = "1.12.0"
 
-  const val COMPOSE_ACCESSIBILITY_TEST_VERSION = "1.8.0"
+  const val COMPOSE_ACCESSIBILITY_TEST_VERSION = "1.12.0"
 
-  const val COMPOSE_MATERIAL3 = "1.3.1"
+  const val COMPOSE_MATERIAL3 = "1.4.0"
+
+  // material-icons-core/-extended version tracks the old compose-ui line, not COMPOSE_VERSION -
+  // the BOM still maps it to 1.7.8 even alongside ui/material3 1.12.0/1.4.0.
+  const val COMPOSE_MATERIAL_ICONS = "1.7.8"
 
   const val TURBINE_FLOW_TEST = "1.2.1"
 
   const val COIL_COMPOSE = "3.2.0"
 
-  const val COMPOSE_NAVIGATION = "2.7.7"
+  const val COMPOSE_NAVIGATION = "2.10.1"
 
   const val HILT_NAVIGATION_COMPOSE = "1.2.0"
 

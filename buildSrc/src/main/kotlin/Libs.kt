@@ -315,6 +315,13 @@ object Libs {
     "androidx.compose.material3:material3:${Versions.COMPOSE_MATERIAL3}"
 
   /**
+   * material3 no longer pulls this in transitively as of 1.4.0 - every
+   * Icons.Filled/Icons.AutoMirrored.Filled usage in the app needs it declared directly now.
+   */
+  const val COMPOSE_MATERIAL_ICONS_CORE: String =
+    "androidx.compose.material:material-icons-core:${Versions.COMPOSE_MATERIAL_ICONS}"
+
+  /**
    * https://developer.android.com/reference/kotlin/androidx/activity/compose
    */
   const val ANDROIDX_ACTIVITY_COMPOSE: String =

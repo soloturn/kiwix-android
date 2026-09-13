@@ -20,7 +20,7 @@ package org.kiwix.kiwixmobile.note
 
 import android.os.Build
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest

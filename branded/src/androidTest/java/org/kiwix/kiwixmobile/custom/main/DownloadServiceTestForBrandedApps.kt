@@ -23,7 +23,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
