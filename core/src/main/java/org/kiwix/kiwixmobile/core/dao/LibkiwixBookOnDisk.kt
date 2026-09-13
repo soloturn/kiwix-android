@@ -29,7 +29,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -265,8 +264,8 @@ class LibkiwixBookOnDisk @Inject constructor(
     }
   }
 
-  private val localBooksFlow: MutableStateFlow<List<LibkiwixBook>?> by lazy {
-    MutableStateFlow<List<LibkiwixBook>?>(null).also { flow ->
+  private val localBooksFlow: MutableSharedFlow<List<LibkiwixBook>?> by lazy {
+    MutableSharedFlow<List<LibkiwixBook>?>(replay = 1).also { flow ->
       CoroutineScope(ioDispatcher).launch {
         runCatching {
           flow.emit(getBooksList())
@@ -426,8 +425,8 @@ class LibkiwixBookOnDisk @Inject constructor(
 
       if (newBooks.isNotEmpty()) {
         writeBookMarksAndSaveLibraryToFile()
-        updateLocalBooksFlow()
       }
+      updateLocalBooksFlow()
     }
   }
 
