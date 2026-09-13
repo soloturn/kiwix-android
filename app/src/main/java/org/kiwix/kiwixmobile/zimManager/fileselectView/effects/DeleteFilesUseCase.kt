@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
+import org.kiwix.kiwixmobile.core.main.reader.helper.ReaderWebViewManager
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem
@@ -29,6 +30,7 @@ import javax.inject.Inject
 
 data class DeleteFilesUseCase @Inject constructor(
   private val libkiwixBookOnDisk: LibkiwixBookOnDisk,
+  private val readerWebViewManager: ReaderWebViewManager,
   private val zimReaderContainer: ZimReaderContainer,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
@@ -39,6 +41,9 @@ data class DeleteFilesUseCase @Inject constructor(
       acc &&
         deleteBook(book).also {
           if (it && book.zimReaderSource == zimReaderContainer.zimReaderSource) {
+            // Stop all WebViews first so Chromium workers no longer issue requests against
+            // the soon-to-be-disposed archive.
+            readerWebViewManager.destroyAllTabs()
             zimReaderContainer.setZimReaderSource(null)
           }
         }
