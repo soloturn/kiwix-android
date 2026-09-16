@@ -68,6 +68,9 @@ class SearchRobot {
           searchView.performTextInput(char.toString())
           if (wait != 0L) {
             waitUntilTimeout(wait)
+          } else {
+            // Let recomposition catch up so back-to-back input doesn't drop a character.
+            waitForIdle()
           }
         }
       }
