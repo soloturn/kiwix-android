@@ -115,15 +115,21 @@ class LibkiwixBookmarks @Inject constructor(
       if (initialized) return@withLock
       withContext(ioDispatcher) {
         // Check if bookmark folder exist if not then create the folder first.
-        if (!File(bookmarksFolderPath()).isFileExist(ioDispatcher)) File(bookmarksFolderPath()).mkdir()
+        val folder = File(bookmarksFolderPath())
+        if (!folder.isFileExist(ioDispatcher)) folder.mkdirs()
+        check(folder.exists()) { "Could not create bookmarks folder: ${folder.path}" }
         // Check if library file exist if not then create the file to save the library with book information.
-        if (!libraryFile().isFileExist(ioDispatcher)) libraryFile().createNewFile()
+        val library = libraryFile()
+        if (!library.isFileExist(ioDispatcher)) library.createNewFile()
+        check(library.exists()) { "Could not create library file: ${library.path}" }
         // set up manager to read the library from this file
-        manager.readFile(libraryFile().canonicalPath)
+        manager.readFile(library.canonicalPath)
         // Check if bookmark file exist if not then create the file to save the bookmarks.
-        if (!bookmarkFile().isFileExist(ioDispatcher)) bookmarkFile().createNewFile()
+        val bookmark = bookmarkFile()
+        if (!bookmark.isFileExist(ioDispatcher)) bookmark.createNewFile()
+        check(bookmark.exists()) { "Could not create bookmark file: ${bookmark.path}" }
         // set up manager to read the bookmarks from this file
-        manager.readBookmarkFile(bookmarkFile().canonicalPath)
+        manager.readBookmarkFile(bookmark.canonicalPath)
         initialized = true
       }
     }
@@ -464,7 +470,8 @@ class LibkiwixBookmarks @Inject constructor(
     fileName: String
   ): File {
     val rootFolder = File(EXPORT_BOOK_MARK_PATH)
-    if (!rootFolder.isFileExist(ioDispatcher)) rootFolder.mkdir()
+    if (!rootFolder.isFileExist(ioDispatcher)) rootFolder.mkdirs()
+    check(rootFolder.exists()) { "Could not create bookmark export folder: ${rootFolder.path}" }
     return sequence {
       yield(File(rootFolder, fileName))
       yieldAll(
