@@ -19,14 +19,16 @@
 package org.kiwix.kiwixmobile.nav.destination.library
 
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onNodeWithTag
 import applyWithViewHierarchyPrinting
 import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.ui.components.TOOLBAR_TITLE_TESTING_TAG
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 
 fun onlineLibrary(func: OnlineLibraryRobot.() -> Unit) =
   OnlineLibraryRobot().applyWithViewHierarchyPrinting(func)
@@ -36,9 +38,15 @@ class OnlineLibraryRobot : BaseRobot() {
     testFlakyView({
       composeContentTestRule.apply {
         waitForIdle()
-        waitUntilTimeout()
-        onNodeWithTag(TOOLBAR_TITLE_TESTING_TAG)
-          .assertTextEquals(context.getString(string.download))
+        val expectedTitle = context.getString(string.download)
+        // Poll for the title instead of a fixed sleep-then-check-once,
+        // which can fire before the shortcut intent's delayed navigation.
+        waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+          onAllNodes(hasTestTag(TOOLBAR_TITLE_TESTING_TAG).and(hasText(expectedTitle)))
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+        }
+        onNodeWithTag(TOOLBAR_TITLE_TESTING_TAG).assertTextEquals(expectedTitle)
       }
     })
   }
