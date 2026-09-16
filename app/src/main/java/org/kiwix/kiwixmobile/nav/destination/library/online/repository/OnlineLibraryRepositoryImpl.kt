@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.nav.destination.library.online.repository
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -29,6 +30,7 @@ import org.kiwix.kiwixmobile.core.di.OPDSKiwixService
 import org.kiwix.kiwixmobile.core.di.modules.KIWIX_OPDS_LIBRARY_URL
 import org.kiwix.kiwixmobile.core.ui.components.ONE
 import org.kiwix.kiwixmobile.core.utils.FIVE
+import org.kiwix.kiwixmobile.core.utils.files.Log
 import org.kiwix.kiwixmobile.data.remote.OnlineLibraryManager
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryRequest
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState
@@ -77,6 +79,14 @@ class OnlineLibraryRepositoryImpl @Inject constructor(
         emit(Success(request, books, totalPages))
         return@flow
       } catch (ignore: Exception) {
+        // Cancellation isn't a retry-able failure - respect it and stop, don't
+        // spend the remaining attempts fighting an already-cancelled scope.
+        if (ignore is CancellationException) throw ignore
+        Log.e(
+          "OnlineLibraryRepository",
+          "fetchOnlineLibrary attempt ${attempt + ONE}/$maxRetries failed",
+          ignore
+        )
         if (attempt == maxRetries - ONE) {
           emit(Error(request, ignore))
         }
