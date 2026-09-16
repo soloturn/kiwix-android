@@ -19,6 +19,8 @@
 package org.kiwix.kiwixmobile.webserver
 
 import android.Manifest
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
@@ -97,6 +99,7 @@ class ZimHostScreenInstrumentTest : BaseActivityTest() {
   @Test
   fun testZimHostScreen() {
     if (isWifiEnabled() && Build.VERSION.SDK_INT != Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+      waitUntilActiveNetworkIsWifi()
       activityScenario.onActivity {
         kiwixMainActivity = it
         it.navigate(KiwixDestination.Library.route)
@@ -173,6 +176,19 @@ class ZimHostScreenInstrumentTest : BaseActivityTest() {
     return wifiManager?.isWifiEnabled == true
   }
 
+  // The app shows the WiFi dialog only once the active network is WiFi, which can lag behind
+  // the radio being enabled; otherwise it shows the manual-hotspot dialog instead.
+  private fun waitUntilActiveNetworkIsWifi() {
+    val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+    val deadline = System.currentTimeMillis() + WIFI_CONNECT_WAIT_MS
+    while (System.currentTimeMillis() < deadline) {
+      val capabilities =
+        connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+      if (capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) return
+      Thread.sleep(WIFI_CONNECT_POLL_MS)
+    }
+  }
+
   @Test
   fun testZIMFilesShowingOnZimHostScreen() {
     activityScenario.onActivity {
@@ -208,5 +224,10 @@ class ZimHostScreenInstrumentTest : BaseActivityTest() {
   @After
   fun finish() {
     context.let(TestUtils::deleteTemporaryFilesOfTestCases)
+  }
+
+  private companion object {
+    const val WIFI_CONNECT_WAIT_MS = 15_000L
+    const val WIFI_CONNECT_POLL_MS = 500L
   }
 }

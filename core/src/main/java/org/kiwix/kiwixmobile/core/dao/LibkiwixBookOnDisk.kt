@@ -232,15 +232,15 @@ class LibkiwixBookOnDisk @Inject constructor(
       if (isManagerInitialized) return@withLock true
       withContext(ioDispatcher) {
         // Check if ZIM files folder exist if not then create the folder first.
-        if (!File(localBookFolderPath()).isFileExist(ioDispatcher)) {
-          File(localBookFolderPath()).mkdirs()
-        }
+        val folder = File(localBookFolderPath())
+        if (!folder.isFileExist(ioDispatcher)) folder.mkdirs()
+        check(folder.exists()) { "Could not create ZIM files folder: ${folder.path}" }
         // Check if library file exist if not then create the file to save the library with book information.
-        if (!libraryFile().isFileExist(ioDispatcher)) {
-          libraryFile().createNewFile()
-        }
+        val libraryXmlFile = libraryFile()
+        if (!libraryXmlFile.isFileExist(ioDispatcher)) libraryXmlFile.createNewFile()
+        check(libraryXmlFile.exists()) { "Could not create library file: ${libraryXmlFile.path}" }
         // set up manager to read the library from this file
-        manager.readFile(libraryFile().canonicalPath)
+        manager.readFile(libraryXmlFile.canonicalPath)
         isManagerInitialized = true
       }
     }
