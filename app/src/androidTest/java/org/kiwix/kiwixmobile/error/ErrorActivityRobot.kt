@@ -44,7 +44,7 @@ class ErrorActivityRobot : BaseRobot() {
     composeTestRule.apply {
       waitUntil(FIFTEEN_SECOND_DELAY) {
         onAllNodesWithTag(SEND_DIAGNOSTIC_REPORT_TESTING_TAG)
-          .fetchSemanticsNodes()
+          .fetchSemanticsNodes(atLeastOneRootRequired = false)
           .isNotEmpty()
       }
       onNodeWithTag(SEND_DIAGNOSTIC_REPORT_TESTING_TAG).assertIsDisplayed()
@@ -62,7 +62,7 @@ class ErrorActivityRobot : BaseRobot() {
     composeTestRule.apply {
       waitUntil(FIFTEEN_SECOND_DELAY) {
         onAllNodesWithText(context.getString(R.string.diagnostic_report))
-          .fetchSemanticsNodes()
+          .fetchSemanticsNodes(atLeastOneRootRequired = false)
           .isNotEmpty()
       }
       onNodeWithText(context.getString(R.string.diagnostic_report))

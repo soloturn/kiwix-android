@@ -19,8 +19,11 @@
 package org.kiwix.kiwixmobile.webserver
 
 import android.Manifest
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.util.Log
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -30,6 +33,7 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
 import leakcanary.LeakAssertions
 import org.junit.After
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -97,6 +101,10 @@ class ZimHostScreenInstrumentTest : BaseActivityTest() {
   @Test
   fun testZimHostScreen() {
     if (isWifiEnabled() && Build.VERSION.SDK_INT != Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+      assumeTrue(
+        "Wi-Fi is enabled but the active network did not become Wi-Fi",
+        waitUntilActiveNetworkIsWifi()
+      )
       activityScenario.onActivity {
         kiwixMainActivity = it
         it.navigate(KiwixDestination.Library.route)
@@ -173,6 +181,26 @@ class ZimHostScreenInstrumentTest : BaseActivityTest() {
     return wifiManager?.isWifiEnabled == true
   }
 
+  // The app shows the WiFi dialog only once the active network is WiFi, which can lag behind
+  // the radio being enabled; otherwise it shows the manual-hotspot dialog instead.
+  private fun waitUntilActiveNetworkIsWifi(): Boolean {
+    val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+    val deadline = System.currentTimeMillis() + WIFI_CONNECT_WAIT_MS
+    var lastCapabilities: NetworkCapabilities? = null
+    while (System.currentTimeMillis() < deadline) {
+      lastCapabilities =
+        connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+      if (lastCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) return true
+      Thread.sleep(WIFI_CONNECT_POLL_MS)
+    }
+    Log.w(
+      TAG,
+      "Active network did not become Wi-Fi within ${WIFI_CONNECT_WAIT_MS}ms; " +
+        "wifiEnabled=${isWifiEnabled()}, capabilities=$lastCapabilities"
+    )
+    return false
+  }
+
   @Test
   fun testZIMFilesShowingOnZimHostScreen() {
     activityScenario.onActivity {
@@ -208,5 +236,11 @@ class ZimHostScreenInstrumentTest : BaseActivityTest() {
   @After
   fun finish() {
     context.let(TestUtils::deleteTemporaryFilesOfTestCases)
+  }
+
+  private companion object {
+    const val TAG = "ZimHostScreenTest"
+    const val WIFI_CONNECT_WAIT_MS = 15_000L
+    const val WIFI_CONNECT_POLL_MS = 500L
   }
 }

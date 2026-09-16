@@ -85,7 +85,7 @@ class DeepLinksTest : BaseActivityTest() {
   fun fileTypeDeepLinkTest() {
     loadZimFileInApplicationAndReturnSchemeTypeUri("file")?.let {
       // Launch the activity to test the deep link
-      ActivityScenario
+      activityScenario = ActivityScenario
         .launch<KiwixMainActivity>(
           createDeepLinkIntent(it, "application/octet-stream")
         ).onActivity {}
@@ -116,11 +116,11 @@ class DeepLinksTest : BaseActivityTest() {
     }
   }
 
-  @Test
+  @Test(timeout = 120_000)
   fun contentTypeDeepLinkTest() {
     loadZimFileInApplicationAndReturnSchemeTypeUri("content")?.let {
       // Launch the activity to test the deep link
-      ActivityScenario
+      activityScenario = ActivityScenario
         .launch<KiwixMainActivity>(
           createDeepLinkIntent(it, "application/octet-stream")
         ).onActivity {}
@@ -161,8 +161,9 @@ class DeepLinksTest : BaseActivityTest() {
       refreshList(composeTestRule)
       waitUntilZimFilesRefreshing(composeTestRule)
     }
+    activityScenario.close()
     // it tests the zim deep link e.g. (zim://60094d1e-1c9a-a60b-2011-4fb02f8db6c3/A/Android_(operating_system).html)
-    ActivityScenario
+    activityScenario = ActivityScenario
       .launch<KiwixMainActivity>(
         createDeepLinkIntent("zim://60094d1e-1c9a-a60b-2011-4fb02f8db6c3/A/Android_(operating_system).html".toUri())
       ).onActivity {}
@@ -179,7 +180,7 @@ class DeepLinksTest : BaseActivityTest() {
   fun testZimHostDeepLink() {
     // For testing the deep link triggers when user click on notification of the hotspot.
     // it should open the WIFI-Hotspot screen.
-    ActivityScenario
+    activityScenario = ActivityScenario
       .launch<KiwixMainActivity>(
         createDeepLinkIntent(ZIM_HOST_NAV_DEEP_LINK.toUri())
       ).onActivity {}
@@ -199,7 +200,7 @@ class DeepLinksTest : BaseActivityTest() {
         putExtra(ZIM_FILE_URI_KEY, zimFileUri.toString())
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
-      ActivityScenario.launch<KiwixMainActivity>(intent).onActivity {}
+      activityScenario = ActivityScenario.launch<KiwixMainActivity>(intent).onActivity {}
       composeTestRule.mainClock.advanceTimeBy(500)
       composeTestRule.waitForIdle()
       deepLink {
