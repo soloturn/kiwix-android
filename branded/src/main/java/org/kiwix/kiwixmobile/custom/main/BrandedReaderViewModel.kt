@@ -270,7 +270,10 @@ class BrandedReaderViewModel @Inject constructor(
     runCatching {
       File(getDemoFilePathForBrandedApp(context)).also {
         if (!it.isFileExist(ioDispatcher)) it.createNewFile()
+        check(it.exists()) { "Could not create demo file: ${it.path}" }
       }
+    }.onFailure {
+      Log.e(TAG_KIWIX, "Could not create demo file. Original exception = $it")
     }
   }
 
