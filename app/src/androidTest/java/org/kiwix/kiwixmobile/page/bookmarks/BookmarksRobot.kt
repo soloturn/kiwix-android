@@ -309,5 +309,12 @@ class BookmarksRobot : BaseRobot() {
         onAllNodesWithTag(PAGE_ITEM_TESTING_TAG)[0].performClick()
       }
     })
+    // Unlike the initial ZIM open, nothing here waited for the reader screen
+    // to actually come up before the caller checks WebView content.
+    composeTestRule.waitUntil(TEST_PAUSE_MS.toLong()) {
+      composeTestRule
+        .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
+        .isDisplayed()
+    }
   }
 }
