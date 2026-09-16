@@ -31,6 +31,7 @@ import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavOptions
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
@@ -260,6 +261,7 @@ class BrandedReaderViewModel @Inject constructor(
           val book = Book().apply { update(zimFileReader.jniKiwixReader) }
           repositoryActions.saveBook(book)
         } catch (e: Exception) {
+          if (e is CancellationException) throw e
           Log.e(TAG_KIWIX, "Could not save book in library. Original exception = $e")
         }
       }
