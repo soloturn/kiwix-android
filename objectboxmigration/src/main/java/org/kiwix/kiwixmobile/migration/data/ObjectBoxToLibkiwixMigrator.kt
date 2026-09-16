@@ -21,6 +21,7 @@ package org.kiwix.kiwixmobile.migration.data
 import io.objectbox.Box
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -76,20 +77,29 @@ class ObjectBoxToLibkiwixMigrator @Inject constructor(
       )
     }
     migrationMutex.withLock {
-      runCatching {
-        val libkiwixBooks = bookOnDiskList.map {
+      // Convert book-by-book: previously one bad archive aborted the whole
+      // batch via a single runCatching, silently dropping every other book.
+      val libkiwixBooks = bookOnDiskList.mapNotNull {
+        try {
           val archive = Archive(it.zimReaderSource.toDatabase())
-          Book().apply {
-            update(archive)
-          }
+          Book().apply { update(archive) }
+        } catch (ignore: Exception) {
+          if (ignore is CancellationException) throw ignore
+          Log.e(
+            "MIGRATING_BOOK_ON_DISK",
+            "there is an error while migrating the bookOnDisk ${it.zimReaderSource.toDatabase()} \n" +
+              "Original exception is = $ignore"
+          )
+          null
         }
-        libkiwixBookOnDisk.insert(libkiwixBooks)
-      }.onFailure {
-        Log.e(
-          "MIGRATING_BOOK_ON_DISK",
-          "there is an error while migrating the bookOnDisk \n" +
-            "Original exception is = $it"
-        )
+      }
+      if (libkiwixBooks.isNotEmpty()) {
+        runCatching {
+          libkiwixBookOnDisk.insert(libkiwixBooks)
+        }.onFailure {
+          if (it is CancellationException) throw it
+          Log.e("MIGRATING_BOOK_ON_DISK", "insert failed - $it")
+        }
       }
     }
     kiwixDataStore.setBookOnDiskMigrated(true)
@@ -157,6 +167,7 @@ class ObjectBoxToLibkiwixMigrator @Inject constructor(
           //   )
           // }.remove()
         } catch (ignore: Exception) {
+          if (ignore is CancellationException) throw ignore
           Log.e(
             "MIGRATING_BOOKMARKS",
             "there is an error while migrating the bookmark for\n" +
