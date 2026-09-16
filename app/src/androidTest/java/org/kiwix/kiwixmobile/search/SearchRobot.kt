@@ -99,6 +99,9 @@ class SearchRobot : BaseRobot() {
         searchView.performTextInput(char.toString())
         if (wait != 0L) {
           SystemClock.sleep(wait)
+        } else {
+          // Let recomposition catch up so back-to-back input doesn't drop a character.
+          waitForIdle()
         }
       }
       searchView.assertTextEquals(query)
