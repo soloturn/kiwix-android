@@ -251,10 +251,12 @@ object TestUtils {
     if (directory.isDirectory) {
       directory.listFiles()?.forEach { file ->
         if (file.isDirectory) {
-          // Recursively delete files in subdirectories
+          // Recursively delete files in subdirectories, but keep the
+          // subdirectory itself - other code may rely on it still existing.
           deleteAllFilesInDirectory(file)
+        } else {
+          file.delete()
         }
-        file.delete()
       }
     }
   }
