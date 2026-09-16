@@ -262,6 +262,18 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       composeTestRule.activity.openZimFromFilePath(zimFile.absolutePath)
     }
 
-    composeTestRule.waitForIdle()
+    composeTestRule.apply {
+      waitForIdle()
+      // Opening the ZIM file (native archive) happens asynchronously after
+      // navigation returns. TOOLBAR_TITLE_TESTING_TAG is used by every
+      // screen's app bar, so polling "is its text non-empty" can false-positive
+      // on the PREVIOUS screen's still-visible title before the reader has even
+      // composed - check the native reader directly instead, which is also the
+      // exact thing that needs to be ready to avoid a not-yet-initialized
+      // zimFileReader (crashing later JNI calls like Book.update()).
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+        activity.zimReaderContainer.zimFileReader != null
+      }
+    }
   }
 }
