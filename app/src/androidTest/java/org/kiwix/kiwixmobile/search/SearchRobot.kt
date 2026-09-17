@@ -35,6 +35,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.espresso.web.sugar.Web.onWebView
 import androidx.test.espresso.web.webdriver.DriverAtoms.findElement
 import androidx.test.espresso.web.webdriver.Locator
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import applyWithViewHierarchyPrinting
 import org.kiwix.kiwixmobile.BaseRobot
@@ -103,6 +104,9 @@ class SearchRobot : BaseRobot() {
           // Let recomposition catch up so back-to-back input doesn't drop a character.
           waitForIdle()
         }
+        // waitForIdle() above only drains Compose - it doesn't wait for the IME's
+        // own inset animation to settle after this keystroke burst.
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
       }
       searchView.assertTextEquals(query)
     }
