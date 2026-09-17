@@ -30,7 +30,7 @@ inputs:
   cores:
     description: Number of emulator CPU cores
     required: false
-    default: "4"
+    default: "3"
 
   heap-size:
     description: Emulator heap size
@@ -112,6 +112,31 @@ runs:
         export PATH="$ANDROID_HOME/platform-tools:$PATH"
         adb start-server
 
+        # One-time host specs, to know what the emulator's cores/ram-size
+        # inputs are actually competing against on this runner.
+        echo "::group::Host diagnostics"
+        echo "nproc: $(nproc)"
+        free -h
+        echo "::endgroup::"
+
+        # Whether a userspace backtrace during a stall could ever be matched
+        # against gfxstream/QEMU source, or would just be bare hex addresses -
+        # the launcher binary is usually a thin wrapper, so check the actual
+        # QEMU binary underneath it too, wherever this SDK version puts it.
+        echo "::group::Emulator binary symbol check"
+        qemu_bin="$(find "$ANDROID_HOME/emulator" -maxdepth 4 -type f -name 'qemu-system-*' 2>/dev/null | head -1)"
+        for bin in "$ANDROID_HOME/emulator/emulator" "$qemu_bin"; do
+          if [ -n "$bin" ] && [ -f "$bin" ]; then
+            echo "--- $bin ---"
+            file "$bin"
+            echo "dynamic symbols: $(nm -D "$bin" 2>/dev/null | wc -l)"
+            echo "full symbol table: $(nm "$bin" 2>/dev/null | wc -l)"
+          else
+            echo "--- $bin: not found ---"
+          fi
+        done
+        echo "::endgroup::"
+
         for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
           echo "::group::Boot attempt ${attempt}/${MAX_ATTEMPTS}"
 
@@ -181,12 +206,111 @@ runs:
             adb -s "$SERIAL" shell settings put global transition_animation_scale 0.0
             adb -s "$SERIAL" shell settings put global animator_duration_scale 0.0
             echo "::endgroup::"
+
+            # Sample host load/memory and the emulator's own RSS every 20s
+            # for the duration of the test script, to see whether failures
+            # correlate with rising resource pressure over the run rather
+            # than being uniformly distributed.
+            : > /tmp/resource-diag.log
+            (
+              prev_iowait=0
+              prev_total=0
+              while true; do
+                mem="$(free -m | awk 'NR==2 {printf "mem_used=%sMiB mem_avail=%sMiB", $3, $7}')"
+                rss="$(ps -o rss= -p "$emulator_pid" 2>/dev/null | tr -d ' ')"
+                # iowait_pct is the share of CPU time (summed across cores)
+                # spent blocked on disk I/O since the previous sample - CPU
+                # load/RSS/mem above can look idle while a native archive
+                # open is actually stuck waiting on disk, not the CPU.
+                read -r _ user nice system idle iowait irq softirq steal _ < /proc/stat
+                total=$((user + nice + system + idle + iowait + irq + softirq + steal))
+                iowait_pct=0
+                if [ "$prev_total" -gt 0 ] && [ "$((total - prev_total))" -gt 0 ]; then
+                  iowait_pct=$(( (iowait - prev_iowait) * 100 / (total - prev_total) ))
+                fi
+                prev_iowait=$iowait
+                prev_total=$total
+                echo "$(date -u +%FT%TZ) load=$(cut -d' ' -f1-3 /proc/loadavg) ${mem} emulator_rss=${rss}KiB iowait_pct=${iowait_pct}" >> /tmp/resource-diag.log
+                ps -eo rss,comm --sort=-rss 2>/dev/null | head -6 >> /tmp/resource-diag.log
+                # D-state (uninterruptible sleep) is the kernel-level signature of a
+                # thread genuinely blocked on I/O or a futex, not just busy - a
+                # direct check for "is the emulator itself stuck" vs. generic load.
+                ps -L -o tid,stat,comm -p "$emulator_pid" 2>/dev/null | awk '$2 ~ /D/' >> /tmp/resource-diag.log
+                sleep 20
+              done
+            ) &
+            diag_pid=$!
+
+            # Follow the host kernel's own log for the duration of the test
+            # script. If a stall is a genuine kernel/scheduling-level event
+            # (soft lockup, RCU stall, hung task), the kernel's own detectors
+            # log it here - a much more authoritative signal than inferring
+            # one from userspace symptoms.
+            : > /tmp/dmesg.log
+            sudo dmesg -w > /tmp/dmesg.log 2>&1 &
+            dmesg_pid=$!
+
+            # Cheap liveness probe (a trivial adb round-trip every 3s) instead
+            # of tracing continuously. A no-op should return near-instantly;
+            # if it takes several seconds, a stall is happening right now, so
+            # capture a heavy, targeted snapshot at that exact moment - kernel
+            # thread stacks and wait-channels for every emulator thread, plus
+            # the tail of dmesg - rather than running that tracing for the
+            # whole run. Debounced so one stall doesn't spam repeat captures.
+            #
+            # Run 35308243036 showed the echo probe alone missing a real
+            # stall (88s logcat silence, host load 6.37, but adb echo always
+            # under 5000ms). Also poll the guest's own load average, which
+            # reflects contention an echo round-trip doesn't.
+            : > /tmp/stall-capture.log
+            (
+              last_capture=0
+              while true; do
+                # %3N is unreliable across date implementations - diff full
+                # nanoseconds (always exactly 9 digits, unambiguous) instead.
+                start_ns=$(date +%s%N)
+                timeout 8 adb -s "$SERIAL" shell echo ping > /dev/null 2>&1
+                end_ns=$(date +%s%N)
+                elapsed_ms=$(( (end_ns - start_ns) / 1000000 ))
+                guest_load1=""
+                guest_loadavg="$(timeout 5 adb -s "$SERIAL" shell cat /proc/loadavg 2>/dev/null)"
+                guest_load1="$(echo "$guest_loadavg" | cut -d' ' -f1)"
+                # Guest load past its own vCPU count means it's oversubscribed.
+                guest_overloaded=false
+                if [ -n "$guest_load1" ] && awk -v l="$guest_load1" -v c="${{ inputs.cores }}" 'BEGIN { exit !(l > c) }'; then
+                  guest_overloaded=true
+                fi
+                now=$(date +%s)
+                if { [ "$elapsed_ms" -gt 5000 ] || [ "$guest_overloaded" = true ]; } && [ $((now - last_capture)) -gt 15 ]; then
+                  last_capture=$now
+                  {
+                    echo "=== stall detected at $(date -u +%FT%TZ), adb echo took ${elapsed_ms}ms, guest loadavg=[$guest_loadavg] ==="
+                    echo "--- emulator thread states (tid/stat/wchan) ---"
+                    ps -L -o tid,stat,wchan:32,comm -p "$emulator_pid" 2>/dev/null
+                    echo "--- emulator thread kernel stacks ---"
+                    for tid_dir in /proc/"$emulator_pid"/task/*; do
+                      echo "tid $(basename "$tid_dir"):"
+                      sudo cat "$tid_dir/stack" 2>/dev/null
+                    done
+                    echo "--- recent dmesg ---"
+                    sudo dmesg -T 2>/dev/null | tail -80
+                    echo "=== end stall capture ==="
+                  } >> /tmp/stall-capture.log
+                fi
+                sleep 3
+              done
+            ) &
+            stall_pid=$!
+
             echo "::group::Run test script"
             set +e
             EMULATOR_PORT="$PORT" ANDROID_SERIAL="$SERIAL" bash -c '${{ inputs.script }}'
             script_exit=$?
             set -e
             echo "::endgroup::"
+            kill "$diag_pid" 2>/dev/null || true
+            kill "$dmesg_pid" 2>/dev/null || true
+            kill "$stall_pid" 2>/dev/null || true
             kill_emulator
             exit $script_exit
           fi
@@ -205,5 +329,9 @@ runs:
       uses: actions/upload-artifact@v6
       with:
         name: emulator-host-log-${{ github.job }}-${{ strategy.job-index }}
-        path: /tmp/emulator-host-*.log
+        path: |
+          /tmp/emulator-host-*.log
+          /tmp/resource-diag.log
+          /tmp/dmesg.log
+          /tmp/stall-capture.log
         if-no-files-found: ignore
