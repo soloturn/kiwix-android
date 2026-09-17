@@ -197,16 +197,19 @@ class BookmarksRobot : BaseRobot() {
         onNodeWithTag(BOTTOM_NAV_READER_ITEM_TESTING_TAG).performClick()
       }
     }
-    testFlakyView({
-      Web
-        .onWebView()
-        .withElement(
-          DriverAtoms.findElement(
-            Locator.XPATH,
-            "//*[contains(text(), 'Android_(operating_system)')]"
+    testFlakyView(
+      {
+        Web
+          .onWebView()
+          .withElement(
+            DriverAtoms.findElement(
+              Locator.XPATH,
+              "//*[contains(text(), 'Android_(operating_system)')]"
+            )
           )
-        )
-    })
+      },
+      TestUtils.RETRY_COUNT_FOR_WEBVIEW_CONTENT_LOAD
+    )
   }
 
   fun assertBookmarkButtonShowBookmarked(composeTestRule: ComposeContentTestRule) {

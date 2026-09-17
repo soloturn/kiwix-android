@@ -70,14 +70,37 @@ object TestUtils {
 
   const val TEST_PAUSE_MS = 3000
   const val TEST_PAUSE_MS_FOR_SEARCH_TEST = 1000
+
+  // WebView renderer respawns (Activity torn down/recreated between tests -> the
+  // sandboxed renderer process bound to it dies and is silently relaunched; harmless,
+  // but the ~1-2s respawn+reload can outrun a 3s wait) can delay search results.
+  // See run https://github.com/soloturn/kiwix-android/actions/runs/35167290688.
+  // 6000ms was still too tight: run 35260139385 timed out on this wait in all 3
+  // RetryRule attempts back-to-back, meaning the underlying CI stall outlasts 6s.
+  // 15000ms wasn't enough either, three separate times - run 35308243036's
+  // resource-diag showed why: host load average hit 6.37 on a 4-vCPU runner
+  // right before an 88-SECOND total logcat silence (confirmed via the raw
+  // job log, not just this diagnostic). No fixed wait survives a stall that
+  // severe; this only raises the bar against smaller, more common spikes.
+  // The real mitigations are the guest-load-based stall capture and reduced
+  // Gradle worker contention added alongside this change.
+  const val TEST_PAUSE_MS_FOR_SEARCH_RESULTS = 30_000L
   const val TEST_PAUSE_MS_FOR_DOWNLOAD_TEST = 10000L
 
   // longClickOnSaveBookmarkImage's own wait - kept separate from the
   // shared constant above since that one has ~30 unrelated call sites.
   const val TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON = 20_000L
+
+  // zimReaderContainer.zimFileReader != null polls: run 35415742112 timed
+  // out 3/3 retries at 10s waiting for the native archive to open.
+  const val TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN = 20_000L
   const val TEST_PAUSE_MS_FOR_SNACKBAR = 6000L
   const val FIVE_SECOND_DELAY = 5000L
   const val FIFTEEN_SECOND_DELAY = 15_000L
+
+  // Own retry budget for assertZimFileLoadedIntoTheReader - default 2.5s was
+  // too tight for WebView content load under CI load (run 35424852955).
+  const val RETRY_COUNT_FOR_WEBVIEW_CONTENT_LOAD = 40
   private const val READ_AND_CALL_TIMEOUT = 5L
   private const val CONNECTION_TIMEOUT = 1L
 

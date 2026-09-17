@@ -65,7 +65,7 @@ import org.kiwix.kiwixmobile.page.bookmarks.bookmarks
 import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.FIVE_SECOND_DELAY
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN
 import org.kiwix.kiwixmobile.testutils.TestUtils.getOkkHttpClientForTesting
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
@@ -498,13 +498,8 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     }
     composeTestRule.apply {
       waitForIdle()
-      // Opening the ZIM file (native archive) happens asynchronously after
-      // navigation returns. TOOLBAR_TITLE_TESTING_TAG is used by every
-      // screen's app bar, so polling "is its text non-empty" can false-positive
-      // on the PREVIOUS screen's still-visible title before the reader has even
-      // composed - check the native reader directly instead, which is the
-      // exact thing that needs to be ready.
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+      // Native archive open is async and can take longer than 10s under CI load.
+      waitUntil(TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN) {
         zimReaderContainer.zimFileReader != null
       }
     }
