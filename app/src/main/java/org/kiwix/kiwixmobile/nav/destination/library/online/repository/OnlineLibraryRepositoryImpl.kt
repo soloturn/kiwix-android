@@ -20,6 +20,7 @@ package org.kiwix.kiwixmobile.nav.destination.library.online.repository
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -40,6 +41,11 @@ import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibr
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryState.Success
 import retrofit2.Response
 import javax.inject.Inject
+
+// Base delay for the retry backoff below - doubled on each subsequent
+// attempt (1s, 2s, 4s, 8s) so a transient blip gets a real chance to
+// clear instead of re-hitting the network in the same instant.
+private const val RETRY_BACKOFF_BASE_MS = 1000L
 
 class OnlineLibraryRepositoryImpl @Inject constructor(
   private val onlineLibraryManager: OnlineLibraryManager,
@@ -84,11 +90,14 @@ class OnlineLibraryRepositoryImpl @Inject constructor(
         if (ignore is CancellationException) throw ignore
         Log.e(
           "OnlineLibraryRepository",
-          "fetchOnlineLibrary attempt ${attempt + ONE}/$maxRetries failed",
+          "fetchOnlineLibrary attempt ${attempt + ONE}/$maxRetries failed: " +
+            "${ignore.javaClass.name}: ${ignore.message}",
           ignore
         )
         if (attempt == maxRetries - ONE) {
           emit(Error(request, ignore))
+        } else {
+          delay(RETRY_BACKOFF_BASE_MS shl attempt)
         }
       }
     }
