@@ -6,10 +6,10 @@ import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.kotlin.dsl.newInstance
-import javax.inject.Inject
 import org.w3c.dom.Element
 import plugin.KiwixConfigurationPlugin
 import java.io.StringWriter
+import javax.inject.Inject
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory
