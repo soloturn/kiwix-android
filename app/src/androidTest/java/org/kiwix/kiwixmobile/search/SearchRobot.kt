@@ -42,7 +42,7 @@ import org.kiwix.kiwixmobile.core.search.SEARCH_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.components.NAVIGATION_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.main.BOTTOM_NAV_READER_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils.FIVE_SECOND_DELAY
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SEARCH_RESULTS
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 
@@ -57,7 +57,9 @@ class SearchRobot : BaseRobot() {
   fun clickOnSearchItemInSearchList(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntil(FIVE_SECOND_DELAY) {
+        // Same search-results wait as assertSearchSuccessful below; run 35260139385
+        // timed this one out too, so it needs the same longer budget.
+        waitUntil(TEST_PAUSE_MS_FOR_SEARCH_RESULTS) {
           try {
             onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
           } catch (_: IllegalStateException) {
@@ -107,7 +109,7 @@ class SearchRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitUntil(
-          timeoutMillis = TEST_PAUSE_MS.toLong(),
+          timeoutMillis = TEST_PAUSE_MS_FOR_SEARCH_RESULTS,
           condition = {
             try {
               onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)
