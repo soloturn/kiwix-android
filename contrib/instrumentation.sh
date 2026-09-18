@@ -38,8 +38,25 @@ adb logcat -c
 if adb shell settings list secure | grep -q "stylus_handwriting_enabled"; then
   adb shell settings put secure stylus_handwriting_enabled 0
 fi
-# shellcheck disable=SC2035
-adb logcat *:E -v color &
+# adb logcat is known to silently stop producing output for a while and
+# then resume (documented upstream, e.g. https://issuetracker.google.com/issues/150558653) -
+# left running once for a 40-50min job with no supervision, that shows up
+# as gaps in what we can see. Restart it whenever the client exits instead
+# of a single fire-and-forget background process.
+#
+# RetryRule's own diagnostics (System.err.println on each retry attempt)
+# land in logcat under tag System.err at priority W, not E - a bare "*:E"
+# filter silently drops them, so a flaky test's retries are invisible in
+# every capture we have. Add System.err:W so a run like 35284788813 (two
+# ComposeTimeoutException failures with no way to tell whether RetryRule
+# actually retried 3x or gave up early) can be diagnosed from its own log.
+(
+  while true; do
+    # shellcheck disable=SC2035
+    adb logcat *:E System.err:W -v color
+    sleep 1
+  done
+) &
 
 PACKAGE_NAME="org.kiwix.kiwixmobile"
 TEST_PACKAGE_NAME="${PACKAGE_NAME}.test"
