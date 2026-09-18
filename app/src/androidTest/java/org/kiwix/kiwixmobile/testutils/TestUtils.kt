@@ -25,6 +25,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Environment
+import android.os.SystemClock
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
@@ -78,6 +79,15 @@ object TestUtils {
   const val TEST_PAUSE_MS_FOR_SNACKBAR = 6000L
   const val FIVE_SECOND_DELAY = 5000L
   const val FIFTEEN_SECOND_DELAY = 15_000L
+
+  // testFlakyView's retries need to survive a transient condition that takes
+  // actual time to resolve (e.g. a WebView renderer respawn); see the retry
+  // loop below for why this delay exists.
+  private const val RETRY_DELAY_FOR_FLAKY_VIEW_MS = 500L
+
+  // Own retry budget for assertZimFileLoadedIntoTheReader - default 2.5s was
+  // too tight for WebView content load under CI load (run 35424852955).
+  const val RETRY_COUNT_FOR_WEBVIEW_CONTENT_LOAD = 40
   private const val READ_AND_CALL_TIMEOUT = 5L
   private const val CONNECTION_TIMEOUT = 1L
 
@@ -232,6 +242,16 @@ object TestUtils {
       action()
     } catch (ignore: Throwable) {
       if (retryCount > 0) {
+        // Retries used to fire back-to-back with no delay, so they burned no real
+        // wall-clock time - useless against a transient condition that takes actual
+        // time to resolve (e.g. the WebView renderer respawn documented in
+        // search-results-webview-respawn-timeout.md, ~1-2s). Run 35294866469's
+        // testBookmarks hit exactly this: assertZimFileLoadedIntoTheReader's
+        // onWebView() check failed outright right after a logged renderer crash,
+        // all 5 instant retries still found no WebView, and only RetryRule's much
+        // coarser whole-test retry (which genuinely takes real time via setup) let
+        // it eventually pass. Give each retry real time to matter.
+        SystemClock.sleep(RETRY_DELAY_FOR_FLAKY_VIEW_MS)
         testFlakyView(action, retryCount - 1)
       } else {
         throw ignore // No more retries, rethrow the exception
