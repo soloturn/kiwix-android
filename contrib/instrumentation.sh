@@ -94,8 +94,17 @@ fi
 # its report would never be uploaded anywhere.
 # Scoped to :app - the bare name also matches core, defaultmigration
 # and objectboxmigration, none of which have any tests.
+# NUM_SHARDS/SHARD_INDEX shard the suite via AndroidJUnitRunner's built-in sharding.
+shard_args=()
+if [ "${NUM_SHARDS:-1}" -gt 1 ]; then
+  shard_args=(
+    "-Pandroid.testInstrumentationRunnerArguments.numShards=${NUM_SHARDS}"
+    "-Pandroid.testInstrumentationRunnerArguments.shardIndex=${SHARD_INDEX:-0}"
+  )
+fi
+
 task="${INSTRUMENTATION_GRADLE_TASK:-:app:connectedDebugAndroidTest}"
-if ./gradlew "$task"; then
+if ./gradlew "$task" "${shard_args[@]}"; then
   echo "$task succeeded" >&2
 else
   adb exec-out screencap -p >screencap.png
