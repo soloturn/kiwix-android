@@ -91,12 +91,14 @@ internal class SearchViewModelTest {
   fun init() {
     clearAllMocks()
     recentsFromDb = MutableSharedFlow(replay = 1)
-    every { zimReaderContainer.zimFileReader } returns zimFileReader
+    every { zimReaderContainer.withReaderBlocking<Any?>(any()) } answers {
+      firstArg<(ZimFileReader) -> Any?>().invoke(zimFileReader)
+    }
     every {
       zimFileReader.getSuggestedSpelledWords(any(), any())
     } returns emptyList()
     coEvery {
-      searchResultGenerator.generateSearchResults(any(), zimFileReader)
+      searchResultGenerator.generateSearchResults(any(), zimReaderContainer)
     } returns null
     every { zimReaderContainer.id } returns "id"
     every { recentSearchRoomDao.recentSearches("id") } returns recentsFromDb
@@ -163,7 +165,7 @@ internal class SearchViewModelTest {
       timeout: Long
     ) {
       coEvery {
-        searchResultGenerator.generateSearchResults(searchTerm, zimFileReader)
+        searchResultGenerator.generateSearchResults(searchTerm, zimReaderContainer)
       } returns suggestionSearch
       viewModel.onSearchValueChanged(searchTerm)
       recentsFromDb.tryEmit(emptyList())
@@ -261,7 +263,7 @@ internal class SearchViewModelTest {
       searchOrigin: SearchOrigin
     ) {
       coEvery {
-        searchResultGenerator.generateSearchResults(searchTerm, zimFileReader)
+        searchResultGenerator.generateSearchResults(searchTerm, zimReaderContainer)
       } returns suggestionSearch
       viewModel.actions.tryEmit(Filter(searchTerm))
       recentsFromDb.tryEmit(databaseResults)

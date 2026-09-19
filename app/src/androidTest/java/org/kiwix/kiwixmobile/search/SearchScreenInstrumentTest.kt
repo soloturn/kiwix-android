@@ -309,7 +309,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       // before the reader has even composed - check the native reader
       // directly instead, which is the exact thing that needs to be ready.
       waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-        kiwixMainActivity.zimReaderContainer.zimFileReader != null
+        kiwixMainActivity.zimReaderContainer.hasReader
       }
     }
   }

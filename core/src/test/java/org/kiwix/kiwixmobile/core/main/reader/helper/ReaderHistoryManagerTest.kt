@@ -36,7 +36,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.page.history.models.HistoryListItem
-import org.kiwix.kiwixmobile.core.reader.ZimFileReader
+import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import java.util.Locale
 
 class ReaderHistoryManagerTest {
@@ -67,7 +67,10 @@ class ReaderHistoryManagerTest {
     readerHistoryManager.saveHistory(
       url = null,
       title = "Title",
-      zimFileReader = mockk()
+      zimId = "zim-id",
+      zimName = "DemoZim",
+      zimReaderSource = mockk(),
+      favicon = null
     )
 
     coVerify(exactly = 0) {
@@ -80,7 +83,10 @@ class ReaderHistoryManagerTest {
     readerHistoryManager.saveHistory(
       url = "article",
       title = null,
-      zimFileReader = mockk()
+      zimId = "zim-id",
+      zimName = "DemoZim",
+      zimReaderSource = mockk(),
+      favicon = null
     )
 
     coVerify(exactly = 0) {
@@ -89,11 +95,14 @@ class ReaderHistoryManagerTest {
   }
 
   @Test
-  fun `saveHistory should do nothing when zimFileReader is null`() = runTest {
+  fun `saveHistory should do nothing when zimId is null`() = runTest {
     readerHistoryManager.saveHistory(
       url = "article",
       title = "Title",
-      zimFileReader = null
+      zimId = null,
+      zimName = "DemoZim",
+      zimReaderSource = mockk(),
+      favicon = null
     )
 
     coVerify(exactly = 0) {
@@ -103,13 +112,7 @@ class ReaderHistoryManagerTest {
 
   @Test
   fun `saveHistory should save history when all parameters are provided`() = runTest {
-    val reader = mockk<ZimFileReader>().apply {
-      every { id } returns ""
-      every { name } returns "DemoZim"
-      every { favicon } returns ""
-      every { zimReaderSource } returns mockk()
-    }
-
+    val readerSource = mockk<ZimReaderSource>()
     val slot = slot<HistoryListItem.HistoryItem>()
 
     coEvery { repository.saveHistory(capture(slot)) } returns Unit
@@ -117,7 +120,10 @@ class ReaderHistoryManagerTest {
     readerHistoryManager.saveHistory(
       url = "article",
       title = "My Title",
-      zimFileReader = reader
+      zimId = "zim-id",
+      zimName = "DemoZim",
+      zimReaderSource = readerSource,
+      favicon = "favicon"
     )
 
     coVerify(exactly = 1) {
@@ -128,8 +134,8 @@ class ReaderHistoryManagerTest {
 
     assertEquals("article", history.url)
     assertEquals("My Title", history.title)
-    assertEquals(reader.zimReaderSource, history.zimReaderSource)
-    assertEquals(reader.favicon, history.favicon)
+    assertEquals(readerSource, history.zimReaderSource)
+    assertEquals("favicon", history.favicon)
 
     assertTrue(history.timeStamp > 0)
     assertFalse(history.dateString.isBlank())

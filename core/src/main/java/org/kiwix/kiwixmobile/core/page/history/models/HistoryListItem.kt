@@ -20,7 +20,6 @@ package org.kiwix.kiwixmobile.core.page.history.models
 import org.kiwix.kiwixmobile.core.dao.entities.HistoryRoomEntity
 import org.kiwix.kiwixmobile.core.page.adapter.Page
 import org.kiwix.kiwixmobile.core.page.adapter.PageRelated
-import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 
 sealed class HistoryListItem : PageRelated {
@@ -38,23 +37,6 @@ sealed class HistoryListItem : PageRelated {
     override val id: Long = databaseId,
     override val url: String = historyUrl
   ) : HistoryListItem(), Page {
-    constructor(
-      url: String,
-      title: String,
-      dateString: String,
-      timeStamp: Long,
-      zimFileReader: ZimFileReader
-    ) : this(
-      zimId = zimFileReader.id,
-      zimName = zimFileReader.name,
-      zimReaderSource = zimFileReader.zimReaderSource,
-      favicon = zimFileReader.favicon,
-      historyUrl = url,
-      title = title,
-      dateString = dateString,
-      timeStamp = timeStamp
-    )
-
     constructor(historyRoomEntity: HistoryRoomEntity) : this(
       historyRoomEntity.id,
       historyRoomEntity.zimId,

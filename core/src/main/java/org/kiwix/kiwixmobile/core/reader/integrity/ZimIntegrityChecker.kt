@@ -59,7 +59,7 @@ class ZimIntegrityChecker @Inject constructor(
       var archive: Archive? = null
       try {
         archive = if (isBrandedApp) {
-          zimReaderContainer.zimFileReader?.zimReaderSource?.createArchive(ioDispatcher)
+          zimReaderContainer.zimReaderSource?.createArchive(ioDispatcher)
         } else {
           zimReaderSource.createArchive(ioDispatcher)
         }

@@ -125,7 +125,7 @@ class ZimHostViewModel @Inject constructor(
       val previouslyHostedBookIds = kiwixDataStore.hostedBookIds.first()
       val books = dataSource.getLanguageCategorizedBooks().first()
       val isBrandedApp = kiwixDataStore.isBrandedApp.first()
-      val zimFileReader = zimReaderContainer.zimFileReader
+      val zimFileReader = zimReaderContainer.withReaderBlocking { it }
       val processedBooks = processBooks(books, previouslyHostedBookIds, isBrandedApp, zimFileReader)
       _uiState.update { it.copy(books = processedBooks) }
 

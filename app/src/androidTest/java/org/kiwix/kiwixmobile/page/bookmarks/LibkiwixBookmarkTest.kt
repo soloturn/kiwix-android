@@ -104,13 +104,13 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
     val zimReaderContainer = composeTestRule.activity.zimReaderContainer
     val libKiwixBook =
       Book().apply {
-        update(zimReaderContainer.zimFileReader?.jniKiwixReader)
+        update(zimReaderContainer.withReaderBlocking { it.jniKiwixReader })
       }
     val bookmarkList = arrayListOf<LibkiwixBookmarkItem>()
     for (i in 1..500) {
       val bookmark =
         Bookmark().apply {
-          bookId = zimReaderContainer.zimFileReader?.id
+          bookId = zimReaderContainer.id
           title = "bookmark$i"
           url = "http://kiwix.org/demoBookmark$i"
           bookTitle = libKiwixBook.title
@@ -118,8 +118,8 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       val libkiwixItem =
         LibkiwixBookmarkItem(
           bookmark,
-          zimReaderContainer.zimFileReader?.favicon,
-          zimReaderContainer.zimFileReader?.zimReaderSource
+          zimReaderContainer.favicon,
+          zimReaderContainer.zimReaderSource
         )
       runBlocking {
         composeTestRule.activity.libkiwixBookmarks.saveBookmark(libkiwixItem).also {
@@ -272,7 +272,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       // exact thing that needs to be ready to avoid a not-yet-initialized
       // zimFileReader (crashing later JNI calls like Book.update()).
       waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-        activity.zimReaderContainer.zimFileReader != null
+        activity.zimReaderContainer.hasReader
       }
     }
   }
