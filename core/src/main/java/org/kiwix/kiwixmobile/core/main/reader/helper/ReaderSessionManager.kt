@@ -137,8 +137,8 @@ class ReaderSessionManager @Inject constructor(
       webView.restoreState(bundle)
       webView.scrollY = webViewHistoryItem.webViewCurrentPosition
     } ?: run {
-      zimReaderContainer.zimFileReader?.let {
-        webView.loadUrl(redirectOrOriginal(contentUrl("${it.mainPage}")))
+      zimReaderContainer.mainPage?.let {
+        webView.loadUrl(redirectOrOriginal(contentUrl(it)))
       }
     }
   }
@@ -197,7 +197,7 @@ class ReaderSessionManager @Inject constructor(
   ): WebViewHistoryEntity? {
     val bundle = Bundle()
     val webBackForwardList = webView.saveState(bundle)
-    val zimId = zimReaderContainer.zimFileReader?.id
+    val zimId = zimReaderContainer.id
 
     if (zimId != null && webBackForwardList != null && webBackForwardList.size > ZERO) {
       return WebViewHistoryEntity(

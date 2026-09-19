@@ -81,33 +81,26 @@ class BookmarkManager @Inject constructor(
     pageTitle: String?,
     articleUrl: String?,
     isBookmarked: Boolean
-  ): BookmarkSaveResult {
-    val zimFileReader = zimReaderContainer.zimFileReader
-    return runCatching {
-      return@addBookmark when {
-        pageTitle == null || articleUrl == null || zimFileReader == null -> {
-          BookmarkSaveResult.Failure(string.unable_to_add_to_bookmarks)
-        }
-
-        isBookmarked -> {
-          val libKiwixBook = getLibkiwixBook(zimFileReader)
-          mainRepositoryActions.deleteBookmark(libKiwixBook.id, articleUrl)
-          BookmarkSaveResult.BookmarkRemoved
-        }
-
-        else -> {
-          val libKiwixBook = getLibkiwixBook(zimFileReader)
-          mainRepositoryActions.saveBookmark(
-            LibkiwixBookmarkItem(pageTitle, articleUrl, zimFileReader, libKiwixBook)
-          )
-          BookmarkSaveResult.BookmarkAdded
-        }
-      }
-    }.getOrElse {
-      // Catch the exception while saving the bookmarks for splitted zim files.
-      // we have an issue with split zim files, see #3827
-      BookmarkSaveResult.Failure(string.unable_to_add_to_bookmarks)
+  ): BookmarkSaveResult = runCatching {
+    if (pageTitle == null || articleUrl == null) {
+      return@runCatching BookmarkSaveResult.Failure(string.unable_to_add_to_bookmarks)
     }
+    if (isBookmarked) {
+      val bookId = zimReaderContainer.withReader { getLibkiwixBook(it).id }
+        ?: return@runCatching BookmarkSaveResult.Failure(string.unable_to_add_to_bookmarks)
+      mainRepositoryActions.deleteBookmark(bookId, articleUrl)
+      BookmarkSaveResult.BookmarkRemoved
+    } else {
+      val item = zimReaderContainer.withReader { reader ->
+        LibkiwixBookmarkItem(pageTitle, articleUrl, reader, getLibkiwixBook(reader))
+      } ?: return@runCatching BookmarkSaveResult.Failure(string.unable_to_add_to_bookmarks)
+      mainRepositoryActions.saveBookmark(item)
+      BookmarkSaveResult.BookmarkAdded
+    }
+  }.getOrElse {
+    // Catch the exception while saving the bookmarks for splitted zim files.
+    // we have an issue with split zim files, see #3827
+    BookmarkSaveResult.Failure(string.unable_to_add_to_bookmarks)
   }
 
   /**
