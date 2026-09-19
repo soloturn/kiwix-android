@@ -122,7 +122,7 @@ class BookmarksRobot : BaseRobot() {
       composeTestRule.apply {
         waitForIdle()
         waitUntilTimeout()
-        waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+        waitUntil(TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON) {
           onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
         }
         onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
@@ -213,19 +213,16 @@ class BookmarksRobot : BaseRobot() {
         onNodeWithTag(BOTTOM_NAV_READER_ITEM_TESTING_TAG).performClick()
       }
     }
-    testFlakyView(
-      {
-        Web
-          .onWebView()
-          .withElement(
-            DriverAtoms.findElement(
-              Locator.XPATH,
-              "//*[contains(text(), 'Android_(operating_system)')]"
-            )
+    testFlakyView({
+      Web
+        .onWebView()
+        .withElement(
+          DriverAtoms.findElement(
+            Locator.XPATH,
+            "//*[contains(text(), 'Android_(operating_system)')]"
           )
-      },
-      TestUtils.RETRY_COUNT_FOR_WEBVIEW_CONTENT_LOAD
-    )
+        )
+    })
   }
 
   fun assertBookmarkButtonShowBookmarked(composeTestRule: ComposeContentTestRule) {
@@ -311,7 +308,7 @@ class BookmarksRobot : BaseRobot() {
     })
     // Unlike the initial ZIM open, nothing here waited for the reader screen
     // to actually come up before the caller checks WebView content.
-    composeTestRule.waitUntil(TEST_PAUSE_MS.toLong()) {
+    composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON) {
       composeTestRule
         .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
         .isDisplayed()
