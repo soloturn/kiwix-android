@@ -50,10 +50,20 @@ fi
 # every capture we have. Add System.err:W so a run like 35284788813 (two
 # ComposeTimeoutException failures with no way to tell whether RetryRule
 # actually retried 3x or gave up early) can be diagnosed from its own log.
+#
+# lmkd logs kills under tag lowmemorykiller/lmkd at Info priority, below
+# the *:E floor - same blind spot System.err:W above was added to close.
+# ActivityManager also logs its own process kills at Info (e.g.
+# "Killing <pid>:...:sandboxed_process0 (adj 900): empty #N") - the
+# aw_browser_terminator "crash detected (code -1)" lines this project has
+# chased across several CI investigations turned out to correlate with
+# per-test process recycling (ANDROIDX_TEST_ORCHESTRATOR spins up a fresh
+# process per test), not an actual crash or lmkd's own low-memory kill.
+# This line is what actually names the killer and the reason.
 (
   while true; do
     # shellcheck disable=SC2035
-    adb logcat *:E System.err:W -v color | tee -a /tmp/logcat-capture.log
+    adb logcat *:E System.err:W lowmemorykiller:V lmkd:V ActivityManager:I -v color | tee -a /tmp/logcat-capture.log
     sleep 1
   done
 ) &
