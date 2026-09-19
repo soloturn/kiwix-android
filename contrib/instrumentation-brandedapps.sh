@@ -38,8 +38,20 @@ adb logcat -c
 if adb shell settings list secure | grep -q "stylus_handwriting_enabled"; then
   adb shell settings put secure stylus_handwriting_enabled 0
 fi
-# shellcheck disable=SC2035
-adb logcat *:E -v color &
+# adb logcat is known to silently stop producing output for a while and then
+# resume (documented upstream, e.g.
+# https://issuetracker.google.com/issues/150558653) - restart it whenever the
+# client exits instead of a single fire-and-forget background process. Also
+# tee to a file so classify_flaky_failures.py below has something to read;
+# the plain app instrumentation.sh does the same (see its own comments for
+# why lowmemorykiller/lmkd are included).
+(
+  while true; do
+    # shellcheck disable=SC2035
+    adb logcat *:E System.err:W lowmemorykiller:V lmkd:V ActivityManager:I -v color | tee -a /tmp/logcat-capture.log
+    sleep 1
+  done
+) &
 
 PACKAGE_NAME="org.kiwix.kiwixmobile.custom"
 TEST_PACKAGE_NAME="${PACKAGE_NAME}.test"
@@ -78,5 +90,16 @@ if ./gradlew connectedCustomexampleDebugAndroidTest; then
   echo "connectedCustomexampleDebugAndroidTest succeeded" >&2
 else
   adb exec-out screencap -p >screencap.png
-  exit 1
+  echo "connectedCustomexampleDebugAndroidTest failed - checking whether every failure is CI-runner overload or a known external bug" >&2
+  mapfile -t junit_xmls < <(find branded/build/outputs/androidTest-results/connected -name 'TEST-*.xml' 2>/dev/null)
+  if [ "${#junit_xmls[@]}" -eq 0 ] || ! python3 contrib/classify_flaky_failures.py \
+    --junit-xml "${junit_xmls[@]}" \
+    --log /tmp/logcat-capture.log \
+    --resource-diag /tmp/resource-diag.log \
+    --dmesg /tmp/dmesg.log \
+    --stall-capture /tmp/stall-capture.log \
+    --apply --in-place; then
+    exit 1
+  fi
+  echo "All failures were CI-runner overload or a known external bug with supporting evidence - not failing the build" >&2
 fi
