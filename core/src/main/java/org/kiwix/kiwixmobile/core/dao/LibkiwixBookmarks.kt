@@ -140,12 +140,12 @@ class LibkiwixBookmarks @Inject constructor(
   override suspend fun deletePages(pagesToDelete: List<Page>, ioDispatcher: CoroutineDispatcher) =
     deleteBookmarks(pagesToDelete as List<LibkiwixBookmarkItem>)
 
-  suspend fun getCurrentZimBookmarksUrl(zimFileReader: ZimFileReader?): List<String> {
+  suspend fun getCurrentZimBookmarksUrl(zimId: String?): List<String> {
     ensureInitialized()
     return withContext(ioDispatcher) {
-      zimFileReader?.let { reader ->
+      zimId?.let { id ->
         getBookmarksList()
-          .filter { it.zimId == reader.id }
+          .filter { it.zimId == id }
           .map(LibkiwixBookmarkItem::bookmarkUrl)
       }.orEmpty()
     }
@@ -420,7 +420,7 @@ class LibkiwixBookmarks @Inject constructor(
       // in custom apps we are using the assetFileDescriptor so we do not have the filePath
       // and in custom apps there is only a single zim file so we are directly
       // getting the zimFileReader object.
-      zimReaderContainer?.zimFileReader
+      zimReaderContainer?.withReaderBlocking { it }
     } else {
       bookmarkItem.zimReaderSource?.let {
         it.createArchive(ioDispatcher)?.let { archive ->
