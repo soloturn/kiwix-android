@@ -291,7 +291,7 @@ private fun OnlineLibraryList(
       .hideKeyboardOnLazyColumnScroll(lazyListState),
     state = lazyListState
   ) {
-    itemsIndexed(state.items) { index, item ->
+    itemsIndexed(state.items, key = { _, item -> item.id }) { index, item ->
       when (item) {
         is DividerItem -> ShowDividerItem(item)
         is LibraryListItem.BookItem -> OnlineBookItem(
