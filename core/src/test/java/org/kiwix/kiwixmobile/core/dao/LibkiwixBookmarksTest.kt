@@ -36,7 +36,6 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.BookTestWrapper
 import org.kiwix.kiwixmobile.core.page.bookmark.models.LibkiwixBookmarkItem
-import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.libkiwix.Book
 import org.kiwix.libkiwix.Bookmark
@@ -90,11 +89,8 @@ class LibkiwixBookmarksTest {
   @Test
   fun `cached bookmark list keeps a bookmark whose url is also bookmarked in another book`() =
     runTest(testDispatcher) {
-      val zimFileReader: ZimFileReader = mockk()
-      every { zimFileReader.id } returns SECOND_BOOK_ID
-
-      val freshBookmarkUrls = libkiwixBookmarks.getCurrentZimBookmarksUrl(zimFileReader)
-      val cachedBookmarkUrls = libkiwixBookmarks.getCurrentZimBookmarksUrl(zimFileReader)
+      val freshBookmarkUrls = libkiwixBookmarks.getCurrentZimBookmarksUrl(SECOND_BOOK_ID)
+      val cachedBookmarkUrls = libkiwixBookmarks.getCurrentZimBookmarksUrl(SECOND_BOOK_ID)
 
       assertEquals(listOf(SHARED_URL), freshBookmarkUrls)
       assertEquals(listOf(SHARED_URL), cachedBookmarkUrls)
