@@ -18,29 +18,26 @@
 
 package org.kiwix.kiwixmobile.core.search.viewmodel
 
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.withContext
-import org.kiwix.kiwixmobile.core.di.IoDispatcher
-import org.kiwix.kiwixmobile.core.reader.ZimFileReader
+import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.libzim.SuggestionSearch
 import javax.inject.Inject
 
 interface SearchResultGenerator {
   suspend fun generateSearchResults(
     searchTerm: String,
-    zimFileReader: ZimFileReader?
+    zimReaderContainer: ZimReaderContainer
   ): SuggestionSearch?
 }
 
-class ZimSearchResultGenerator @Inject constructor(
-  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
-) : SearchResultGenerator {
-  override suspend fun generateSearchResults(searchTerm: String, zimFileReader: ZimFileReader?) =
-    if (searchTerm.isBlank() || zimFileReader == null) {
-      null
-    } else {
-      withContext(ioDispatcher) {
-        zimFileReader.searchSuggestions(searchTerm)
-      }
-    }
+class ZimSearchResultGenerator @Inject constructor() : SearchResultGenerator {
+  override suspend fun generateSearchResults(
+    searchTerm: String,
+    zimReaderContainer: ZimReaderContainer
+  ) = if (searchTerm.isBlank()) {
+    null
+  } else {
+    // withReader hops onto ioDispatcher itself and leases the reader for the
+    // duration of this call, so it can't be disposed mid-search.
+    zimReaderContainer.withReader { it.searchSuggestions(searchTerm) }
+  }
 }
