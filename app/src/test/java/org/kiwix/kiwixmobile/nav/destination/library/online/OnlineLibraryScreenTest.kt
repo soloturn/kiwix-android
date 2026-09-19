@@ -184,7 +184,9 @@ class OnlineLibraryScreenTest {
   @Test
   fun `calls handleLoadMore when reaching end of list`() {
     val viewModel = createMockViewModel()
-    val items = List(20) { mockk<LibraryListItem.BookItem>(relaxed = true) }
+    val items = List(20) { index ->
+      mockk<LibraryListItem.BookItem>(relaxed = true) { every { id } returns index.toLong() }
+    }
     val listState = LazyListState()
     composeTestRule.mainClock.autoAdvance = false
     renderScreen(createUiState(items = items), lazyListState = listState, viewModel = viewModel)
@@ -203,7 +205,9 @@ class OnlineLibraryScreenTest {
   @Test
   fun `does not trigger load more when not near end`() {
     val viewModel = createMockViewModel()
-    val items = List(50) { mockk<LibraryListItem.BookItem>(relaxed = true) }
+    val items = List(50) { index ->
+      mockk<LibraryListItem.BookItem>(relaxed = true) { every { id } returns index.toLong() }
+    }
     val listState = LazyListState()
 
     composeTestRule.mainClock.autoAdvance = false
@@ -223,7 +227,9 @@ class OnlineLibraryScreenTest {
   @Test
   fun `shows back to top button when scrolled past threshold`() {
     val listState = LazyListState()
-    val items = List(20) { mockk<LibraryListItem.BookItem>(relaxed = true) }
+    val items = List(20) { index ->
+      mockk<LibraryListItem.BookItem>(relaxed = true) { every { id } returns index.toLong() }
+    }
     renderScreen(createUiState(items = items), lazyListState = listState)
 
     composeTestRule.apply {
@@ -239,7 +245,9 @@ class OnlineLibraryScreenTest {
   @Test
   fun `clicking back to top scrolls list to top`() {
     val listState = LazyListState()
-    val items = List(20) { mockk<LibraryListItem.BookItem>(relaxed = true) }
+    val items = List(20) { index ->
+      mockk<LibraryListItem.BookItem>(relaxed = true) { every { id } returns index.toLong() }
+    }
 
     renderScreen(createUiState(items = items), lazyListState = listState)
     composeTestRule.apply {
@@ -266,7 +274,9 @@ class OnlineLibraryScreenTest {
   @Test
   fun `does not call handleLoadMore when already loading`() {
     val viewModel = createMockViewModel()
-    val items = List(20) { mockk<LibraryListItem.BookItem>(relaxed = true) }
+    val items = List(20) { index ->
+      mockk<LibraryListItem.BookItem>(relaxed = true) { every { id } returns index.toLong() }
+    }
     val listState = LazyListState()
 
     composeTestRule.mainClock.autoAdvance = false
