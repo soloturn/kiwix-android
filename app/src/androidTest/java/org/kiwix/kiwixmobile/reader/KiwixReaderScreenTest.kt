@@ -62,10 +62,10 @@ import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.main.topLevel
 import org.kiwix.kiwixmobile.page.bookmarks.bookmarks
+import org.kiwix.kiwixmobile.testutils.Budget
 import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.FIVE_SECOND_DELAY
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN
 import org.kiwix.kiwixmobile.testutils.TestUtils.getOkkHttpClientForTesting
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
@@ -499,7 +499,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     composeTestRule.apply {
       waitForIdle()
       // Native archive open is async and can take longer than 10s under CI load.
-      waitUntil(TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN) {
+      waitUntil(Budget.NATIVE_ARCHIVE_OPEN.millis) {
         zimReaderContainer.hasReader
       }
     }
