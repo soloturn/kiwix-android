@@ -22,7 +22,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.page.history.models.HistoryListItem
-import org.kiwix.kiwixmobile.core.reader.ZimFileReader
+import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.LanguageUtils.Companion.getCurrentLocale
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -35,19 +35,25 @@ class ReaderHistoryManager @Inject constructor(
   suspend fun saveHistory(
     url: String?,
     title: String?,
-    zimFileReader: ZimFileReader?
+    zimId: String?,
+    zimName: String?,
+    zimReaderSource: ZimReaderSource?,
+    favicon: String?
   ) {
-    if (url == null || title == null || zimFileReader == null) {
-      return
-    }
+    if (url == null || title == null) return
+    if (zimId == null || zimName == null) return
 
     val timestamp = System.currentTimeMillis()
     val history = HistoryListItem.HistoryItem(
-      url = url,
+      databaseId = 0L,
+      zimId = zimId,
+      zimName = zimName,
+      zimReaderSource = zimReaderSource,
+      favicon = favicon,
+      historyUrl = url,
       title = title,
       dateString = formatDate(timestamp),
-      timeStamp = timestamp,
-      zimFileReader = zimFileReader
+      timeStamp = timestamp
     )
 
     mainRepositoryActions.saveHistory(history)

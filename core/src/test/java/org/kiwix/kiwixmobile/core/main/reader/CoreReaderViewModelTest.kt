@@ -681,7 +681,7 @@ internal class CoreReaderViewModelTest {
             advanceUntilIdle()
 
             coVerify { readerSessionManager.saveReaderSession() }
-            verify { viewModel.closeZimBook() }
+            coVerify { viewModel.closeZimBook() }
 
             cancelAndIgnoreRemainingEvents()
           }
@@ -709,7 +709,7 @@ internal class CoreReaderViewModelTest {
             coVerify { readerSessionManager.saveReaderSession() }
 
             // If webViewList is not empty, closeZimBook should not be called
-            verify(exactly = 0) { viewModel.closeZimBook() }
+            coVerify(exactly = 0) { viewModel.closeZimBook() }
 
             cancelAndIgnoreRemainingEvents()
           }
@@ -1035,7 +1035,7 @@ internal class CoreReaderViewModelTest {
       fun closeTab_snackBarResult_dismissed_savesSessionAndClosesZimBook() = runTest {
         coEvery { readerSessionManager.saveReaderSession() } just Runs
         every { readerWebViewManager.webViewList() } returns emptyList()
-        every { viewModel.closeZimBook() } just Runs
+        coEvery { viewModel.closeZimBook() } just Runs
 
         viewModel.effects.test {
           viewModel.onAction(ReaderAction.CloseTab(1))
@@ -1049,7 +1049,7 @@ internal class CoreReaderViewModelTest {
           coVerify { readerSessionManager.saveReaderSession() }
 
           // Only close if webViewList is empty
-          verify { viewModel.closeZimBook() }
+          coVerify { viewModel.closeZimBook() }
 
           cancelAndIgnoreRemainingEvents()
         }
@@ -1542,7 +1542,7 @@ internal class CoreReaderViewModelTest {
   inner class OnAddToHomeScreenMenuClicked {
     @Test
     fun whenReaderIsNull_doesNotEmitEffect() = runTest {
-      every { zimReaderContainer.zimFileReader } returns null
+      every { zimReaderContainer.hasReader } returns false
 
       viewModel.effects.test {
         viewModel.onAddToHomeScreenMenuClicked()
@@ -1555,8 +1555,7 @@ internal class CoreReaderViewModelTest {
     fun whenXiaomiDeviceAndPermissionNotGranted_emitsXiaomiShortcutPermissionDialogAndOpensPermissionEditorOnClick() =
       runTest {
         val viewModel = spyk(viewModel)
-        val zimFileReader = mockk<ZimFileReader>()
-        every { zimReaderContainer.zimFileReader } returns zimFileReader
+        every { zimReaderContainer.hasReader } returns true
 
         every { viewModel.isXiaomiDevice() } returns true
         every { viewModel.isShortcutPermissionGranted() } returns false
@@ -1579,9 +1578,8 @@ internal class CoreReaderViewModelTest {
     @Test
     fun whenNotXiaomiDevice_emitsAddShortcutDialog() = runTest {
       val viewModel = spyk(viewModel)
-      val zimFileReader = mockk<ZimFileReader>()
-      every { zimFileReader.title } returns "Wikipedia"
-      every { zimReaderContainer.zimFileReader } returns zimFileReader
+      every { zimReaderContainer.hasReader } returns true
+      every { zimReaderContainer.zimFileTitle } returns "Wikipedia"
 
       every { viewModel.isXiaomiDevice() } returns false
 
@@ -1598,9 +1596,8 @@ internal class CoreReaderViewModelTest {
     @Test
     fun whenXiaomiDeviceAndPermissionGranted_emitsAddShortcutDialog() = runTest {
       val viewModel = spyk(viewModel)
-      val zimFileReader = mockk<ZimFileReader>()
-      every { zimFileReader.title } returns "Wikipedia"
-      every { zimReaderContainer.zimFileReader } returns zimFileReader
+      every { zimReaderContainer.hasReader } returns true
+      every { zimReaderContainer.zimFileTitle } returns "Wikipedia"
 
       every { viewModel.isXiaomiDevice() } returns true
       every { viewModel.isShortcutPermissionGranted() } returns true
@@ -1620,7 +1617,11 @@ internal class CoreReaderViewModelTest {
       val viewModel = spyk(viewModel)
       val zimFileReader = mockk<ZimFileReader>()
       every { zimFileReader.title } returns "Wikipedia"
-      every { zimReaderContainer.zimFileReader } returns zimFileReader
+      every { zimReaderContainer.hasReader } returns true
+      every { zimReaderContainer.zimFileTitle } returns "Wikipedia"
+      coEvery { zimReaderContainer.withReader<Any?>(any()) } coAnswers {
+        firstArg<(ZimFileReader) -> Any?>().invoke(zimFileReader)
+      }
       every { mockWebView.url } returns "https://kiwix.app/A/page"
       every { context.getString(string.shortcut_disabled_message) } returns "Shortcut not available"
 
@@ -1653,7 +1654,11 @@ internal class CoreReaderViewModelTest {
       val viewModel = spyk(viewModel)
       val zimFileReader = mockk<ZimFileReader>()
       every { zimFileReader.title } returns "Wikipedia"
-      every { zimReaderContainer.zimFileReader } returns zimFileReader
+      every { zimReaderContainer.hasReader } returns true
+      every { zimReaderContainer.zimFileTitle } returns "Wikipedia"
+      coEvery { zimReaderContainer.withReader<Any?>(any()) } coAnswers {
+        firstArg<(ZimFileReader) -> Any?>().invoke(zimFileReader)
+      }
       every { mockWebView.url } returns "https://kiwix.app/A/page"
 
       every { viewModel.isXiaomiDevice() } returns false
@@ -1725,9 +1730,12 @@ internal class CoreReaderViewModelTest {
 
     val url = mockWebView.url
     val title = mockWebView.title
-    val reader = zimFileManager.zimFileReader
+    val zimId = zimReaderContainer.id
+    val zimName = zimReaderContainer.name
+    val zimReaderSource = zimReaderContainer.zimReaderSource
+    val favicon = zimReaderContainer.favicon
     coEvery {
-      readerHistoryManager.saveHistory(url, title, reader)
+      readerHistoryManager.saveHistory(url, title, zimId, zimName, zimReaderSource, favicon)
     } just Runs
 
     coEvery { readerSessionManager.saveReaderSession() } just Runs
@@ -1751,7 +1759,10 @@ internal class CoreReaderViewModelTest {
       readerHistoryManager.saveHistory(
         url,
         title,
-        zimFileManager.zimFileReader
+        zimId,
+        zimName,
+        zimReaderSource,
+        favicon
       )
     }
     coVerify { kiwixDataStore.incrementRateAppReadingCount() }
@@ -2191,20 +2202,20 @@ internal class CoreReaderViewModelTest {
         val viewModel = spyk(viewModel)
 
         val zimReaderSource = mockk<ZimReaderSource>()
-        val zimFileReader = mockk<ZimFileReader>()
+        val zimId = "zim-id"
 
         coEvery {
           zimFileManager.openZimFileInReader(
             zimReaderSource,
             viewModel.shouldShowSpellCheckedSuggestions()
           )
-        } returns ZimFileManager.OpenZimResult.Success(zimFileReader)
+        } returns ZimFileManager.OpenZimResult.Success(zimId)
         every { viewModel.isBrandedApp() } returns false
         coEvery { readerWebViewManager.destroyAllTabs() } just Runs
         every { viewModel.shouldShowSpellCheckedSuggestions() } returns false
         coEvery { kiwixPermissionChecker.hasReadExternalStoragePermission() } returns true
         coEvery { viewModel.updateTitle() } just Runs
-        coEvery { viewModel.observeBookmarks(zimFileReader) } just Runs
+        coEvery { viewModel.observeBookmarks(zimId) } just Runs
         every { readerMenuState.onFileOpened(true) } just Runs
 
         viewModel.readerMenuState = readerMenuState
@@ -2217,7 +2228,7 @@ internal class CoreReaderViewModelTest {
         coVerify { readerWebViewManager.openPage(zimReaderContainer.mainPage, mockWebView) }
         verify { readerMenuState.onFileOpened(any()) }
         assertThat(viewModel.uiState.value.showTabSwitcher).isFalse()
-        verify { viewModel.observeBookmarks(zimFileReader) }
+        verify { viewModel.observeBookmarks(zimId) }
         coVerify { viewModel.updateTitle() }
       }
 
@@ -2453,15 +2464,13 @@ internal class CoreReaderViewModelTest {
 
   @Test
   fun invokesBookmarkManagerAndUpdatesUrlFlow() = runTest {
-    val zimFileReader = mockk<ZimFileReader>()
     val zimId = "zim_id_123"
-    every { zimFileReader.id } returns zimId
     every {
       bookmarkManager.observeBookmarks(viewModel.viewModelScope, zimId, any())
     } just Runs
     every { mockWebView.url } returns "https://kiwix.app/page"
 
-    viewModel.observeBookmarks(zimFileReader)
+    viewModel.observeBookmarks(zimId)
     advanceUntilIdle()
 
     verify { bookmarkManager.observeBookmarks(viewModel.viewModelScope, zimId, any()) }
@@ -2532,8 +2541,7 @@ internal class CoreReaderViewModelTest {
         )
       } just Runs
 
-      val zimFileReader = mockk<ZimFileReader>()
-      every { zimReaderContainer.zimFileReader } returns zimFileReader
+      every { zimReaderContainer.id } returns "zim-id"
       every { viewModel.observeBookmarks(any()) } just Runs
       every { pendingSearchItemManager.consume() } returns null
       every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.None
@@ -2556,7 +2564,7 @@ internal class CoreReaderViewModelTest {
       }
 
       // Verifies  onSessionRestoreCompleted() called when onComplete() of restoreViewStateOnValidWebViewHistory()
-      verify { viewModel.observeBookmarks(zimFileReader) }
+      verify { viewModel.observeBookmarks("zim-id") }
       assertThat(viewModel.isWebViewHistoryRestoring).isFalse()
       verify { pendingSearchItemManager.consume() }
       verify { readerIntentManager.consumePendingAction() }
@@ -2678,7 +2686,7 @@ internal class CoreReaderViewModelTest {
         every { pendingSearchItemManager.consume() } returns item
         coEvery { viewModel.loadUrlWithCurrentWebview(any()) } just Runs
 
-        every { zimReaderContainer.zimFileReader } returns null
+        every { zimReaderContainer.id } returns null
         every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.None
         coEvery { readerSessionManager.saveReaderSession() } just Runs
 
@@ -2727,7 +2735,7 @@ internal class CoreReaderViewModelTest {
         every { pendingSearchItemManager.consume() } returns item
         coEvery { viewModel.loadUrlWithCurrentWebview(any()) } just Runs
 
-        every { zimReaderContainer.zimFileReader } returns null
+        every { zimReaderContainer.id } returns null
         every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.None
         coEvery { readerSessionManager.saveReaderSession() } just Runs
 
@@ -2776,7 +2784,7 @@ internal class CoreReaderViewModelTest {
         every { zimReaderContainer.isRedirect(any()) } returns false
 
         coEvery { viewModel.loadUrlWithCurrentWebview(any()) } just Runs
-        every { zimReaderContainer.zimFileReader } returns null
+        every { zimReaderContainer.id } returns null
         every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.None
         coEvery { readerSessionManager.saveReaderSession() } just Runs
 
@@ -2825,7 +2833,7 @@ internal class CoreReaderViewModelTest {
         every { zimReaderContainer.isRedirect(any()) } returns false
 
         coEvery { viewModel.loadUrlWithCurrentWebview(any()) } just Runs
-        every { zimReaderContainer.zimFileReader } returns null
+        every { zimReaderContainer.id } returns null
         every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.None
         coEvery { readerSessionManager.saveReaderSession() } just Runs
 
@@ -3263,8 +3271,8 @@ internal class CoreReaderViewModelTest {
       super.exitBook(shouldCloseZimBook)
     }
 
-    public override fun observeBookmarks(zimFileReader: ZimFileReader) {
-      super.observeBookmarks(zimFileReader)
+    public override fun observeBookmarks(zimFileId: String) {
+      super.observeBookmarks(zimFileId)
     }
 
     public override fun showOpenInNewTabDialog(url: String) {
