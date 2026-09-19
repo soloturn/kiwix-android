@@ -104,7 +104,7 @@ jobs:
           cores: 3
           disable-animations: false
           heap-size: 1024M
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
+          emulator-options: -no-window -gpu swangle_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           script: |
             trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
             echo "Generated AVD snapshot for caching."
@@ -171,7 +171,7 @@ jobs:
           profile: pixel_2
           ram-size: 3072M
           cores: 3
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
+          emulator-options: -no-snapshot-save -no-window -gpu swangle_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           disable-animations: true
           force-avd-creation: false
           heap-size: 1024M
@@ -310,7 +310,7 @@ jobs:
           cores: 3
           disable-animations: false
           heap-size: 1024M
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
+          emulator-options: -no-window -gpu swangle_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           script: |
             trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
             echo "Generated AVD snapshot for caching."
@@ -408,7 +408,7 @@ jobs:
           cores: 3
           disable-animations: false
           heap-size: 1024M
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
+          emulator-options: -no-window -gpu swangle_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           script: |
             trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
             echo "Generated AVD snapshot for caching."
@@ -506,7 +506,7 @@ jobs:
           cores: 3
           disable-animations: false
           heap-size: 1024M
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
+          emulator-options: -no-window -gpu swangle_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           script: |
             trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
             echo "Generated AVD snapshot for caching."
