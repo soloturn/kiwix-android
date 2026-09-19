@@ -53,7 +53,7 @@ fi
 (
   while true; do
     # shellcheck disable=SC2035
-    adb logcat *:E System.err:W -v color
+    adb logcat *:E System.err:W -v color | tee -a /tmp/logcat-capture.log
     sleep 1
   done
 ) &
@@ -112,6 +112,7 @@ else
   mapfile -t junit_xmls < <(find app/build/outputs/androidTest-results/connected -name 'TEST-*.xml' 2>/dev/null)
   if [ "${#junit_xmls[@]}" -eq 0 ] || ! python3 contrib/classify_flaky_failures.py \
     --junit-xml "${junit_xmls[@]}" \
+    --log /tmp/logcat-capture.log \
     --resource-diag /tmp/resource-diag.log \
     --dmesg /tmp/dmesg.log \
     --stall-capture /tmp/stall-capture.log \

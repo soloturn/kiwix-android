@@ -23,13 +23,12 @@ CI investigations this project has done (see e.g. runs 35284788813 and
 checked against host load samples, kernel dmesg stall detectors, and the
 android-emulator-runner action's own stall-capture probe.
 
-This does NOT retry tests or guess. It only relabels a failure that already
-happened as non-blocking when there is concrete, printed evidence the
-runner itself was overloaded at the time - never on the exception type
-alone. Every relabel is printed with the evidence that justified it, so
-the decision can be audited, and a run with no supporting artifacts
-(--resource-diag/--dmesg/--stall-capture all omitted) will never relabel
-anything, no matter how "flaky-looking" the exception is.
+This does NOT retry tests or guess. It only relabels a failure as
+non-blocking given concrete printed evidence - CI overload (host-load/
+dmesg/stall-capture) for KNOWN_FLAKY_SIGNATURES, or the exact crash text
+in --log for KNOWN_EXTERNAL_BUG_SIGNATURES - never the exception type
+alone. Every relabel prints the evidence that justified it; omit all
+artifact flags and nothing gets relabeled.
 
 Usage:
   classify_flaky_failures.py --junit-xml build/outputs/.../TEST-*.xml \\
@@ -65,6 +64,23 @@ KNOWN_FLAKY_SIGNATURES: list[tuple[str, str | None]] = [
   (
     "java.lang.RuntimeException",
     "No views in hierarchy found matching: an instance of android.webkit.WebView",
+  ),
+]
+
+# Failures confirmed, by reading the actual native crash in the raw job log
+# (not merely the JUnit XML message), to be a known bug in a dependency
+# outside this project's code - not CI-runner overload, so no host-load
+# evidence is required or checked. Evidence here is the exact crash
+# signature string appearing in the log near the failure, which is why this
+# is matched separately from KNOWN_FLAKY_SIGNATURES/find_evidence.
+KNOWN_EXTERNAL_BUG_SIGNATURES: list[tuple[str, str, str, str]] = [
+  (
+    "Test instrumentation process crashed",
+    "Detected dangling raw_ptr",
+    "Native Android System WebView crash (Chromium PartitionAlloc "
+    "dangling-ptr detector, SIGTRAP in Chrome_IOThread) - a bug in the "
+    "device's WebView build, not this project's code.",
+    "https://issues.chromium.org/u/1/issues/554600555",
   ),
 ]
 
@@ -164,6 +180,28 @@ def parse_dmesg_hits(path: Path) -> list[str]:
         hits.append(line.strip())
         break
   return hits
+
+
+def parse_log_signature_hits(log_path: Path, signature: str) -> list[str]:
+  """Lines containing `signature` anywhere in the log. Not time-correlated,
+  like parse_dmesg_hits - `log_path` may be a raw local adb logcat capture
+  (no GH Actions timestamp prefix) as well as a downloaded job log, and the
+  signature is rare/specific enough not to need correlation either way."""
+  hits = []
+  for line in log_path.read_text(errors="replace").splitlines():
+    if signature in line:
+      hits.append(line.strip())
+  return hits
+
+
+def matches_known_external_bug(message: str) -> tuple[str, str, str] | None:
+  """Returns (log_signature, description, upstream_link) for the first
+  KNOWN_EXTERNAL_BUG_SIGNATURES entry whose message substring is in
+  `message`, or None."""
+  for message_substr, log_signature, description, upstream_link in KNOWN_EXTERNAL_BUG_SIGNATURES:
+    if message_substr in message:
+      return log_signature, description, upstream_link
+  return None
 
 
 def build_failure_timestamp_index(log_path: Path) -> dict[tuple[str, str], datetime]:
@@ -268,7 +306,13 @@ def find_evidence(
   return ev
 
 
-def print_report(failure: TestFailure, evidence: Evidence | None, classified_overload: bool) -> None:
+def print_report(
+  failure: TestFailure,
+  evidence: Evidence | None,
+  classified_overload: bool,
+  external_bug: tuple[str, str] | None = None,
+  external_bug_hits: list[str] | None = None,
+) -> None:
   print(f"\n{failure.classname}#{failure.method}")
   print(f"  exception: {failure.exc_type}")
   if failure.message:
@@ -294,7 +338,18 @@ def print_report(failure: TestFailure, evidence: Evidence | None, classified_ove
         print(f"    {hit}")
       if len(evidence.dmesg_hits) > 5:
         print(f"    ... and {len(evidence.dmesg_hits) - 5} more")
-  verdict = "CI OVERLOAD - quarantining as passed" if classified_overload else "GENUINE - left failing"
+  if external_bug is not None:
+    description, upstream_link = external_bug
+    print(f"  known external bug: {description}")
+    print(f"  upstream: {upstream_link}")
+    for hit in (external_bug_hits or [])[:3]:
+      print(f"    {hit}")
+  if classified_overload:
+    verdict = "CI OVERLOAD - quarantining as passed"
+  elif external_bug is not None:
+    verdict = "KNOWN EXTERNAL BUG - quarantining as passed"
+  else:
+    verdict = "GENUINE - left failing"
   print(f"  verdict: {verdict}")
 
 
@@ -316,10 +371,8 @@ def main() -> int:
     "--log",
     type=Path,
     help=(
-      "Raw instrumentation/gradle job log (e.g. from `gh api .../logs`), for precise "
-      "failure timestamps. Optional - without it, timestamps are estimated from each "
-      "testsuite's start time plus cumulative testcase durations, which is what's "
-      "available mid-job in CI before the log can be fetched."
+      "Job log or local adb logcat capture. Gives precise failure timestamps "
+      "and is required for KNOWN_EXTERNAL_BUG_SIGNATURES matching."
     ),
   )
   parser.add_argument("--resource-diag", type=Path, help="resource-diag.log artifact")
@@ -354,7 +407,9 @@ def main() -> int:
     print("No JUnit XML files found for the given pattern(s).", file=sys.stderr)
     return 2
 
-  failure_ts_index = build_failure_timestamp_index(args.log) if args.log else {}
+  failure_ts_index = (
+    build_failure_timestamp_index(args.log) if args.log and args.log.exists() else {}
+  )
   resource_samples = (
     parse_resource_diag(args.resource_diag)
     if args.resource_diag and args.resource_diag.exists()
@@ -366,6 +421,12 @@ def main() -> int:
     else []
   )
   dmesg_hits = parse_dmesg_hits(args.dmesg) if args.dmesg and args.dmesg.exists() else []
+  external_bug_hits_by_signature: dict[str, list[str]] = {}
+  if args.log and args.log.exists():
+    for _, log_signature, _, _ in KNOWN_EXTERNAL_BUG_SIGNATURES:
+      external_bug_hits_by_signature[log_signature] = parse_log_signature_hits(
+        args.log, log_signature
+      )
 
   print(
     f"Loaded {len(xml_paths)} JUnit XML file(s), {len(failure_ts_index)} failure "
@@ -403,8 +464,17 @@ def main() -> int:
           failure.timestamp, window, resource_samples, stall_events, dmesg_hits, args.load_threshold
         )
         classified_overload = evidence.has_any
-      print_report(failure, evidence, classified_overload)
-      if classified_overload:
+      external_bug = None
+      external_bug_hits: list[str] = []
+      if not classified_overload:
+        match = matches_known_external_bug(failure.message)
+        if match:
+          log_signature, description, upstream_link = match
+          external_bug_hits = external_bug_hits_by_signature.get(log_signature, [])
+          if external_bug_hits:
+            external_bug = (description, upstream_link)
+      print_report(failure, evidence, classified_overload, external_bug, external_bug_hits)
+      if classified_overload or external_bug is not None:
         quarantined += 1
         any_quarantined_here = True
         if args.apply:
@@ -416,12 +486,12 @@ def main() -> int:
       print(f"  -> wrote {out_path}")
 
   print(
-    f"\n{total} failure(s) examined, {quarantined} classified as CI overload"
-    f"{' and quarantined' if args.apply else ' (dry run, use --apply to rewrite XML)'}."
+    f"\n{total} failure(s) examined, {quarantined} classified as CI overload or a known "
+    f"external bug{' and quarantined' if args.apply else ' (dry run, use --apply to rewrite XML)'}."
   )
-  # Exit 0 only if every observed failure was CI overload (or there were
-  # none) - callers (e.g. a CI step deciding whether to fail the build)
-  # can rely on this without re-parsing the printed report.
+  # Exit 0 only if every observed failure was CI overload or a known external
+  # bug (or there were none) - callers (e.g. a CI step deciding whether to
+  # fail the build) can rely on this without re-parsing the printed report.
   return 0 if quarantined == total else 1
 
 
