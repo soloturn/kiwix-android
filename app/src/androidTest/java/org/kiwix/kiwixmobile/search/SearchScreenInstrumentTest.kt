@@ -29,7 +29,6 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import okhttp3.ResponseBody
 import org.junit.After
-import org.junit.Assume
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -83,7 +82,6 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
 
   @Test(timeout = 240_000)
   fun searchScreenSimple() {
-    Assume.assumeTrue(Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA)
     activityScenario.onActivity {
       kiwixMainActivity = it
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
