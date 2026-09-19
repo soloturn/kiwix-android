@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.SideEffect
@@ -103,7 +104,9 @@ class SearchViewModel @Inject constructor(
 
   private suspend fun getSuggestedSpelledWords(word: String, maxCount: Int): List<String> =
     withContext(ioDispatcher) {
-      zimReaderContainer.zimFileReader?.getSuggestedSpelledWords(word, maxCount).orEmpty()
+      zimReaderContainer.withReaderBlocking {
+        it.getSuggestedSpelledWords(word, maxCount)
+      }.orEmpty()
     }
 
   fun setAlertDialogShower(alertDialogShower: AlertDialogShower) {
@@ -193,11 +196,25 @@ class SearchViewModel @Inject constructor(
   private fun searchResults() =
     filter.asStateFlow()
       .mapLatest {
-        SearchResultsWithTerm(
-          it,
-          searchResultGenerator.generateSearchResults(it, zimReaderContainer.zimFileReader),
-          searchMutex
-        )
+        // The ZIM file's single shared SuggestionSearcher can otherwise be entered from two
+        // ViewModel instances at once (e.g. searching again reuses it before the previous
+        // screen's coroutine is done). Same searchMutex as getVisibleResults below.
+        //
+        // generateSearchResults() blocks on native JNI code with no suspension point, so a
+        // fast-typing burst can queue several already-stale calls behind each other, each
+        // paying full cost only to be discarded. Skip if a newer term has already landed.
+        val suggestionSearch = if (filter.value != it) {
+          null
+        } else {
+          searchMutex.withLock {
+            if (filter.value != it) {
+              null
+            } else {
+              searchResultGenerator.generateSearchResults(it, zimReaderContainer)
+            }
+          }
+        }
+        SearchResultsWithTerm(it, suggestionSearch, searchMutex)
       }
 
   @Suppress("CyclomaticComplexMethod")
