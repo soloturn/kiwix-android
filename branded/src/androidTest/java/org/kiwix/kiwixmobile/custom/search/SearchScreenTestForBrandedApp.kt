@@ -366,6 +366,12 @@ class SearchScreenTestForBrandedApp {
 
   @After
   fun finish() {
+    // RetryRule re-runs @Before/@After on retry without a new test instance -
+    // without closing here, a retry's fresh ActivityScenario.launch() leaves the
+    // previous attempt's Activity/WebView never explicitly torn down.
+    if (::activityScenario.isInitialized) {
+      activityScenario.close()
+    }
     TestUtils.deleteTemporaryFilesOfTestCases(context)
     context.cacheDir?.let {
       it.listFiles()?.let { files ->
