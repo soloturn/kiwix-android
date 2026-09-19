@@ -40,7 +40,6 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.page.history.models.WebViewHistoryItem
-import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
@@ -229,10 +228,7 @@ class ReaderSessionManagerTest {
       every { webView.url } returns "url"
       every { webView.saveState(any()) } returns null
 
-      val zimReader = mockk<ZimFileReader>()
-      every { zimReader.id } returns "zim"
-
-      every { zimReaderContainer.zimFileReader } returns zimReader
+      every { zimReaderContainer.id } returns "zim"
       mockCurrentTabs(listOf(webView))
       mockSaveReaderSessionDependencies()
 
@@ -263,7 +259,7 @@ class ReaderSessionManagerTest {
     fun `saveReaderSession skips webview when zim reader is null`() = runTest {
       mockSaveReaderSessionDependencies()
 
-      every { zimReaderContainer.zimFileReader } returns null
+      every { zimReaderContainer.id } returns null
 
       val webView = mockWebView()
 
@@ -311,10 +307,7 @@ class ReaderSessionManagerTest {
     }
 
     private fun mockZimReader(id: String = "zim-id") {
-      val zimReader = mockk<ZimFileReader>()
-
-      every { zimReader.id } returns id
-      every { zimReaderContainer.zimFileReader } returns zimReader
+      every { zimReaderContainer.id } returns id
     }
 
     private fun mockCurrentTabs(
@@ -393,7 +386,7 @@ class ReaderSessionManagerTest {
       val historyItem = mockk<WebViewHistoryItem>()
 
       every { historyItem.webViewBackForwardListBundle } returns null
-      every { zimReaderContainer.zimFileReader } returns null
+      every { zimReaderContainer.mainPage } returns null
 
       readerSessionManager.restoreTabState(
         webView,
@@ -413,7 +406,7 @@ class ReaderSessionManagerTest {
     fun `restoreTabState does nothing when history item is null and zim reader is null`() {
       val webView = mockk<KiwixWebView>(relaxed = true)
 
-      every { zimReaderContainer.zimFileReader } returns null
+      every { zimReaderContainer.mainPage } returns null
 
       readerSessionManager.restoreTabState(
         webView,

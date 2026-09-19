@@ -957,8 +957,7 @@ abstract class CoreReaderViewModel(
   }
 
   override fun onAddToHomeScreenMenuClicked() {
-    val reader = zimReaderContainer.zimFileReader
-    if (reader == null) {
+    if (!zimReaderContainer.hasReader) {
       Log.e(TAG_KIWIX, "Reader or ZimFileReader is null, cannot add to home screen")
       return
     }
@@ -976,7 +975,7 @@ abstract class CoreReaderViewModel(
       }
     } else {
       // Permission is granted (or not Xiaomi) — show the shortcut naming dialog
-      val initialName = reader.title
+      val initialName = zimReaderContainer.zimFileTitle.orEmpty()
       val nameState = mutableStateOf(initialName)
 
       val dialog = KiwixDialog.AddShortcut(
@@ -996,12 +995,18 @@ abstract class CoreReaderViewModel(
       )
       ReaderEffect.ShowKiwixDialog(dialog) {
         launchInMainScope {
-          val result = addBookShortcut(
-            zimFileReader = reader,
-            pageUrl = getCurrentWebView().url,
-            customName = nameState.value
-          )
-          if (result == ShortcutResult.NotSupported) {
+          // Re-lease the reader here rather than reusing one captured when the
+          // menu was clicked - by the time the user confirms this dialog, the
+          // book may have been closed or swapped out from under us.
+          val pageUrl = getCurrentWebView().url
+          val result = zimReaderContainer.withReader { reader ->
+            addBookShortcut(
+              zimFileReader = reader,
+              pageUrl = pageUrl,
+              customName = nameState.value
+            )
+          }
+          if (result == null || result == ShortcutResult.NotSupported) {
             emitEffect(ReaderEffect.ShowToast(context.getString(string.shortcut_disabled_message)))
           }
         }
@@ -1065,7 +1070,10 @@ abstract class CoreReaderViewModel(
       readerHistoryManager.saveHistory(
         currentWebView.url,
         currentWebView.title,
-        zimFileManager.zimFileReader
+        zimReaderContainer.id,
+        zimReaderContainer.name,
+        zimReaderContainer.zimReaderSource,
+        zimReaderContainer.favicon
       )
       kiwixDataStore.incrementRateAppReadingCount()
       updateBottomToolbarVisibility()
@@ -1288,7 +1296,7 @@ abstract class CoreReaderViewModel(
           openMainPage()
           readerMenuState?.onFileOpened(urlIsValid())
           updateState { copy(showTabSwitcher = false) }
-          observeBookmarks(result.zimFileReader)
+          observeBookmarks(result.id)
           updateTitle()
         }
 
@@ -1362,10 +1370,8 @@ abstract class CoreReaderViewModel(
     }
   }
 
-  fun closeZimBook() {
-    viewModelScope.launch {
-      zimFileManager.close()
-    }
+  suspend fun closeZimBook() {
+    zimFileManager.close()
   }
 
   protected suspend fun urlIsValid(): Boolean =
@@ -1398,9 +1404,9 @@ abstract class CoreReaderViewModel(
     }
   }
 
-  protected open fun observeBookmarks(zimFileReader: ZimFileReader) {
+  protected open fun observeBookmarks(zimFileId: String) {
     runCatching {
-      bookmarkManager.observeBookmarks(viewModelScope, zimFileReader.id, webUrlsFlow)
+      bookmarkManager.observeBookmarks(viewModelScope, zimFileId, webUrlsFlow)
       updateUrlFlow()
     }.onFailure {
       Log.e(
@@ -1440,7 +1446,7 @@ abstract class CoreReaderViewModel(
     // This is especially important for custom apps, where the ZIM file is now loaded
     // only if it's not already open in the reader. So when the user navigates to another
     // screen and returns, we ensure the bookmark is restored correctly.
-    zimReaderContainer.zimFileReader?.let(::observeBookmarks)
+    zimReaderContainer.id?.let(::observeBookmarks)
     // This lambda is executed after the tabs have been restored. It checks if there is a
     // search item to open. If `searchItemToOpen` is not null, it calls `openSearchItem`
     // to open the specified item, then sets `searchItemToOpen` to null to prevent
@@ -1562,9 +1568,9 @@ abstract class CoreReaderViewModel(
           if (result == SnackbarResult.Dismissed) {
             launchInViewModelScope {
               readerSessionManager.saveReaderSession()
-            }
-            if (readerWebViewManager.webViewList().isEmpty()) {
-              closeZimBook()
+              if (readerWebViewManager.webViewList().isEmpty()) {
+                closeZimBook()
+              }
             }
           }
         }
@@ -1600,9 +1606,9 @@ abstract class CoreReaderViewModel(
           if (result == SnackbarResult.Dismissed) {
             launchInViewModelScope {
               readerSessionManager.saveReaderSession()
-            }
-            if (readerWebViewManager.webViewList().isEmpty()) {
-              closeZimBook()
+              if (readerWebViewManager.webViewList().isEmpty()) {
+                closeZimBook()
+              }
             }
           }
         }

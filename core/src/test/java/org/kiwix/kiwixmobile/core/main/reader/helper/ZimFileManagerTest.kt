@@ -27,7 +27,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.sharedFunctions.MainDispatcherRule
@@ -40,7 +39,6 @@ class ZimFileManagerTest {
   private lateinit var manager: ZimFileManager
 
   private val zimReaderContainer = mockk<ZimReaderContainer>(relaxed = true)
-  private val zimReader = mockk<ZimFileReader>(relaxed = true)
 
   @Before
   fun setup() {
@@ -54,13 +52,6 @@ class ZimFileManagerTest {
     coVerify {
       zimReaderContainer.setZimReaderSource(null)
     }
-  }
-
-  @Test
-  fun `zimFileReader delegates to container`() {
-    every { zimReaderContainer.zimFileReader } returns zimReader
-
-    assertThat(manager.zimFileReader).isEqualTo(zimReader)
   }
 
   @Test
@@ -93,12 +84,12 @@ class ZimFileManagerTest {
 
     coEvery { source.canOpenInLibkiwix(testDispatcher) } returns true
     every { zimReaderContainer.zimReaderSource } returns null
-    every { zimReaderContainer.zimFileReader } returns zimReader
+    every { zimReaderContainer.id } returns "zim-id"
 
     val result = manager.openZimFileInReader(source, true)
 
     assertThat(result)
-      .isEqualTo(ZimFileManager.OpenZimResult.Success(zimReader))
+      .isEqualTo(ZimFileManager.OpenZimResult.Success("zim-id"))
 
     coVerify {
       zimReaderContainer.setZimReaderSource(source, true)
@@ -111,7 +102,7 @@ class ZimFileManagerTest {
 
     coEvery { source.canOpenInLibkiwix(testDispatcher) } returns true
     every { zimReaderContainer.zimReaderSource } returns null
-    every { zimReaderContainer.zimFileReader } returns null
+    every { zimReaderContainer.id } returns null
 
     val result = manager.openZimFileInReader(source, false)
 

@@ -20,11 +20,12 @@ package org.kiwix.kiwixmobile.core.reader
 import android.webkit.WebResourceResponse
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Factory
 import java.net.HttpURLConnection
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -45,30 +46,37 @@ class ZimReaderContainer @Inject constructor(
   private val lock = ReentrantReadWriteLock()
   private var backingZimFileReader: ZimFileReader? = null
 
-  // Guards setZimReaderSource against a cancelled-but-still-running caller's stale write
-  // landing after a newer one's.
-  private val requestGeneration = AtomicLong(0)
+  // Serializes setZimReaderSource() itself so callers (CoreReaderViewModel,
+  // DeleteFilesUseCase, ...) can never race to dispose each other's reader
+  // mid-open - only one open/close runs at a time, in call order.
+  private val setReaderMutex = Mutex()
 
-  var zimFileReader: ZimFileReader?
-    get() = lock.read { backingZimFileReader }
-    set(value) {
-      lock.write {
-        backingZimFileReader?.dispose()
-        backingZimFileReader = value
-      }
-    }
-
-  private inline fun <T> withReader(block: (ZimFileReader?) -> T): T =
+  private inline fun <T> withReaderOrNull(block: (ZimFileReader?) -> T): T =
     lock.read { block(backingZimFileReader) }
+
+  /**
+   * Leases the current reader to [block] for synchronous callers already off the
+   * main thread - the WebView's own callback thread (isRedirect/load/getRedirect
+   * below), or a coroutine that has already hopped onto ioDispatcher via [withReader].
+   * Holding the read lock for the duration blocks setZimReaderSource's dispose()
+   * until [block] returns, so the reader can never be disposed mid-use.
+   */
+  fun <T> withReaderBlocking(block: (ZimFileReader) -> T): T? =
+    lock.read { backingZimFileReader?.let(block) }
+
+  /** Coroutine-friendly version of [withReaderBlocking] - hops onto ioDispatcher first. */
+  suspend fun <T> withReader(block: (ZimFileReader) -> T): T? =
+    withContext(ioDispatcher) { withReaderBlocking(block) }
+
+  val hasReader: Boolean get() = withReaderOrNull { it != null }
 
   suspend fun setZimReaderSource(
     zimReaderSource: ZimReaderSource?,
     showSearchSuggestionsSpellChecked: Boolean = false
-  ) {
-    if (zimReaderSource == withReader { it?.zimReaderSource }) {
-      return
+  ) = setReaderMutex.withLock {
+    if (zimReaderSource == withReaderOrNull { it?.zimReaderSource }) {
+      return@withLock
     }
-    val generation = requestGeneration.incrementAndGet()
     val newReader = withContext(ioDispatcher) {
       if (zimReaderSource?.exists(ioDispatcher) == true &&
         zimReaderSource.canOpenInLibkiwix(ioDispatcher)
@@ -79,22 +87,18 @@ class ZimReaderContainer @Inject constructor(
       }
     }
     lock.write {
-      if (generation == requestGeneration.get()) {
-        backingZimFileReader?.dispose()
-        backingZimFileReader = newReader
-      } else {
-        newReader?.dispose()
-      }
+      backingZimFileReader?.dispose()
+      backingZimFileReader = newReader
     }
   }
 
-  fun getPageUrlFromTitle(title: String) = withReader { it?.getPageUrlFrom(title) }
+  fun getPageUrlFromTitle(title: String) = withReaderOrNull { it?.getPageUrlFrom(title) }
 
-  fun getRandomPageUrl() = withReader { it?.getRandomPageUrl() }
-  fun isRedirect(url: String): Boolean = withReader { it?.isRedirect(url) == true }
-  fun getRedirect(url: String): String = withReader { it?.getRedirect(url) }.orEmpty()
+  fun getRandomPageUrl() = withReaderOrNull { it?.getRandomPageUrl() }
+  fun isRedirect(url: String): Boolean = withReaderOrNull { it?.isRedirect(url) == true }
+  fun getRedirect(url: String): String = withReaderOrNull { it?.getRedirect(url) }.orEmpty()
   fun load(url: String, requestHeaders: Map<String, String>): WebResourceResponse = runBlocking {
-    return@runBlocking withReader { reader ->
+    return@runBlocking withReaderOrNull { reader ->
       WebResourceResponse(
         reader?.getMimeTypeFromUrl(url),
         Charsets.UTF_8.name(),
@@ -119,16 +123,16 @@ class ZimReaderContainer @Inject constructor(
     }
   }
 
-  val zimReaderSource get() = withReader { it?.zimReaderSource }
-  val zimFileTitle get() = withReader { it?.title }
-  val mainPage get() = withReader { it?.mainPage }
-  val id get() = withReader { it?.id }
-  val fileSize get() = withReader { it?.fileSize } ?: 0L
-  val creator get() = withReader { it?.creator }
-  val publisher get() = withReader { it?.publisher }
-  val name get() = withReader { it?.name }
-  val date get() = withReader { it?.date }
-  val description get() = withReader { it?.description }
-  val favicon get() = withReader { it?.favicon }
-  val language get() = withReader { it?.language }
+  val zimReaderSource get() = withReaderOrNull { it?.zimReaderSource }
+  val zimFileTitle get() = withReaderOrNull { it?.title }
+  val mainPage get() = withReaderOrNull { it?.mainPage }
+  val id get() = withReaderOrNull { it?.id }
+  val fileSize get() = withReaderOrNull { it?.fileSize } ?: 0L
+  val creator get() = withReaderOrNull { it?.creator }
+  val publisher get() = withReaderOrNull { it?.publisher }
+  val name get() = withReaderOrNull { it?.name }
+  val date get() = withReaderOrNull { it?.date }
+  val description get() = withReaderOrNull { it?.description }
+  val favicon get() = withReaderOrNull { it?.favicon }
+  val language get() = withReaderOrNull { it?.language }
 }

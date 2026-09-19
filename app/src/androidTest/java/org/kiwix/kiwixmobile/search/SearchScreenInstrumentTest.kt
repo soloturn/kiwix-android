@@ -302,7 +302,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       waitForIdle()
       // Native archive open is async and can take longer than 10s under CI load.
       waitUntil(TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN) {
-        kiwixMainActivity.zimReaderContainer.zimFileReader != null
+        kiwixMainActivity.zimReaderContainer.hasReader
       }
     }
   }

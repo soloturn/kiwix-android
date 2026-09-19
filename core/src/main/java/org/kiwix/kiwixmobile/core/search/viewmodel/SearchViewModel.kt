@@ -104,7 +104,9 @@ class SearchViewModel @Inject constructor(
 
   private suspend fun getSuggestedSpelledWords(word: String, maxCount: Int): List<String> =
     withContext(ioDispatcher) {
-      zimReaderContainer.zimFileReader?.getSuggestedSpelledWords(word, maxCount).orEmpty()
+      zimReaderContainer.withReaderBlocking {
+        it.getSuggestedSpelledWords(word, maxCount)
+      }.orEmpty()
     }
 
   fun setAlertDialogShower(alertDialogShower: AlertDialogShower) {
@@ -208,7 +210,7 @@ class SearchViewModel @Inject constructor(
             if (filter.value != it) {
               null
             } else {
-              searchResultGenerator.generateSearchResults(it, zimReaderContainer.zimFileReader)
+              searchResultGenerator.generateSearchResults(it, zimReaderContainer)
             }
           }
         }

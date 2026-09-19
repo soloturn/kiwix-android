@@ -241,7 +241,7 @@ class NoteScreenTest : BaseActivityTest() {
       // composed - check the native reader directly instead, which is the
       // exact thing that needs to be ready.
       waitUntil(TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN) {
-        kiwixMainActivity.zimReaderContainer.zimFileReader != null
+        kiwixMainActivity.zimReaderContainer.hasReader
       }
     }
   }
