@@ -93,7 +93,7 @@ class ZimReaderContainerTest {
   @After
   fun tearDown() {
     if (::container.isInitialized) {
-      container.zimFileReader?.dispose()
+      container.withReaderBlocking { it.dispose() }
     }
     if (::testZimFile.isInitialized) {
       testZimFile.delete()
@@ -108,13 +108,13 @@ class ZimReaderContainerTest {
 
     // Valid source
     container.setZimReaderSource(source)
-    assertNotNull(container.zimFileReader)
+    assertTrue(container.hasReader)
     assertEquals(source, container.zimReaderSource)
 
     // Same source should not recreate
-    val originalReader = container.zimFileReader
+    val originalReader = container.withReaderBlocking { it }
     container.setZimReaderSource(source)
-    assertSame(originalReader, container.zimFileReader)
+    assertSame(originalReader, container.withReaderBlocking { it })
 
     // Different source should recreate
     val secondFile = File(targetContext.cacheDir, "second.zim").also {
@@ -122,7 +122,7 @@ class ZimReaderContainerTest {
       tempFiles += it
     }
     container.setZimReaderSource(ZimReaderSource(secondFile))
-    assertNotSame(originalReader, container.zimFileReader)
+    assertNotSame(originalReader, container.withReaderBlocking { it })
 
     // Invalid file
     val invalidFile = File(targetContext.cacheDir, "fake.zim").also {
@@ -130,11 +130,11 @@ class ZimReaderContainerTest {
       tempFiles += it
     }
     container.setZimReaderSource(ZimReaderSource(invalidFile))
-    assertNull(container.zimFileReader)
+    assertFalse(container.hasReader)
 
     // Null source clears reader
     container.setZimReaderSource(null)
-    assertNull(container.zimFileReader)
+    assertFalse(container.hasReader)
     assertNull(container.zimReaderSource)
   }
 
@@ -174,7 +174,7 @@ class ZimReaderContainerTest {
   @Test
   fun readerApiAndMetadataScenarios() = runTest {
     // Behavior without reader
-    assertNull(container.zimFileReader)
+    assertFalse(container.hasReader)
     assertNull(container.zimReaderSource)
     assertNull(container.zimFileTitle)
     assertNull(container.mainPage)
@@ -202,19 +202,17 @@ class ZimReaderContainerTest {
     assertTrue(container.getRedirect(CONTENT_PREFIX + mainEntry).contains(mainEntry))
 
     // Title lookup
-    val title = container.zimFileReader!!
-      .jniKiwixReader.mainEntry
-      .getItem(true)
-      .title
+    val title = container.withReaderBlocking {
+      it.jniKiwixReader.mainEntry.getItem(true).title
+    }!!
 
     val url = container.getPageEntryPathFromTitle(title)
     assertNotNull(url)
     assertTrue(url!!.isNotBlank())
 
-    val mainEntryTitle = container.zimFileReader!!
-      .jniKiwixReader.mainEntry
-      .getItem(true)
-      .title
+    val mainEntryTitle = container.withReaderBlocking {
+      it.jniKiwixReader.mainEntry.getItem(true).title
+    }!!
     val result = container.getPageEntryPathFromTitle(mainEntryTitle)
     assertNotNull(result)
     assertTrue(result!!.isNotBlank())

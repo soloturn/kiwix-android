@@ -21,7 +21,6 @@ import org.kiwix.kiwixmobile.core.dao.entities.HistoryRoomEntity
 import org.kiwix.kiwixmobile.core.extensions.toLocalDate
 import org.kiwix.kiwixmobile.core.page.adapter.Page
 import org.kiwix.kiwixmobile.core.page.adapter.PageRelated
-import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.threeten.bp.LocalDate
 
@@ -44,24 +43,6 @@ sealed class HistoryListItem : PageRelated {
     // formatted in the app language at the time of the visit.
     val date: LocalDate
       get() = timeStamp.toLocalDate()
-
-    constructor(
-      url: String,
-      title: String,
-      dateString: String,
-      timeStamp: Long,
-      zimFileReader: ZimFileReader
-    ) : this(
-      zimId = zimFileReader.id,
-      zimName = zimFileReader.name,
-      zimReaderSource = zimFileReader.zimReaderSource,
-      favicon = zimFileReader.favicon,
-      historyUrl = url,
-      title = title,
-      dateString = dateString,
-      timeStamp = timeStamp
-    )
-
     constructor(historyRoomEntity: HistoryRoomEntity) : this(
       historyRoomEntity.id,
       historyRoomEntity.zimId,
