@@ -66,7 +66,7 @@ class BookmarkManagerTest {
   inner class AddBookmarkTest {
     @Test
     fun `addBookmark returns Failure when page title is null`() = runTest {
-      every { zimReaderContainer.zimFileReader } returns mockZimReader()
+      stubWithReader(mockZimReader())
 
       val result = bookmarkManager.addBookmark(
         pageTitle = null,
@@ -88,7 +88,7 @@ class BookmarkManagerTest {
 
     @Test
     fun `addBookmark returns Failure when article url is null`() = runTest {
-      every { zimReaderContainer.zimFileReader } returns mockZimReader()
+      stubWithReader(mockZimReader())
 
       val result = bookmarkManager.addBookmark(
         pageTitle = "Title",
@@ -106,7 +106,7 @@ class BookmarkManagerTest {
 
     @Test
     fun `addBookmark returns Failure when zim reader is null`() = runTest {
-      every { zimReaderContainer.zimFileReader } returns null
+      stubWithReader(null)
 
       val result = bookmarkManager.addBookmark(
         "Title",
@@ -124,7 +124,7 @@ class BookmarkManagerTest {
 
     @Test
     fun `addBookmark saves bookmark`() = runTest {
-      every { zimReaderContainer.zimFileReader } returns mockZimReader()
+      stubWithReader(mockZimReader())
       every { libkiwixBookFactory.create() } returns BookTestWrapper("id")
 
       coEvery {
@@ -149,7 +149,7 @@ class BookmarkManagerTest {
 
     @Test
     fun `addBookmark removes bookmark when already bookmarked`() = runTest {
-      every { zimReaderContainer.zimFileReader } returns mockZimReader()
+      stubWithReader(mockZimReader())
       every { libkiwixBookFactory.create() } returns BookTestWrapper("id")
       coEvery {
         mainRepositoryActions.deleteBookmark(any(), any())
@@ -173,7 +173,7 @@ class BookmarkManagerTest {
 
     @Test
     fun `addBookmark returns Failure when save throws`() = runTest {
-      every { zimReaderContainer.zimFileReader } returns mockZimReader()
+      stubWithReader(mockZimReader())
 
       coEvery {
         mainRepositoryActions.saveBookmark(any())
@@ -195,7 +195,7 @@ class BookmarkManagerTest {
 
     @Test
     fun `addBookmark returns Failure when delete throws`() = runTest {
-      every { zimReaderContainer.zimFileReader } returns mockZimReader()
+      stubWithReader(mockZimReader())
 
       coEvery {
         mainRepositoryActions.deleteBookmark(any(), any())
@@ -301,5 +301,11 @@ class BookmarkManagerTest {
 
   private fun mockZimReader(): ZimFileReader = mockk<ZimFileReader>(relaxed = true).apply {
     every { jniKiwixReader } returns mockk(relaxed = true)
+  }
+
+  private fun stubWithReader(reader: ZimFileReader?) {
+    coEvery { zimReaderContainer.withReader<Any?>(any()) } coAnswers {
+      reader?.let { firstArg<(ZimFileReader) -> Any?>().invoke(it) }
+    }
   }
 }

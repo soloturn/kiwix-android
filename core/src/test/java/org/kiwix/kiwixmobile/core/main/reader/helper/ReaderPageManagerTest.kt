@@ -259,7 +259,7 @@ class ReaderPageManagerTest {
 
   @Test
   fun `getRandomPage returns NoZimFileLoaded when no zim file is loaded`() = runTest {
-    every { zimReaderContainer.zimFileReader } returns null
+    every { zimReaderContainer.hasReader } returns false
 
     assertEquals(
       ReaderPageManager.GetRandomPageResult.NoZimFileLoaded,
@@ -273,7 +273,7 @@ class ReaderPageManagerTest {
 
   @Test
   fun `getRandomPage returns Success when page is found`() = runTest {
-    every { zimReaderContainer.zimFileReader } returns mockk()
+    every { zimReaderContainer.hasReader } returns true
     every { zimReaderContainer.getRandomPageUrl() } returns "A/B"
 
     assertEquals(
@@ -288,7 +288,7 @@ class ReaderPageManagerTest {
 
   @Test
   fun `getRandomPage retries until page is found`() = runTest {
-    every { zimReaderContainer.zimFileReader } returns mockk()
+    every { zimReaderContainer.hasReader } returns true
 
     every {
       zimReaderContainer.getRandomPageUrl()
@@ -310,7 +310,7 @@ class ReaderPageManagerTest {
 
   @Test
   fun `getRandomPage returns FailedAfterRetries when retries are exhausted`() = runTest {
-    every { zimReaderContainer.zimFileReader } returns mockk()
+    every { zimReaderContainer.hasReader } returns true
 
     every { zimReaderContainer.getRandomPageUrl() } returns null
 
@@ -326,7 +326,7 @@ class ReaderPageManagerTest {
 
   @Test
   fun `getRandomPage respects custom retry count`() = runTest {
-    every { zimReaderContainer.zimFileReader } returns mockk()
+    every { zimReaderContainer.hasReader } returns true
 
     every { zimReaderContainer.getRandomPageUrl() } returns null
 

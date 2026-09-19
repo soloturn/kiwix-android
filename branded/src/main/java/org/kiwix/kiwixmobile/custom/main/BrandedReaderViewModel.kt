@@ -31,6 +31,7 @@ import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavOptions
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.delay
@@ -156,7 +157,7 @@ class BrandedReaderViewModel @Inject constructor(
       loadUrlWithCurrentWebview(pageUrl)
       // Setup bookmark for current book
       // See https://github.com/kiwix/kiwix-android/issues/3541
-      zimReaderContainer.zimFileReader?.let(::observeBookmarks)
+      zimReaderContainer.id?.let(::observeBookmarks)
     } else {
       isWebViewHistoryRestoring = true
       if (isZimFileAlreadyOpenedInReader()) {
@@ -244,24 +245,27 @@ class BrandedReaderViewModel @Inject constructor(
   @Suppress("TooGenericExceptionCaught")
   private suspend fun saveBookToLibrary(zimFile: File?) {
     launchInViewModelScope {
-      zimReaderContainer.zimFileReader?.let { zimFileReader ->
-        try {
-          // Save book in the database to display it in `ZimHostScreen`.
-          // Check if the file is not null. If the file is null,
-          // it means we have created zimFileReader with a fileDescriptor,
-          // so we create a demo file to save it in the database for display on the `ZimHostScreen`.
-          val file = zimFile ?: createDemoFile()
-          // Wrapped in try-catch because if the reader scope is cancelled (for example,
-          // when the user navigates to another screen), the scope and related variables
-          // may be cleared from the ViewModel. Accessing them would then throw an error.
-          // The `Book.update()` method is not a suspend function, and coroutine
-          // cancellation is only checked at suspension points. As a result, this
-          // block may still execute even after the lifecycle scope has been cancelled.
-          val book = Book().apply { update(zimFileReader.jniKiwixReader) }
-          repositoryActions.saveBook(book)
-        } catch (e: Exception) {
-          Log.e(TAG_KIWIX, "Could not save book in library. Original exception = $e")
+      try {
+        // Save book in the database to display it in `ZimHostScreen`.
+        // Check if the file is not null. If the file is null,
+        // it means we have created zimFileReader with a fileDescriptor,
+        // so we create a demo file to save it in the database for display on the `ZimHostScreen`.
+        val file = zimFile ?: createDemoFile()
+        // Wrapped in try-catch because if the reader scope is cancelled (for example,
+        // when the user navigates to another screen), the scope and related variables
+        // may be cleared from the ViewModel. Accessing them would then throw an error.
+        // The `Book.update()` method is not a suspend function, and coroutine
+        // cancellation is only checked at suspension points. As a result, this
+        // block may still execute even after the lifecycle scope has been cancelled.
+        val book = zimReaderContainer.withReader { zimFileReader ->
+          Book().apply { update(zimFileReader.jniKiwixReader) }
         }
+        if (book != null) {
+          repositoryActions.saveBook(book)
+        }
+      } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        Log.e(TAG_KIWIX, "Could not save book in library. Original exception = $e")
       }
     }
   }
@@ -444,10 +448,9 @@ class BrandedReaderViewModel @Inject constructor(
    *         otherwise `false`.
    */
   private suspend fun isZimFileAlreadyOpenedInReader(): Boolean =
-    zimReaderContainer.zimFileReader != null &&
+    zimReaderContainer.hasReader &&
       zimReaderContainer.zimReaderSource?.exists(ioDispatcher) == true &&
-      zimReaderContainer.zimReaderSource?.canOpenInLibkiwix(ioDispatcher) == true &&
-      zimReaderContainer.zimFileReader?.jniKiwixReader != null
+      zimReaderContainer.zimReaderSource?.canOpenInLibkiwix(ioDispatcher) == true
 
   /**
    * Overrides the method to create the main menu for the app. The branded app can be configured to disable
