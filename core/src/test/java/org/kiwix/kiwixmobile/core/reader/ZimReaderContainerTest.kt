@@ -18,9 +18,14 @@
 
 package org.kiwix.kiwixmobile.core.reader
 
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
@@ -79,4 +84,38 @@ class ZimReaderContainerTest {
       executor.shutdownNow()
     }
   }
+
+  @Test
+  fun `a stale setZimReaderSource call does not clobber a newer one`() =
+    runTest(mainDispatcherRule.dispatcher) {
+      val staleSource: ZimReaderSource = mockk()
+      val freshSource: ZimReaderSource = mockk()
+      val staleReader: ZimFileReader = mockk(relaxed = true)
+      val freshReader: ZimFileReader = mockk(relaxed = true)
+      val staleGate = CompletableDeferred<Unit>()
+      coEvery { staleSource.exists(any()) } coAnswers {
+        staleGate.await()
+        true
+      }
+      coEvery { staleSource.canOpenInLibkiwix(any()) } returns true
+      coEvery { freshSource.exists(any()) } returns true
+      coEvery { freshSource.canOpenInLibkiwix(any()) } returns true
+      coEvery { zimFileReaderFactory.create(staleSource, any()) } returns staleReader
+      coEvery { zimFileReaderFactory.create(freshSource, any()) } returns freshReader
+
+      // Starts, but suspends on staleGate before it can apply its result.
+      val staleJob = launch { container.setZimReaderSource(staleSource) }
+      runCurrent()
+
+      // Completes fully while the stale call is still suspended.
+      launch { container.setZimReaderSource(freshSource) }.join()
+      assertEquals(freshReader, container.zimFileReader)
+
+      // The stale call now finishes and tries to apply its now-superseded result.
+      staleGate.complete(Unit)
+      staleJob.join()
+
+      assertEquals(freshReader, container.zimFileReader)
+      verify { staleReader.dispose() }
+    }
 }

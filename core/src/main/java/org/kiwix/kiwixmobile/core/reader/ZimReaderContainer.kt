@@ -24,6 +24,7 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Factory
 import java.net.HttpURLConnection
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,6 +45,10 @@ class ZimReaderContainer @Inject constructor(
   private val lock = ReentrantReadWriteLock()
   private var backingZimFileReader: ZimFileReader? = null
 
+  // Guards setZimReaderSource against a cancelled-but-still-running caller's stale write
+  // landing after a newer one's.
+  private val requestGeneration = AtomicLong(0)
+
   var zimFileReader: ZimFileReader?
     get() = lock.read { backingZimFileReader }
     set(value) {
@@ -63,13 +68,22 @@ class ZimReaderContainer @Inject constructor(
     if (zimReaderSource == withReader { it?.zimReaderSource }) {
       return
     }
-    zimFileReader = withContext(ioDispatcher) {
+    val generation = requestGeneration.incrementAndGet()
+    val newReader = withContext(ioDispatcher) {
       if (zimReaderSource?.exists(ioDispatcher) == true &&
         zimReaderSource.canOpenInLibkiwix(ioDispatcher)
       ) {
         zimFileReaderFactory.create(zimReaderSource, showSearchSuggestionsSpellChecked)
       } else {
         null
+      }
+    }
+    lock.write {
+      if (generation == requestGeneration.get()) {
+        backingZimFileReader?.dispose()
+        backingZimFileReader = newReader
+      } else {
+        newReader?.dispose()
       }
     }
   }
