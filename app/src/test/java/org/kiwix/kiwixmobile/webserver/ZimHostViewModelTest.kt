@@ -87,7 +87,7 @@ class ZimHostViewModelTest {
     coEvery { kiwixDataStore.setHostedBookIds(any()) } returns Unit
     every { dataSource.bookRemoved() } returns bookRemoved
 
-    every { zimReaderContainer.zimFileReader } returns null
+    every { zimReaderContainer.withReaderBlocking<Any?>(any()) } returns null
 
     // Permission
     coEvery { kiwixPermissionChecker.hasNotificationPermission() } returns true
@@ -180,7 +180,9 @@ class ZimHostViewModelTest {
   @Test
   fun loadBooks_whenIsBrandedAppTrue_returnsSingleSelectedBook() = runTest {
     val fakeReader: ZimFileReader = mockk(relaxed = true)
-    every { zimReaderContainer.zimFileReader } returns fakeReader
+    every { zimReaderContainer.withReaderBlocking<Any?>(any()) } answers {
+      firstArg<(ZimFileReader) -> Any?>().invoke(fakeReader)
+    }
 
     coEvery { dataSource.getLanguageCategorizedBooks() } returns flowOf(listOf(book1))
     coEvery { kiwixDataStore.isBrandedApp } returns flowOf(true)
