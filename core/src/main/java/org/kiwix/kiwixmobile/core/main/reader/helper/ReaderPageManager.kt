@@ -122,7 +122,7 @@ class ReaderPageManager @Inject constructor(
 
   @Suppress("ReturnCount")
   suspend fun getRandomPage(retryCount: Int = 2): GetRandomPageResult {
-    if (zimReaderContainer.zimFileReader == null) {
+    if (!zimReaderContainer.hasReader) {
       return GetRandomPageResult.NoZimFileLoaded
     }
 

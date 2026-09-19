@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core.search.viewmodel
 
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -26,6 +27,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
+import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.sharedFunctions.MainDispatcherRule
 
 internal class ZimSearchResultGeneratorTest {
@@ -33,13 +35,13 @@ internal class ZimSearchResultGeneratorTest {
   @JvmField
   val mainDispatcherRule = MainDispatcherRule()
   private val zimFileReader: ZimFileReader = mockk()
+  private val zimReaderContainer: ZimReaderContainer = mockk()
 
-  private val zimSearchResultGenerator: ZimSearchResultGenerator =
-    ZimSearchResultGenerator(mainDispatcherRule.dispatcher)
+  private val zimSearchResultGenerator: ZimSearchResultGenerator = ZimSearchResultGenerator()
 
   @Test
   internal fun `empty search term returns empty list`() = runTest {
-    assertThat(zimSearchResultGenerator.generateSearchResults("", zimFileReader))
+    assertThat(zimSearchResultGenerator.generateSearchResults("", zimReaderContainer))
       .isEqualTo(null)
   }
 
@@ -48,7 +50,10 @@ internal class ZimSearchResultGeneratorTest {
     val searchTerm = "a"
     val suggestionSearchWrapper: SuggestionSearchWrapper = mockk()
     every { zimFileReader.searchSuggestions(searchTerm) } returns suggestionSearchWrapper
-    assertThat(zimSearchResultGenerator.generateSearchResults(searchTerm, zimFileReader))
+    coEvery { zimReaderContainer.withReader<Any?>(any()) } coAnswers {
+      firstArg<(ZimFileReader) -> Any?>().invoke(zimFileReader)
+    }
+    assertThat(zimSearchResultGenerator.generateSearchResults(searchTerm, zimReaderContainer))
       .isEqualTo(suggestionSearchWrapper)
     verify {
       zimFileReader.searchSuggestions(searchTerm)

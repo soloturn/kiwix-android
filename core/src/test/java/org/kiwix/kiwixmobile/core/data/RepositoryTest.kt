@@ -49,7 +49,6 @@ import org.kiwix.kiwixmobile.core.page.bookmark.models.LibkiwixBookmarkItem
 import org.kiwix.kiwixmobile.core.page.history.models.HistoryListItem
 import org.kiwix.kiwixmobile.core.page.history.models.HistoryListItem.HistoryItem
 import org.kiwix.kiwixmobile.core.page.notes.models.NoteListItem
-import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
@@ -224,25 +223,25 @@ class RepositoryTest {
 
     @Test
     fun `getCurrentZimBookmarksUrl delegates to libkiwixBookmarks`() = runTest {
-      val zimFileReader: ZimFileReader = mockk()
+      val zimId = "zim-id"
       val expectedUrls = listOf("/article1", "/article2")
 
-      every { zimReaderContainer.zimFileReader } returns zimFileReader
+      every { zimReaderContainer.id } returns zimId
       coEvery {
-        libkiwixBookmarks.getCurrentZimBookmarksUrl(zimFileReader)
+        libkiwixBookmarks.getCurrentZimBookmarksUrl(zimId)
       } returns expectedUrls
 
       val result = repository.getCurrentZimBookmarksUrl()
 
       assertThat(result).isEqualTo(expectedUrls)
       coVerify(exactly = 1) {
-        libkiwixBookmarks.getCurrentZimBookmarksUrl(zimFileReader)
+        libkiwixBookmarks.getCurrentZimBookmarksUrl(zimId)
       }
     }
 
     @Test
     fun `getCurrentZimBookmarksUrl with null zimFileReader`() = runTest {
-      every { zimReaderContainer.zimFileReader } returns null
+      every { zimReaderContainer.id } returns null
       coEvery {
         libkiwixBookmarks.getCurrentZimBookmarksUrl(null)
       } returns emptyList()
