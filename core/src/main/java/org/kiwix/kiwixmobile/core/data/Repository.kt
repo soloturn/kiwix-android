@@ -116,7 +116,7 @@ class Repository @Inject internal constructor(
     libkiwixBookmarks.bookmarks() as Flow<List<LibkiwixBookmarkItem>>
 
   override suspend fun getCurrentZimBookmarksUrl() =
-    libkiwixBookmarks.getCurrentZimBookmarksUrl(zimReaderContainer.zimFileReader)
+    libkiwixBookmarks.getCurrentZimBookmarksUrl(zimReaderContainer.id)
 
   override suspend fun saveBookmark(libkiwixBookmarkItem: LibkiwixBookmarkItem) =
     libkiwixBookmarks.saveBookmark(libkiwixBookmarkItem)

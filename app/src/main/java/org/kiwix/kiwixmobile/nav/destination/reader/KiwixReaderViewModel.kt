@@ -162,7 +162,7 @@ class KiwixReaderViewModel @Inject constructor(
         // This is necessary because we are not opening the ZIM file again; the bookmark is
         // inside the currently opened book. Bookmarks are set up when opening the ZIM file.
         // See https://github.com/kiwix/kiwix-android/issues/3541
-        zimReaderContainer.zimFileReader?.let(::observeBookmarks)
+        zimReaderContainer.id?.let(::observeBookmarks)
         // Also update the reader menu state for the same reason as above: it is normally
         // updated when a ZIM file is opened, so it needs to be set explicitly here since
         // we're only loading a URL into the already-open ZIM file's WebView.
@@ -234,7 +234,7 @@ class KiwixReaderViewModel @Inject constructor(
               "Kiwix normal start, Opened last used zimFile: -> ${zimReaderSource.toDatabase()}"
             )
           } else {
-            zimReaderContainer.zimFileReader?.let(::observeBookmarks)
+            zimReaderContainer.id?.let(::observeBookmarks)
           }
           restoreTabs(webViewHistoryItemList, currentTab, onComplete)
         } else {
@@ -254,7 +254,9 @@ class KiwixReaderViewModel @Inject constructor(
 
   override suspend fun restoreViewStateOnInvalidWebViewHistory() {
     Log.d(TAG_KIWIX, "Kiwix normal start, no zimFile loaded last time  -> display home page")
-    exitBook()
+    // Don't tear down a reader a concurrent instance just published; "normal start"
+    // has nothing open anyway, so this only changes that race.
+    exitBook(shouldCloseZimBook = !zimReaderContainer.hasReader)
   }
 
   override fun openSearch(
