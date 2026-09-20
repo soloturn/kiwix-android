@@ -89,7 +89,7 @@ jobs:
         run: ./gradlew testDebugUnitTest testCustomexampleDebugUnitTest
 
       - name: Create AVD and generate snapshot
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ./.github/actions/android-emulator-runner
         timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
@@ -97,15 +97,9 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
           ram-size: 4096M
-          force-avd-creation: false
           sdcard-path-or-size: 1024M
           cores: 4
-          disable-animations: false
           heap-size: 1024M
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
-          script: |
-            trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
-            echo "Generated AVD snapshot for caching."
 
       - name: Create instrumentation coverage
         uses: ./.github/actions/android-emulator-runner
@@ -149,10 +143,8 @@ jobs:
 
       - name: Run benchmarks
         if: ${{ matrix.api-level==30 && matrix.shard==0 }}
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ./.github/actions/android-emulator-runner
         timeout-minutes: 10
-        env:
-          GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
         with:
           api-level: 30
           target: ${{ matrix.target }}
@@ -160,13 +152,9 @@ jobs:
           profile: pixel_2
           ram-size: 3072M
           cores: 4
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
-          disable-animations: true
-          force-avd-creation: false
           heap-size: 1024M
-          script: |
-            trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
-            ./gradlew :benchmark:connectedBenchmarkAndroidTest
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
+          script: ./gradlew :benchmark:connectedBenchmarkAndroidTest
 
   # Merges api-level 30's shards' .ec files into one coverage report.
   automated-tests-coverage-report:
@@ -287,7 +275,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Create AVD and generate snapshot
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ./.github/actions/android-emulator-runner
         timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
@@ -295,15 +283,9 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
           ram-size: 4096M
-          force-avd-creation: false
           sdcard-path-or-size: 1024M
           cores: 4
-          disable-animations: false
           heap-size: 1024M
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
-          script: |
-            trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
-            echo "Generated AVD snapshot for caching."
 
       - name: Create instrumentation coverage for PlayStore variant
         uses: ./.github/actions/android-emulator-runner
@@ -376,7 +358,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Create AVD and generate snapshot
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ./.github/actions/android-emulator-runner
         timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
@@ -384,15 +366,9 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
           ram-size: 4096M
-          force-avd-creation: false
           sdcard-path-or-size: 1024M
           cores: 4
-          disable-animations: false
           heap-size: 1024M
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
-          script: |
-            trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
-            echo "Generated AVD snapshot for caching."
 
       - name: Test branded app
         uses: ./.github/actions/android-emulator-runner
@@ -465,7 +441,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Create AVD and generate snapshot
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ./.github/actions/android-emulator-runner
         timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
@@ -473,15 +449,9 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_c
           ram-size: 4096M
-          force-avd-creation: false
           sdcard-path-or-size: 1024M
           cores: 4
-          disable-animations: false
           heap-size: 1024M
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
-          script: |
-            trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
-            echo "Generated AVD snapshot for caching."
 
       - name: File Opening test on Tablet
         uses: ./.github/actions/android-emulator-runner
