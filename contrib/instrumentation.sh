@@ -78,7 +78,7 @@ fi
 task="${INSTRUMENTATION_GRADLE_TASK:-jacocoInstrumentationTestReport}"
 
 retry=0
-while [ $retry -le 3 ]; do
+while [ $retry -le 4 ]; do
   if ./gradlew "$task" "${shard_args[@]}"; then
     echo "$task succeeded" >&2
     break
@@ -111,11 +111,11 @@ while [ $retry -le 3 ]; do
     fi
     ./gradlew --stop
     retry=$(( retry + 1 ))
-    if [ $retry -eq 3 ]; then
+    if [ $retry -eq 4 ]; then
       adb exec-out screencap -p >screencap.png
       exit 1
     fi
-    # Give a transient outage (e.g. a Maven Central 403) time to clear.
-    sleep $(( retry * 15 ))
+    # Give a transient outage (e.g. a Maven Central 403) time to clear: 5s, 20s, 80s.
+    sleep $(( 5 * 4 ** (retry - 1) ))
   fi
 done
