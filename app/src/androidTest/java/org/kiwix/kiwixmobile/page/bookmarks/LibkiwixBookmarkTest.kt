@@ -45,10 +45,10 @@ import org.kiwix.kiwixmobile.core.utils.TestingUtils.HILT_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.main.topLevel
+import org.kiwix.kiwixmobile.testutils.Budget
 import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SNACKBAR
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.kiwixmobile.ui.KiwixDestination
@@ -266,7 +266,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
     composeTestRule.apply {
       waitForIdle()
       // Native archive open is async and can take longer than 10s under CI load.
-      waitUntil(TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN) {
+      waitUntil(Budget.NATIVE_ARCHIVE_OPEN.millis) {
         activity.zimReaderContainer.hasReader
       }
     }
