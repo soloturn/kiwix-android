@@ -90,6 +90,7 @@ jobs:
 
       - name: Create AVD and generate snapshot
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -149,6 +150,7 @@ jobs:
       - name: Run benchmarks
         if: ${{ matrix.api-level==30 && matrix.shard==0 }}
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 10
         env:
           GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
         with:
@@ -286,6 +288,7 @@ jobs:
 
       - name: Create AVD and generate snapshot
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -374,6 +377,7 @@ jobs:
 
       - name: Create AVD and generate snapshot
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -462,6 +466,7 @@ jobs:
 
       - name: Create AVD and generate snapshot
         uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
