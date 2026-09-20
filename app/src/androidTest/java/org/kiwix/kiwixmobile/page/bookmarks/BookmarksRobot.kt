@@ -121,7 +121,6 @@ class BookmarksRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
-        waitUntilTimeout()
         waitUntil(TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON) {
           onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
         }
