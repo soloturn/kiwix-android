@@ -23,7 +23,6 @@ import androidx.compose.ui.test.performClick
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 
 /**
  * Created by mhutti1 on 27/04/17.
@@ -32,7 +31,7 @@ object StandardActions {
   fun enterSettings(composeContentTest: ComposeContentTestRule) {
     testFlakyView({
       composeContentTest.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG).performClick()
       }
     })
