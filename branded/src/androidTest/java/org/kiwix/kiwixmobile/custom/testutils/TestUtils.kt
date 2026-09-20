@@ -46,8 +46,8 @@ object TestUtils {
   // the app module - branded doesn't share androidTest sources with app, so
   // these are duplicated as plain constants rather than a cross-module import.
   const val NATIVE_ARCHIVE_OPEN_MS = 20_000L
-  const val SEARCH_INDEX_QUERY_MS = 30_000L
-  const val WEBVIEW_CONTENT_SETTLE_MS = 20_000L
+  const val SEARCH_INDEX_QUERY_MS = 90_000L
+  const val WEBVIEW_CONTENT_SETTLE_MS = 60_000L
 
   // testFlakyView's retries need to survive a transient condition that takes
   // actual time to resolve (e.g. a WebView renderer respawn) - mirrors the

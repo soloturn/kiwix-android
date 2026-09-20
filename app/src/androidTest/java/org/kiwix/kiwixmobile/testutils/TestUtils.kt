@@ -402,14 +402,15 @@ enum class Budget(val millis: Long, val evidence: List<StallEvidence>) {
     listOf(StallEvidence("35415742112", "hasReader poll timed out 3/3 retries at 10s", 10_000L))
   ),
   WEBVIEW_CONTENT_SETTLE(
-    20_000L,
+    60_000L,
     listOf(
       StallEvidence("35424852955", "WebView content load too slow for a 2.5s retry budget", 2_500L),
-      StallEvidence("35294866469", "onWebView() found no WebView right after a logged renderer crash", 0L)
+      StallEvidence("35294866469", "onWebView() found no WebView right after a logged renderer crash", 0L),
+      StallEvidence("35481353141", "LibkiwixBookmarkTest missed a 20s waitUntil", 20_000L)
     )
   ),
   SEARCH_INDEX_QUERY(
-    30_000L,
+    90_000L,
     listOf(
       StallEvidence("35167290688", "WebView renderer respawn delayed results past a 3s wait", 3_000L),
       StallEvidence("35260139385", "3/3 RetryRule attempts timed out at 6s", 6_000L),
@@ -418,7 +419,8 @@ enum class Budget(val millis: Long, val evidence: List<StallEvidence>) {
         "host load 6.37 on a 4-vCPU runner, 88s total logcat silence - no fixed " +
           "wait survives a stall this severe",
         88_000L
-      )
+      ),
+      StallEvidence("35481353141", "testSearchWithExtraSpaces/searchScreenSimple missed a 30s waitUntil", 30_000L)
     )
   ),
   DIALOG_RENDER(
