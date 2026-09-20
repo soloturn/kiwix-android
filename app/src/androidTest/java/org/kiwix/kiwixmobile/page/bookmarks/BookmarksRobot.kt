@@ -63,7 +63,6 @@ import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SNACKBAR
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.kiwixmobile.utils.StandardActions.openDrawer
 
 fun bookmarks(func: BookmarksRobot.() -> Unit) =
@@ -121,7 +120,6 @@ class BookmarksRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
-        waitUntilTimeout()
         waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
         }
@@ -184,7 +182,7 @@ class BookmarksRobot : BaseRobot() {
       composeTestRule.waitForIdle()
       openDrawer(coreMainActivity)
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(LEFT_DRAWER_BOOKMARK_ITEM_TESTING_TAG).performClick()
       }
     })
@@ -209,7 +207,7 @@ class BookmarksRobot : BaseRobot() {
   fun assertZimFileLoadedIntoTheReader(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(BOTTOM_NAV_READER_ITEM_TESTING_TAG).performClick()
       }
     }
@@ -231,7 +229,6 @@ class BookmarksRobot : BaseRobot() {
   fun assertBookmarkButtonShowBookmarked(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.waitForIdle()
-      composeTestRule.waitUntilTimeout()
       composeTestRule
         .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
         .assertIsSelected()
@@ -241,7 +238,6 @@ class BookmarksRobot : BaseRobot() {
   fun assertBookmarkButtonShowNotBookmarked(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.waitForIdle()
-      composeTestRule.waitUntilTimeout()
       composeTestRule
         .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
         .assertIsNotSelected()
