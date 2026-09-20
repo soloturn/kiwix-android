@@ -115,5 +115,7 @@ while [ $retry -le 3 ]; do
       adb exec-out screencap -p >screencap.png
       exit 1
     fi
+    # Give a transient outage (e.g. a Maven Central 403) time to clear.
+    sleep $(( retry * 15 ))
   fi
 done
