@@ -63,6 +63,8 @@ runs:
       uses: reactivecircus/android-emulator-runner@v2
       env:
         GRADLE_OPTS: ${{ inputs.gradle-opts }}
+        # ddmlib's install timeout defaults to 4 minutes; tripled for slow runners.
+        ADB_INSTALL_TIMEOUT: "12"
       with:
         api-level: ${{ inputs.api-level }}
         target: ${{ inputs.target }}
@@ -113,6 +115,8 @@ runs:
       uses: reactivecircus/android-emulator-runner@v2
       env:
         GRADLE_OPTS: ${{ inputs.gradle-opts }}
+        # ddmlib's install timeout defaults to 4 minutes; tripled for slow runners.
+        ADB_INSTALL_TIMEOUT: "12"
       with:
         api-level: ${{ inputs.api-level }}
         target: ${{ inputs.target }}
@@ -156,6 +160,8 @@ runs:
       uses: reactivecircus/android-emulator-runner@v2
       env:
         GRADLE_OPTS: ${{ inputs.gradle-opts }}
+        # ddmlib's install timeout defaults to 4 minutes; tripled for slow runners.
+        ADB_INSTALL_TIMEOUT: "12"
       with:
         api-level: ${{ inputs.api-level }}
         target: ${{ inputs.target }}
