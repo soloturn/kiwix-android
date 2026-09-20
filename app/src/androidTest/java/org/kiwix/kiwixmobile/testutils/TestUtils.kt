@@ -420,5 +420,9 @@ enum class Budget(val millis: Long, val evidence: List<StallEvidence>) {
         88_000L
       )
     )
+  ),
+  DIALOG_RENDER(
+    15_000L,
+    listOf(StallEvidence("35481353141", "donation dialog missed a 10s waitUntil", 10_000L))
   )
 }

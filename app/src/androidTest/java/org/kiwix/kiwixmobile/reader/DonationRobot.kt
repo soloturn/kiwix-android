@@ -25,16 +25,14 @@ import androidx.compose.ui.test.onNodeWithTag
 import applyWithViewHierarchyPrinting
 import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.main.reader.DONATION_LAYOUT_TESTING_TAG
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
+import org.kiwix.kiwixmobile.testutils.Budget
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 
 fun donation(func: DonationRobot.() -> Unit) = DonationRobot().applyWithViewHierarchyPrinting(func)
 class DonationRobot : BaseRobot() {
   fun assertDonationDialogDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      // The isDisplayed() result was previously discarded here - waitUntil both
-      // waits for and actually asserts the dialog appears.
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+      waitUntil(Budget.DIALOG_RENDER.millis) {
         onNodeWithTag(DONATION_LAYOUT_TESTING_TAG).isDisplayed()
       }
     }
