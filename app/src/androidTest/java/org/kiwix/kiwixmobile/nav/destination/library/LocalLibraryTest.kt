@@ -36,7 +36,6 @@ import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.kiwixmobile.ui.KiwixDestination
 
 @HiltAndroidTest
@@ -115,7 +114,7 @@ class LocalLibraryTest : BaseActivityTest() {
       )
       clickOnReaderScreen(composeTestRule)
       clickOnLocalLibraryScreen(composeTestRule)
-      composeTestRule.waitUntilTimeout()
+      composeTestRule.waitForIdle()
       // Assert scan dialog visible.
       assertScanFileSystemDialogDisplayed(composeTestRule)
       clickOnDialogConfirmButton(composeTestRule)

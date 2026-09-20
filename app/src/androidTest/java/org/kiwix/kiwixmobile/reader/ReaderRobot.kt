@@ -89,7 +89,7 @@ class ReaderRobot : BaseRobot() {
 
   fun clickOnTabIcon(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntilTimeout()
+      waitForIdle()
       testFlakyView({
         onNodeWithTag(TAB_MENU_ITEM_TESTING_TAG).performClick()
       })
@@ -98,9 +98,9 @@ class ReaderRobot : BaseRobot() {
 
   fun clickOnClosedAllTabsButton(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntilTimeout()
+      waitForIdle()
       onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).performClick()
-      waitUntilTimeout()
+      waitForIdle()
       testFlakyView({
         onNodeWithTag(CLOSE_ALL_TABS_MENU_ITEM_TESTING_TAG).performClick()
       })
@@ -109,7 +109,7 @@ class ReaderRobot : BaseRobot() {
 
   fun clickOnNewTabButton(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntilTimeout()
+      waitForIdle()
       testFlakyView({
         onNodeWithTag(NEW_TAB_BUTTON_TESTING_TAG).performClick()
       })
@@ -241,7 +241,7 @@ class ReaderRobot : BaseRobot() {
         throw e
       }
       onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).performClick()
-      waitUntilTimeout()
+      waitForIdle()
       onNodeWithTag(READ_ALOUD_MENU_ITEM_TESTING_TAG).performClick()
     }
   }

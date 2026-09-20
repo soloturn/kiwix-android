@@ -88,7 +88,7 @@ class NoteRobot : BaseRobot() {
         onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).performClick()
-      waitUntilTimeout()
+      waitForIdle()
       onNodeWithTag(TAKE_NOTE_MENU_ITEM_TESTING_TAG).performClick()
     }
   }

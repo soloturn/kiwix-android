@@ -123,7 +123,7 @@ class SearchRobot {
     composeTestRule.waitUntilTimeout()
     openSearchScreen(composeTestRule)
     // Wait a bit to properly visible the search screen.
-    composeTestRule.waitUntilTimeout()
+    composeTestRule.waitForIdle()
     searchWithFrequentlyTypedWords(searchString, composeTestRule = composeTestRule)
     clickOnSearchItemInSearchList(composeTestRule)
   }
@@ -195,7 +195,7 @@ class SearchRobot {
     coreMainActivity.openNavigationDrawer()
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(LEFT_DRAWER_NOTES_ITEM_TESTING_TAG).performClick()
       }
     })
