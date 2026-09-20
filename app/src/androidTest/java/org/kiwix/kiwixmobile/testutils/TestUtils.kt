@@ -315,13 +315,18 @@ object TestUtils {
         "Unable to load $zimFileName. Please ensure it exists in the resources folder."
       }
     val zimFile = File(destinationDirectory, zimFileName)
-    if (zimFile.exists()) zimFile.delete()
-    zimFile.createNewFile()
+    // Write to a temp file and rename into place instead of writing zimFile directly -
+    // a reader that opens zimFile mid-copy (e.g. a prior test's reader, still disposing
+    // in the background when RetryRule fires a retry that overwrites the same path) would
+    // see a truncated file ("zim-file is too small to contain a header"). rename(2) swaps
+    // the directory entry atomically, so any open() after this call sees a complete file.
+    val tempFile = File(destinationDirectory, "$zimFileName.tmp")
     loadFileStream.use { inputStream ->
-      zimFile.outputStream().use { output ->
+      tempFile.outputStream().use { output ->
         inputStream.copyTo(output)
       }
     }
+    check(tempFile.renameTo(zimFile)) { "Could not move $tempFile to $zimFile" }
     return zimFile
   }
 
