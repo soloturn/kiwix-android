@@ -37,8 +37,6 @@ import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.download.downloadRobot
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.testutils.RetryRule
-import org.kiwix.kiwixmobile.testutils.TestUtils
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.kiwixmobile.ui.KiwixDestination
 import org.kiwix.kiwixmobile.utils.StandardActions
 
@@ -101,7 +99,6 @@ class LanguageScreenTest : BaseActivityTest() {
       clickOnSaveLanguageIcon(composeTestRule)
       // test if the selected language filter is applied on the online library or not.
       downloadRobot {
-        composeTestRule.waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
         waitForDataToLoad(composeTestRule = composeTestRule)
         checkLanguageFilterAppliedToOnlineContent(
           composeTestRule,
@@ -130,7 +127,6 @@ class LanguageScreenTest : BaseActivityTest() {
 
       // test if the selected language filter is applied on the online library or not.
       downloadRobot {
-        composeTestRule.waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
         waitForDataToLoad(composeTestRule = composeTestRule)
         checkLanguageFilterAppliedToOnlineContent(
           composeTestRule,

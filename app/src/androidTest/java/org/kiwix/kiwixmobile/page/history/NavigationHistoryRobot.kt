@@ -209,7 +209,7 @@ class NavigationHistoryRobot : BaseRobot() {
   fun clickOnReaderScreen(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(BOTTOM_NAV_READER_ITEM_TESTING_TAG).performClick()
       }
     })
@@ -218,7 +218,7 @@ class NavigationHistoryRobot : BaseRobot() {
   fun clickOnCancelButton(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(ALERT_DIALOG_DISMISS_BUTTON_TESTING_TAG).performClick()
       }
     })
