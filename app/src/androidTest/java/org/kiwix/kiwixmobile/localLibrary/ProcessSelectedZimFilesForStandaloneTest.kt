@@ -101,9 +101,7 @@ class ProcessSelectedZimFilesForStandaloneTest : BaseActivityTest() {
     triggerProcessSelectedZimFiles(listOfZimFilesUri)
     copyMoveFileHandler {
       composeTestRule.apply {
-        // Wait for some time so that ZIM files can properly loaded in library.
         waitForIdle()
-        waitUntilTimeout()
         assertZimFileAddedInTheLocalLibrary(composeTestRule)
       }
     }
@@ -118,7 +116,6 @@ class ProcessSelectedZimFilesForStandaloneTest : BaseActivityTest() {
       // Test for invalid ZIM file it shows the error dialog.
       assertFileCopyMoveErrorDialogDisplayed(composeTestRule)
       clickOnYesButton(composeTestRule)
-      composeTestRule.waitUntilTimeout()
       assertZimFileAddedInTheLocalLibrary(composeTestRule)
     }
   }
