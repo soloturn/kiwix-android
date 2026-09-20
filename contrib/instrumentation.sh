@@ -60,9 +60,18 @@ fi
 if is_app_installed "$TEST_ORCHESTRATOR_PACKAGE"; then
   adb uninstall "${TEST_ORCHESTRATOR_PACKAGE}"
 fi
+# NUM_SHARDS/SHARD_INDEX shard the suite via AndroidJUnitRunner's built-in sharding.
+shard_args=()
+if [ "${NUM_SHARDS:-1}" -gt 1 ]; then
+  shard_args=(
+    "-Pandroid.testInstrumentationRunnerArguments.numShards=${NUM_SHARDS}"
+    "-Pandroid.testInstrumentationRunnerArguments.shardIndex=${SHARD_INDEX:-0}"
+  )
+fi
+task="${INSTRUMENTATION_GRADLE_TASK:-jacocoInstrumentationTestReport}"
 
-if ./gradlew jacocoInstrumentationTestReport; then
-  echo "jacocoInstrumentationTestReport succeeded" >&2
+if ./gradlew "$task" "${shard_args[@]}"; then
+  echo "$task succeeded" >&2
 else
   adb exec-out screencap -p >screencap.png
   exit 1
