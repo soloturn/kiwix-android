@@ -827,7 +827,7 @@ jobs:
           key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
 
       - name: Save Gradle dependency cache
-        if: always() && github.ref == 'refs/heads/main'
+        if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         uses: actions/cache/save@v6
         with:
           path: |
@@ -836,7 +836,7 @@ jobs:
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
 
       - name: Save Gradle wrapper cache
-        if: always() && github.ref == 'refs/heads/main'
+        if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         uses: actions/cache/save@v6
         with:
           path: ~/.gradle/wrapper
