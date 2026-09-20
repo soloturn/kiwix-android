@@ -28,7 +28,9 @@ touch /tmp/emulator_script_started
 # The emulator's crashpad_handler subprocess can survive `adb emu kill` and
 # hang the android-emulator-runner action's teardown
 # (https://github.com/ReactiveCircus/android-emulator-runner/issues/385).
-# Kill it once this script exits, regardless of the test outcome.
+# Kill it once this script exits, regardless of the test outcome. Extended
+# below (once logcat_loop_pid exists) rather than appended, since a second
+# `trap ... EXIT` would replace this one instead of adding to it.
 trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
 
 # Enable Wi-Fi on the emulator
@@ -50,13 +52,41 @@ fi
 # every capture we have. Add System.err:W so a run like 35284788813 (two
 # ComposeTimeoutException failures with no way to tell whether RetryRule
 # actually retried 3x or gave up early) can be diagnosed from its own log.
+#
+# lmkd logs kills under tag lowmemorykiller/lmkd at Info priority, below
+# the *:E floor - same blind spot System.err:W above was added to close.
+# ActivityManager also logs its own process kills at Info. Confirmed via
+# run 35470368074: every aw_browser_terminator "crash detected (code -1)"
+# line this project chased across several CI investigations is
+# immediately followed by "ActivityManager: Killing
+# <pid>:...:sandboxed_process0:...(adj 0): isolated not needed" - ordinary
+# per-test process teardown (ANDROIDX_TEST_ORCHESTRATOR recycling a
+# process per test), not a crash, not lmkd, not OOM. Settled; no further
+# investigation needed if this line reappears.
 (
   while true; do
     # shellcheck disable=SC2035
-    adb logcat *:E System.err:W -v color | tee -a /tmp/logcat-capture.log
+    adb logcat *:E System.err:W lowmemorykiller:V lmkd:V ActivityManager:I -v color | tee -a /tmp/logcat-capture.log
     sleep 1
   done
 ) &
+logcat_loop_pid=$!
+# This loop is never awaited, so a normal script exit leaves it as an
+# orphan that still holds this step's stdout pipe open - GitHub Actions
+# won't see EOF (and the step won't complete) until it exits too. `adb
+# logcat` has no per-call timeout, so if it's mid-blocking-read exactly
+# when the emulator teardown below severs the connection, it can hang
+# indefinitely instead of erroring out - observed in run 35470368074's
+# job (30,0): the actual test task succeeded in 5 minutes, but the step
+# then ran for 3 hours until the hard EMULATOR_STEP_TIMEOUT_MINUTES kill.
+# pkill by pattern rather than just the loop's own PID, since that PID is
+# the `while` subshell, not the adb logcat process actually stuck inside it.
+trap '
+  kill "$logcat_loop_pid" 2>/dev/null
+  pkill -f "adb logcat" 2>/dev/null
+  killall -INT crashpad_handler 2>/dev/null
+  true
+' EXIT
 
 PACKAGE_NAME="org.kiwix.kiwixmobile"
 TEST_PACKAGE_NAME="${PACKAGE_NAME}.test"
