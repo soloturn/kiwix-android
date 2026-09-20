@@ -103,6 +103,7 @@ jobs:
 
       - name: Create instrumentation coverage
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 45
         env:
           # api-level 30's report is merged later in automated-tests-coverage-report.
           INSTRUMENTATION_GRADLE_TASK: ${{ matrix.api-level == 30 && ':app:createDebugCoverageReport' || ':app:connectedDebugAndroidTest' }}
@@ -289,6 +290,7 @@ jobs:
 
       - name: Create instrumentation coverage for PlayStore variant
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 45
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -372,6 +374,7 @@ jobs:
 
       - name: Test branded app
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 45
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -455,6 +458,7 @@ jobs:
 
       - name: File Opening test on Tablet
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 45
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
