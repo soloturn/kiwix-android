@@ -269,7 +269,7 @@ class LibraryRobot : BaseRobot() {
   fun assertShowSwipeDownToScanFileSystemTextDisplayed(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(SHOW_SWIPE_DOWN_TO_SCAN_FILE_SYSTEM_TEXT_TESTING_TAG)
           .assertTextEquals(context.getString(R.string.swipe_down_to_scan_storage))
       }
