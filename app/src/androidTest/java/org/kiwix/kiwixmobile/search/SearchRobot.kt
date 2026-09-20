@@ -88,7 +88,7 @@ class SearchRobot : BaseRobot() {
   ) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         val searchView = onNodeWithTag(SEARCH_FIELD_TESTING_TAG)
         searchView.performTextInput("")
         for (char in query) {

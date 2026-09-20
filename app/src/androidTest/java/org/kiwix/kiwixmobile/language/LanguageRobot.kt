@@ -41,7 +41,7 @@ fun language(func: LanguageRobot.() -> Unit) = LanguageRobot().applyWithViewHier
 class LanguageRobot : BaseRobot() {
   fun clickDownloadOnBottomNav(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntilTimeout()
+      waitForIdle()
       onNodeWithTag(BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG).performClick()
     }
   }
