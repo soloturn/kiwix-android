@@ -82,6 +82,15 @@ KNOWN_EXTERNAL_BUG_SIGNATURES: list[tuple[str, str, str, str]] = [
     "device's WebView build, not this project's code.",
     "https://issues.chromium.org/u/1/issues/554600555",
   ),
+  (
+    "performMeasureAndLayout called during measure layout",
+    "MeasureAndLayoutDelegate.measureAndLayout(MeasureAndLayoutDelegate.kt:781)",
+    "androidx.compose.ui internal measure/layout reentrancy assertion "
+    "(AndroidComposeView.dispatchDraw() re-entering measureAndLayout() "
+    "while one is already in progress) - a Compose framework bug, not "
+    "app or test code; every frame of the stack is inside androidx.compose.",
+    "https://github.com/alexvanyo/composelife/issues/1300",
+  ),
 ]
 
 # Kernel-level signatures of a genuine scheduling stall, independent of any
@@ -273,12 +282,19 @@ def collect_failures(xml_path: Path, root: ET.Element) -> list[TestFailure]:
         elem = testcase.find(tag)
         if elem is None:
           continue
+        # Gradle's connectedAndroidTest runner emits bare <failure>/<error>
+        # elements with no type/message attributes - the exception class and
+        # message only exist in the element's text (the stack trace, headed
+        # by Throwable.toString()). Fall back to searching that text so the
+        # substring checks below still work against this project's real XML.
+        exc_type = elem.get("type") or elem.text or ""
+        message = elem.get("message") or elem.text or ""
         failures.append(
           TestFailure(
             classname=testcase.get("classname", ""),
             method=testcase.get("name", ""),
-            exc_type=elem.get("type", ""),
-            message=elem.get("message", "") or "",
+            exc_type=exc_type,
+            message=message,
             testcase_elem=testcase,
             failure_elem=elem,
             suite_elem=suite,
