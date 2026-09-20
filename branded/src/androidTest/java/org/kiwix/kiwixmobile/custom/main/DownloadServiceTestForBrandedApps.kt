@@ -23,7 +23,9 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
@@ -45,11 +47,13 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorService
+import org.kiwix.kiwixmobile.core.main.reader.READER_SCREEN_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.custom.testutils.RetryRule
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils
+import org.kiwix.kiwixmobile.custom.testutils.TestUtils.NATIVE_ARCHIVE_OPEN_MS
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.closeSystemDialogs
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.getOkkHttpClientForTesting
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.isSystemUINotRespondingDialogVisible
@@ -165,9 +169,12 @@ class DownloadServiceTestForBrandedApps {
     UiThreadStatement.runOnUiThread {
       brandedMainActivity.readerIntentManager.openZimFileFromPath(zimFile.path, "")
     }
-    // Wait a bit to properly load the ZIM file in reader.
-    composeTestRule.waitForIdle()
-    composeTestRule.waitUntilTimeout()
+    composeTestRule.apply {
+      waitForIdle()
+      waitUntil(NATIVE_ARCHIVE_OPEN_MS) {
+        onNodeWithTag(READER_SCREEN_TESTING_TAG).isDisplayed()
+      }
+    }
   }
 
   private fun writeZimFileData(responseBody: ResponseBody, file: File) {

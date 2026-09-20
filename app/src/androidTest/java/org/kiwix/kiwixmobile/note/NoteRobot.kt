@@ -54,10 +54,10 @@ import org.kiwix.kiwixmobile.core.ui.components.TOOLBAR_TITLE_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_DISMISS_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_TAG
+import org.kiwix.kiwixmobile.testutils.Budget
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.kiwixmobile.utils.StandardActions.openDrawer
 
 fun note(func: NoteRobot.() -> Unit) = NoteRobot().apply(func)
@@ -302,19 +302,21 @@ class NoteRobot : BaseRobot() {
   }
 
   fun assertAndroidArticleLoadedInReader(composeTestRule: ComposeContentTestRule) {
-    testFlakyView({
-      composeTestRule.apply {
-        waitForIdle()
-        waitUntilTimeout()
-        onWebView()
-          .withElement(
-            findElement(
-              Locator.XPATH,
-              "//*[contains(text(), 'History')]"
+    testFlakyView(
+      {
+        composeTestRule.apply {
+          waitForIdle()
+          onWebView()
+            .withElement(
+              findElement(
+                Locator.XPATH,
+                "//*[contains(text(), 'History')]"
+              )
             )
-          )
-      }
-    })
+        }
+      },
+      TestUtils.retryCountFor(Budget.WEBVIEW_CONTENT_SETTLE)
+    )
   }
 
   private fun pauseForBetterTestPerformance() {

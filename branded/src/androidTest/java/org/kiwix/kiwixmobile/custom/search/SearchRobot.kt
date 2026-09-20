@@ -42,11 +42,15 @@ import org.hamcrest.CoreMatchers.containsString
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_NOTES_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.reader.READER_BOTTOM_BAR_HOME_BUTTON_TESTING_TAG
+import org.kiwix.kiwixmobile.core.main.reader.READER_SCREEN_TESTING_TAG
 import org.kiwix.kiwixmobile.core.page.SEARCH_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.SEARCH_FIELD_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.SEARCH_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.custom.testutils.TestUtils.NATIVE_ARCHIVE_OPEN_MS
+import org.kiwix.kiwixmobile.custom.testutils.TestUtils.SEARCH_INDEX_QUERY_MS
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.TEST_PAUSE_MS
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.TEST_PAUSE_MS_FOR_SEARCH_TEST
+import org.kiwix.kiwixmobile.custom.testutils.TestUtils.retryCountForWebviewSettle
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.waitUntilTimeout
 
@@ -118,9 +122,12 @@ class SearchRobot {
   }
 
   fun searchAndClickOnArticle(searchString: String, composeTestRule: ComposeContentTestRule) {
-    // wait a bit to properly load the ZIM file in the reader
-    composeTestRule.waitForIdle()
-    composeTestRule.waitUntilTimeout()
+    composeTestRule.apply {
+      waitForIdle()
+      waitUntil(NATIVE_ARCHIVE_OPEN_MS) {
+        onNodeWithTag(READER_SCREEN_TESTING_TAG).isDisplayed()
+      }
+    }
     openSearchScreen(composeTestRule)
     // Wait a bit to properly visible the search screen.
     composeTestRule.waitForIdle()
@@ -131,7 +138,9 @@ class SearchRobot {
   private fun clickOnSearchItemInSearchList(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitUntil(SEARCH_INDEX_QUERY_MS) {
+          onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
         waitForIdle()
         onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0].performClick()
       }
@@ -163,16 +172,19 @@ class SearchRobot {
   }
 
   fun clickOnAFoolForYouArticle(composeTestRule: ComposeContentTestRule) {
-    testFlakyView({
-      composeTestRule.waitUntilTimeout()
-      onWebView()
-        .withElement(
-          findElement(
-            Locator.XPATH,
-            "//*[contains(text(), 'A Fool for You')]"
-          )
-        ).perform(webClick())
-    })
+    testFlakyView(
+      {
+        composeTestRule.waitForIdle()
+        onWebView()
+          .withElement(
+            findElement(
+              Locator.XPATH,
+              "//*[contains(text(), 'A Fool for You')]"
+            )
+          ).perform(webClick())
+      },
+      retryCountForWebviewSettle()
+    )
   }
 
   fun assertAFoolForYouArticleLoaded(composeTestRule: ComposeContentTestRule) {
