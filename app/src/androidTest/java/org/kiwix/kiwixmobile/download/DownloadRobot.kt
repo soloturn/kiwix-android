@@ -484,7 +484,7 @@ class DownloadRobot : BaseRobot() {
 
   fun clickOnSearchIcon(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntilTimeout()
+      waitForIdle()
       onNodeWithTag(SEARCH_ICON_TESTING_TAG).performClick()
     }
   }
@@ -492,7 +492,7 @@ class DownloadRobot : BaseRobot() {
   fun clickOnClearSearchIcon(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(ONLINE_LIBRARY_SEARCH_VIEW_CLOSE_BUTTON_TESTING_TAG).performClick()
       }
     })
@@ -501,7 +501,7 @@ class DownloadRobot : BaseRobot() {
   fun searchWikipediaZIMFiles(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         val searchView = onNodeWithTag(ONLINE_LIBRARY_SEARCH_VIEW_TESTING_TAG)
         searchView.performTextInput("")
         searchView.performTextInput("Wikipedia")
@@ -512,7 +512,7 @@ class DownloadRobot : BaseRobot() {
   fun assertPreviousSearchRemainsActive(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(ONLINE_LIBRARY_SEARCH_VIEW_TESTING_TAG)
           .assertTextEquals("Wikipedia")
       }
@@ -526,7 +526,6 @@ class DownloadRobot : BaseRobot() {
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
-        waitUntilTimeout()
         onNodeWithTag(TOOLBAR_TITLE_TESTING_TAG)
           .assertTextEquals(kiwixMainActivity.getString(string.download))
       }

@@ -118,7 +118,6 @@ class BookmarksRobot : BaseRobot() {
   fun clickOnSaveBookmarkImage(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitForIdle()
-      waitUntilTimeout()
       waitUntil(Budget.WEBVIEW_CONTENT_SETTLE.millis) {
         onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
       }
@@ -167,7 +166,7 @@ class BookmarksRobot : BaseRobot() {
       composeTestRule.waitForIdle()
       openDrawer(coreMainActivity)
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(LEFT_DRAWER_BOOKMARK_ITEM_TESTING_TAG).performClick()
       }
     })
@@ -193,7 +192,7 @@ class BookmarksRobot : BaseRobot() {
   fun assertZimFileLoadedIntoTheReader(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       composeTestRule.apply {
-        waitUntilTimeout()
+        waitForIdle()
         onNodeWithTag(BOTTOM_NAV_READER_ITEM_TESTING_TAG).performClick()
       }
     }
@@ -215,7 +214,6 @@ class BookmarksRobot : BaseRobot() {
   fun assertBookmarkButtonShowBookmarked(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.waitForIdle()
-      composeTestRule.waitUntilTimeout()
       composeTestRule
         .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
         .assertIsSelected()
@@ -225,7 +223,6 @@ class BookmarksRobot : BaseRobot() {
   fun assertBookmarkButtonShowNotBookmarked(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.waitForIdle()
-      composeTestRule.waitUntilTimeout()
       composeTestRule
         .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
         .assertIsNotSelected()

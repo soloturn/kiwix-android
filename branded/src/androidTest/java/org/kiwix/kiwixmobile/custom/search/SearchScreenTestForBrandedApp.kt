@@ -310,10 +310,10 @@ class SearchScreenTestForBrandedApp {
       clickOnAFoolForYouArticle(composeTestRule)
       composeTestRule.mainClock.advanceTimeByFrame()
       assertAFoolForYouArticleLoaded(composeTestRule)
-      composeTestRule.waitUntilTimeout()
+      composeTestRule.waitForIdle()
       // open note screen.
       openNoteScreen(brandedMainActivity as CoreMainActivity, composeTestRule)
-      composeTestRule.waitUntilTimeout()
+      composeTestRule.waitForIdle()
       composeTestRule.onNodeWithTag(NAVIGATION_ICON_TESTING_TAG).performClick()
       // after came back check the previously loaded article is still showing or not.
       assertAFoolForYouArticleLoaded(composeTestRule)
