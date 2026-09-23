@@ -438,6 +438,9 @@ abstract class CoreReaderViewModel(
 
   private fun observeReaderPendingIntent() =
     viewModelScope.launch {
+      // The only subscriber to ReaderIntentManager's events - its replay = 1 exists
+      // so a freshly-created instance's subscription here still sees an emission that
+      // fired just before it started collecting, instead of missing it permanently.
       readerIntentManager.events.collect {
         if (isWebViewHistoryRestoring) return@collect
         handlePendingIntent()

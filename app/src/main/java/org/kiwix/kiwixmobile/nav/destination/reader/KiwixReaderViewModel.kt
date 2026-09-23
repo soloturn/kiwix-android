@@ -258,7 +258,11 @@ class KiwixReaderViewModel @Inject constructor(
     Log.d(TAG_KIWIX, "Kiwix normal start, no zimFile loaded last time  -> display home page")
     // TEMP DIAGNOSTIC - remove once the LibkiwixBookmarkTest race is confirmed/fixed.
     Log.e("ZimReaderDiag", "restoreViewStateOnInvalidWebViewHistory calling exitBook() on $this")
-    exitBook()
+    // A concurrently-created reader instance may have already published a reader while
+    // this one was still restoring - don't tear it down underneath it. "Normal start"
+    // (this override's actual intent) has nothing open anyway, so this only changes
+    // behavior for that race.
+    exitBook(shouldCloseZimBook = !zimReaderContainer.hasReader)
   }
 
   override fun openSearch(
