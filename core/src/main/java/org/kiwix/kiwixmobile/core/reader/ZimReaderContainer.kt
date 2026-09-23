@@ -18,7 +18,9 @@
 package org.kiwix.kiwixmobile.core.reader
 
 import android.webkit.WebResourceResponse
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,13 +40,28 @@ private class ReadWriteMutex {
 
   suspend fun <T> read(block: suspend () -> T): T {
     readerCountMutex.withLock {
-      if (++readerCount == 1) writerMutex.lock()
+      if (++readerCount == 1) {
+        try {
+          writerMutex.lock()
+        } catch (cancellation: CancellationException) {
+          // Never acquired writerMutex - undo the increment so the count stays
+          // balanced, otherwise it can never reach 0 again and writerMutex
+          // would appear permanently held to every future writer.
+          readerCount--
+          throw cancellation
+        }
+      }
     }
     try {
       return block()
     } finally {
-      readerCountMutex.withLock {
-        if (--readerCount == 0) writerMutex.unlock()
+      // Cancelling the caller must not skip this: Mutex.withLock() is a suspend
+      // fun, so an already-cancelled coroutine can hit it here and silently
+      // no-op, leaking readerCount and stranding writerMutex locked forever.
+      withContext(NonCancellable) {
+        readerCountMutex.withLock {
+          if (--readerCount == 0) writerMutex.unlock()
+        }
       }
     }
   }
