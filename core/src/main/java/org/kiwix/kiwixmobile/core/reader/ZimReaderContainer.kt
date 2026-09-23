@@ -80,6 +80,10 @@ class ZimReaderContainer @Inject constructor(
   // CoreWebViewClient.shouldInterceptRequest. write() only completes once every in-flight
   // read() has finished, so readers see either the old or the new reader, never a disposed one.
   private val lock = ReadWriteMutex()
+
+  // Volatile so hasReader can read it lock-free below - every other accessor still
+  // goes through lock.read {} because it calls into the disposable native Archive.
+  @Volatile
   private var backingZimFileReader: ZimFileReader? = null
 
   // Serializes setZimReaderSource() itself so callers (CoreReaderViewModel,
@@ -102,7 +106,10 @@ class ZimReaderContainer @Inject constructor(
   suspend fun <T> withReader(block: (ZimFileReader) -> T): T? =
     withContext(ioDispatcher) { withReaderSuspend { it?.let(block) } }
 
-  val hasReader: Boolean get() = withReaderOrNull { it != null }
+  // A reference check, not a native call - reading it directly avoids the runBlocking
+  // deadlock this hit when polled from Main while a writer was also queued on Main
+  // (see setZimReaderSource, which now hops off Main for the same reason).
+  val hasReader: Boolean get() = backingZimFileReader != null
 
   suspend fun setZimReaderSource(
     zimReaderSource: ZimReaderSource?,
@@ -111,18 +118,22 @@ class ZimReaderContainer @Inject constructor(
     if (zimReaderSource == withReaderSuspend { it?.zimReaderSource }) {
       return@withLock
     }
-    val newReader = withContext(ioDispatcher) {
-      if (zimReaderSource?.exists(ioDispatcher) == true &&
-        zimReaderSource.canOpenInLibkiwix(ioDispatcher)
-      ) {
-        zimFileReaderFactory.create(zimReaderSource, showSearchSuggestionsSpellChecked)
-      } else {
-        null
+    withContext(ioDispatcher) {
+      val newReader =
+        if (zimReaderSource?.exists(ioDispatcher) == true &&
+          zimReaderSource.canOpenInLibkiwix(ioDispatcher)
+        ) {
+          zimFileReaderFactory.create(zimReaderSource, showSearchSuggestionsSpellChecked)
+        } else {
+          null
+        }
+      // Stays on ioDispatcher rather than returning to the caller's (often Main)
+      // dispatcher: a reader anywhere can only unblock this by unlocking writerMutex,
+      // and that resumption must never depend on the Main looper being free to run it.
+      lock.write {
+        backingZimFileReader?.dispose()
+        backingZimFileReader = newReader
       }
-    }
-    lock.write {
-      backingZimFileReader?.dispose()
-      backingZimFileReader = newReader
     }
   }
 
