@@ -116,7 +116,7 @@ jobs:
           profile: pixel_2
           ram-size: 4096M
           cores: 4
-          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation.sh
 
       - name: Upload screenshot result
@@ -154,7 +154,7 @@ jobs:
           ram-size: 3072M
           cores: 4
           heap-size: 1024M
-          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: ./gradlew :benchmark:connectedBenchmarkAndroidTest
 
   # Merges api-level 30's shards' .ec files into one coverage report.
@@ -298,7 +298,7 @@ jobs:
           profile: pixel_2
           ram-size: 4096M
           cores: 4
-          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation-release.sh
 
   automated-tests-branded-apps:
@@ -382,7 +382,7 @@ jobs:
           profile: pixel_2
           ram-size: 4096M
           cores: 4
-          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation-brandedapps.sh
 
   automated-tests-on-tablet:
@@ -466,7 +466,7 @@ jobs:
           profile: pixel_c
           ram-size: 4096M
           cores: 4
-          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation-file-opening-on-tablet.sh
 
   code-formatting-job:
