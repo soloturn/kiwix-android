@@ -92,9 +92,14 @@ object TestUtils {
   // shared constant above since that one has ~30 unrelated call sites.
   const val TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON = 20_000L
 
-  // zimReaderContainer.zimFileReader != null polls: run 35415742112 timed
-  // out 3/3 retries at 10s waiting for the native archive to open.
-  const val TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN = 20_000L
+  // zimReaderContainer.zimFileReader != null polls: run 35415742112 timed out
+  // 3/3 at 10s. 20s wasn't enough either - run 35833790955 timed out 20/20
+  // retries across 5 jobs. Since 72dc991e5, closeZimBook() genuinely awaits
+  // the write lock for dispose(), which can queue behind a straggling
+  // WebView shouldInterceptRequest callback that outlives destroyAllTabs()
+  // (Android doesn't guarantee those stop at WebView.destroy()) - correct,
+  // but slower than the old fire-and-forget close.
+  const val TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN = 40_000L
   const val TEST_PAUSE_MS_FOR_SNACKBAR = 6000L
   const val FIVE_SECOND_DELAY = 5000L
   const val FIFTEEN_SECOND_DELAY = 15_000L
