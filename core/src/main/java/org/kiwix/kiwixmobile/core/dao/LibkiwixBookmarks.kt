@@ -497,9 +497,14 @@ class LibkiwixBookmarks @Inject constructor(
     libkiwixBookOnDisk.getBooks().forEach {
       addBookToLibrary(file = it.zimReaderSource.file)
     }
-    // Save the imported bookmarks to the current library.
-    tempLibrary.getBookmarks(false)?.toList()?.forEach {
-      saveBookmark(LibkiwixBookmarkItem(it, null, null))
+    // Save the imported bookmarks to the current library. Write to disk only on the
+    // last one - avoids an O(n^2) rescan+rewrite per bookmark.
+    val importedBookmarks = tempLibrary.getBookmarks(false)?.toList().orEmpty()
+    importedBookmarks.forEachIndexed { index, it ->
+      saveBookmark(
+        LibkiwixBookmarkItem(it, null, null),
+        shouldWriteBookmarkToFile = index == importedBookmarks.size - 1
+      )
     }
     kiwixDataStore.context.toast(R.string.bookmark_imported_message)
 
