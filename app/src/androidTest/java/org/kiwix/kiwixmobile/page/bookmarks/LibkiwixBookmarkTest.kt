@@ -107,7 +107,8 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
         update(zimReaderContainer.withReaderBlocking { it.jniKiwixReader })
       }
     val bookmarkList = arrayListOf<LibkiwixBookmarkItem>()
-    for (i in 1..500) {
+    val bookmarkCount = 500
+    for (i in 1..bookmarkCount) {
       val bookmark =
         Bookmark().apply {
           bookId = zimReaderContainer.id
@@ -122,7 +123,11 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
           zimReaderContainer.zimReaderSource
         )
       runBlocking {
-        composeTestRule.activity.libkiwixBookmarks.saveBookmark(libkiwixItem).also {
+        // Write to disk only on the last item - avoids an O(n^2) rescan+rewrite per call.
+        composeTestRule.activity.libkiwixBookmarks.saveBookmark(
+          libkiwixItem,
+          shouldWriteBookmarkToFile = i == bookmarkCount
+        ).also {
           bookmarkList.add(libkiwixItem)
         }
       }
