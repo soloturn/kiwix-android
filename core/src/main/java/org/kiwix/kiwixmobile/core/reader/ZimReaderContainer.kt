@@ -27,9 +27,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Factory
+import org.kiwix.kiwixmobile.core.utils.files.Log
 import java.net.HttpURLConnection
 import javax.inject.Inject
 import javax.inject.Singleton
+
+// TEMP DIAGNOSTIC tag - remove once the LibkiwixBookmarkTest race is confirmed/fixed.
+private const val TAG_DIAG = "ZimReaderDiag"
 
 // Coroutine-native reader/writer lock: write() suspends instead of blocking a thread,
 // so a writer queued behind a slow reader can't starve a shared dispatcher's pool.
@@ -115,7 +119,10 @@ class ZimReaderContainer @Inject constructor(
     zimReaderSource: ZimReaderSource?,
     showSearchSuggestionsSpellChecked: Boolean = false
   ) = setReaderMutex.withLock {
+    // TEMP DIAGNOSTIC - remove once the LibkiwixBookmarkTest race is confirmed/fixed.
+    Log.e(TAG_DIAG, "setZimReaderSource entry: source=$zimReaderSource")
     if (zimReaderSource == withReaderSuspend { it?.zimReaderSource }) {
+      Log.e(TAG_DIAG, "setZimReaderSource early-return: already set to $zimReaderSource")
       return@withLock
     }
     withContext(ioDispatcher) {
@@ -133,6 +140,7 @@ class ZimReaderContainer @Inject constructor(
       lock.write {
         backingZimFileReader?.dispose()
         backingZimFileReader = newReader
+        Log.e(TAG_DIAG, "setZimReaderSource published: reader=${newReader != null}")
       }
     }
   }

@@ -256,6 +256,8 @@ class KiwixReaderViewModel @Inject constructor(
 
   override suspend fun restoreViewStateOnInvalidWebViewHistory() {
     Log.d(TAG_KIWIX, "Kiwix normal start, no zimFile loaded last time  -> display home page")
+    // TEMP DIAGNOSTIC - remove once the LibkiwixBookmarkTest race is confirmed/fixed.
+    Log.e("ZimReaderDiag", "restoreViewStateOnInvalidWebViewHistory calling exitBook() on $this")
     exitBook()
   }
 
