@@ -61,7 +61,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
@@ -180,7 +184,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
@@ -255,7 +263,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
@@ -339,7 +351,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
@@ -423,7 +439,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
@@ -495,7 +515,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
@@ -545,7 +569,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
@@ -596,7 +624,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
@@ -650,7 +682,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
@@ -700,7 +736,11 @@ jobs:
           path: |
             ~/.gradle/caches
             !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
           key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
 
       - name: Restore Gradle wrapper cache
         uses: actions/cache/restore@v6
