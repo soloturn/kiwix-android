@@ -27,7 +27,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.core.os.LocaleListCompat
-import androidx.navigation.NavOptions
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -51,7 +50,6 @@ import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SNACKBAR
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
-import org.kiwix.kiwixmobile.ui.KiwixDestination
 import org.kiwix.libkiwix.Book
 import org.kiwix.libkiwix.Bookmark
 
@@ -252,18 +250,12 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
   private fun openZimFileInReader() {
     val zimFile = getZimFileFromResourceFolder(context, "testzim.zim")
 
-    composeTestRule.runOnUiThread {
-      val navOptions = NavOptions
-        .Builder()
-        .setPopUpTo(KiwixDestination.Reader.route, false)
-        .build()
-
-      composeTestRule.activity.navigate(
-        KiwixDestination.Reader.route,
-        navOptions
-      )
-    }
-
+    // No navigate() to Reader here - the app already starts there (see
+    // KiwixMainActivity's start destination), and doing it anyway spun up a
+    // second, redundant KiwixReaderViewModel whose startup restore could
+    // call exitBook()/closeZimBook() (-> setZimReaderSource(null)) moments
+    // after this open published, racing it and intermittently wiping out
+    // the reader - confirmed via logcat timestamps 46ms apart in CI.
     composeTestRule.runOnUiThread {
       composeTestRule.activity.openZimFromFilePath(zimFile.absolutePath)
     }
