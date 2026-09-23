@@ -26,11 +26,31 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Factory
 import java.net.HttpURLConnection
-import java.util.concurrent.locks.ReentrantReadWriteLock
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.concurrent.read
-import kotlin.concurrent.write
+
+// Coroutine-native reader/writer lock: write() suspends instead of blocking a thread,
+// so a writer queued behind a slow reader can't starve a shared dispatcher's pool.
+private class ReadWriteMutex {
+  private val readerCountMutex = Mutex()
+  private val writerMutex = Mutex()
+  private var readerCount = 0
+
+  suspend fun <T> read(block: suspend () -> T): T {
+    readerCountMutex.withLock {
+      if (++readerCount == 1) writerMutex.lock()
+    }
+    try {
+      return block()
+    } finally {
+      readerCountMutex.withLock {
+        if (--readerCount == 0) writerMutex.unlock()
+      }
+    }
+  }
+
+  suspend fun <T> write(block: suspend () -> T): T = writerMutex.withLock { block() }
+}
 
 @Singleton
 class ZimReaderContainer @Inject constructor(
@@ -40,10 +60,9 @@ class ZimReaderContainer @Inject constructor(
   // Guards `backingZimFileReader` against the native use-after-free that happens when the
   // setter below disposes the current reader (native Archive/SuggestionSearcher) while the
   // WebView's Chromium worker thread is mid-read via isRedirect/getRedirect/load, called from
-  // CoreWebViewClient.shouldInterceptRequest. The write lock ensures dispose() only runs once
-  // every in-flight read of this class's own methods has finished; readers see either the old
-  // or the new reader, never a disposed one.
-  private val lock = ReentrantReadWriteLock()
+  // CoreWebViewClient.shouldInterceptRequest. write() only completes once every in-flight
+  // read() has finished, so readers see either the old or the new reader, never a disposed one.
+  private val lock = ReadWriteMutex()
   private var backingZimFileReader: ZimFileReader? = null
 
   // Serializes setZimReaderSource() itself so callers (CoreReaderViewModel,
@@ -51,22 +70,20 @@ class ZimReaderContainer @Inject constructor(
   // mid-open - only one open/close runs at a time, in call order.
   private val setReaderMutex = Mutex()
 
-  private inline fun <T> withReaderOrNull(block: (ZimFileReader?) -> T): T =
+  private suspend fun <T> withReaderSuspend(block: suspend (ZimFileReader?) -> T): T =
     lock.read { block(backingZimFileReader) }
 
-  /**
-   * Leases the current reader to [block] for synchronous callers already off the
-   * main thread - the WebView's own callback thread (isRedirect/load/getRedirect
-   * below), or a coroutine that has already hopped onto ioDispatcher via [withReader].
-   * Holding the read lock for the duration blocks setZimReaderSource's dispose()
-   * until [block] returns, so the reader can never be disposed mid-use.
-   */
+  // For synchronous callers (WebView's own thread); parks only that caller's thread,
+  // not a shared dispatcher.
+  private fun <T> withReaderOrNull(block: (ZimFileReader?) -> T): T =
+    runBlocking { withReaderSuspend(block) }
+
   fun <T> withReaderBlocking(block: (ZimFileReader) -> T): T? =
-    lock.read { backingZimFileReader?.let(block) }
+    withReaderOrNull { it?.let(block) }
 
   /** Coroutine-friendly version of [withReaderBlocking] - hops onto ioDispatcher first. */
   suspend fun <T> withReader(block: (ZimFileReader) -> T): T? =
-    withContext(ioDispatcher) { withReaderBlocking(block) }
+    withContext(ioDispatcher) { withReaderSuspend { it?.let(block) } }
 
   val hasReader: Boolean get() = withReaderOrNull { it != null }
 
@@ -74,7 +91,7 @@ class ZimReaderContainer @Inject constructor(
     zimReaderSource: ZimReaderSource?,
     showSearchSuggestionsSpellChecked: Boolean = false
   ) = setReaderMutex.withLock {
-    if (zimReaderSource == withReaderOrNull { it?.zimReaderSource }) {
+    if (zimReaderSource == withReaderSuspend { it?.zimReaderSource }) {
       return@withLock
     }
     val newReader = withContext(ioDispatcher) {
@@ -98,7 +115,7 @@ class ZimReaderContainer @Inject constructor(
   fun isRedirect(url: String): Boolean = withReaderOrNull { it?.isRedirect(url) == true }
   fun getRedirect(url: String): String = withReaderOrNull { it?.getRedirect(url) }.orEmpty()
   fun load(url: String, requestHeaders: Map<String, String>): WebResourceResponse = runBlocking {
-    return@runBlocking withReaderOrNull { reader ->
+    return@runBlocking withReaderSuspend { reader ->
       WebResourceResponse(
         reader?.getMimeTypeFromUrl(url),
         Charsets.UTF_8.name(),
