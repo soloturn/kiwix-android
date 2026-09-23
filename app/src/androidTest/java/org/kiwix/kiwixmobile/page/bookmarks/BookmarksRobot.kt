@@ -58,8 +58,8 @@ import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_T
 import org.kiwix.kiwixmobile.main.BOTTOM_NAV_READER_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.kiwixmobile.utils.StandardActions.openDrawer
@@ -119,7 +119,7 @@ class BookmarksRobot : BaseRobot() {
     composeTestRule.apply {
       waitForIdle()
       waitUntilTimeout()
-      waitUntil(TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON) {
+      waitUntil(TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN) {
         onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
@@ -135,7 +135,7 @@ class BookmarksRobot : BaseRobot() {
       waitForIdle()
       // wait for disappearing the snack-bar after removing the bookmark
       waitUntilTimeout(timeout)
-      waitUntil(TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON) {
+      waitUntil(TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN) {
         onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
       }
       onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
@@ -297,7 +297,7 @@ class BookmarksRobot : BaseRobot() {
     })
     // Unlike the initial ZIM open, nothing here waited for the reader screen
     // to actually come up before the caller checks WebView content.
-    composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON) {
+    composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_ZIM_FILE_OPEN) {
       composeTestRule
         .onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
         .isDisplayed()
