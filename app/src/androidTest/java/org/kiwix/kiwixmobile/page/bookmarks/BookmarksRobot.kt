@@ -60,7 +60,6 @@ import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_T
 import org.kiwix.kiwixmobile.main.BOTTOM_NAV_READER_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SNACKBAR
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
@@ -139,7 +138,7 @@ class BookmarksRobot : BaseRobot() {
       composeTestRule.apply {
         waitForIdle()
         waitForBookmarkSnackbarToDisappear(composeTestRule)
-        waitUntil(TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON) {
+        waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
         }
         onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG)
