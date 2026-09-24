@@ -28,7 +28,11 @@ import javax.inject.Singleton
 @Singleton
 class ReaderIntentManager @Inject constructor(private val pendingIntentParser: PendingIntentParser) {
   private var pendingAction: ReaderIntentAction = ReaderIntentAction.None
-  private val _events = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+  // replay = 1 so a collector that subscribes after the emission (e.g. a reader instance
+  // created concurrently with this call) still sees it, instead of only whichever
+  // instance happened to already be subscribed at emission time.
+  private val _events = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 1)
   val events = _events.asSharedFlow()
 
   fun storePendingIntent(intent: Intent?) {
