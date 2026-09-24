@@ -45,6 +45,7 @@ import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.main.topLevel
 import org.kiwix.kiwixmobile.testutils.RetryRule
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SNACKBAR
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
@@ -268,7 +269,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       // composed - check the native reader directly instead, which is also the
       // exact thing that needs to be ready to avoid a not-yet-initialized
       // zimFileReader (crashing later JNI calls like Book.update()).
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+      waitUntil(TEST_PAUSE_MS.toLong()) {
         activity.zimReaderContainer.hasReader
       }
     }
