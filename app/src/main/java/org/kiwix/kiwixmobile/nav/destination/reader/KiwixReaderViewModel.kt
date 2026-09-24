@@ -256,7 +256,9 @@ class KiwixReaderViewModel @Inject constructor(
 
   override suspend fun restoreViewStateOnInvalidWebViewHistory() {
     Log.d(TAG_KIWIX, "Kiwix normal start, no zimFile loaded last time  -> display home page")
-    exitBook()
+    // Don't tear down a reader a concurrent instance just published; "normal start"
+    // has nothing open anyway, so this only changes that race.
+    exitBook(shouldCloseZimBook = !zimReaderContainer.hasReader)
   }
 
   override fun openSearch(
