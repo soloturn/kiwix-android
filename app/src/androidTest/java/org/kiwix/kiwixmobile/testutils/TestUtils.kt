@@ -72,10 +72,6 @@ object TestUtils {
   const val TEST_PAUSE_MS = 3000
   const val TEST_PAUSE_MS_FOR_SEARCH_TEST = 1000
   const val TEST_PAUSE_MS_FOR_DOWNLOAD_TEST = 10000L
-
-  // longClickOnSaveBookmarkImage's own wait - kept separate from the
-  // shared constant above since that one has ~30 unrelated call sites.
-  const val TEST_PAUSE_MS_FOR_BOOKMARK_BUTTON = 20_000L
   const val TEST_PAUSE_MS_FOR_SNACKBAR = 6000L
   const val FIVE_SECOND_DELAY = 5000L
   const val FIFTEEN_SECOND_DELAY = 15_000L
