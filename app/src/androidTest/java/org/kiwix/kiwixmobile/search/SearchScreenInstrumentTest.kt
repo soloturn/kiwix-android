@@ -45,7 +45,7 @@ import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
 import org.kiwix.kiwixmobile.testutils.TestUtils.getOkkHttpClientForTesting
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
@@ -308,7 +308,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       // can false-positive on the PREVIOUS screen's still-visible title
       // before the reader has even composed - check the native reader
       // directly instead, which is the exact thing that needs to be ready.
-      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+      waitUntil(TEST_PAUSE_MS.toLong()) {
         kiwixMainActivity.zimReaderContainer.hasReader
       }
     }
