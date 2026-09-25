@@ -104,7 +104,7 @@ jobs:
           profile: pixel_2
           ram-size: 4096M
           sdcard-path-or-size: 1024M
-          cores: 4
+          cores: 3
           heap-size: 1024M
 
       - name: Create instrumentation coverage
@@ -124,7 +124,7 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
           ram-size: 4096M
-          cores: 4
+          cores: 3
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation.sh
 
@@ -172,7 +172,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           ram-size: 3072M
-          cores: 4
+          cores: 3
           heap-size: 1024M
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: ./gradlew :benchmark:connectedBenchmarkAndroidTest
@@ -313,7 +313,7 @@ jobs:
           profile: pixel_2
           ram-size: 4096M
           sdcard-path-or-size: 1024M
-          cores: 4
+          cores: 3
           heap-size: 1024M
 
       - name: Create instrumentation coverage for PlayStore variant
@@ -325,7 +325,7 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
           ram-size: 4096M
-          cores: 4
+          cores: 3
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation-release.sh
 
@@ -410,7 +410,7 @@ jobs:
           profile: pixel_2
           ram-size: 4096M
           sdcard-path-or-size: 1024M
-          cores: 4
+          cores: 3
           heap-size: 1024M
 
       - name: Test branded app
@@ -422,7 +422,7 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
           ram-size: 4096M
-          cores: 4
+          cores: 3
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation-brandedapps.sh
 
@@ -507,7 +507,7 @@ jobs:
           profile: pixel_c
           ram-size: 4096M
           sdcard-path-or-size: 1024M
-          cores: 4
+          cores: 3
           heap-size: 1024M
 
       - name: File Opening test on Tablet
@@ -519,7 +519,7 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_c
           ram-size: 4096M
-          cores: 4
+          cores: 3
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation-file-opening-on-tablet.sh
 
