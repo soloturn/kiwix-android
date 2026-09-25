@@ -75,8 +75,6 @@ class ReaderRobot : BaseRobot() {
         onNodeWithTag(READER_SCREEN_TESTING_TAG).isDisplayed()
       }
       Log.e(TAG, "Reader screen is displayed.")
-      // Wait for a few second to fully load the article in reader.
-      waitUntilTimeout()
       articlePageContent?.let {
         assertArticleLoaded(it)
         Log.e(TAG, "Article content '$it' loaded successfully in the WebView.")
@@ -128,7 +126,11 @@ class ReaderRobot : BaseRobot() {
 
   fun assertTabRestored(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntilTimeout()
+      waitUntil(FIFTEEN_SECOND_DELAY) {
+        onAllNodesWithTag(TAB_TITLE_TESTING_TAG, useUnmergedTree = true)
+          .fetchSemanticsNodes()
+          .isNotEmpty()
+      }
       onAllNodesWithTag(TAB_TITLE_TESTING_TAG, useUnmergedTree = true)[0].assertTextEquals("Test Zim")
     }
   }
@@ -147,15 +149,18 @@ class ReaderRobot : BaseRobot() {
   }
 
   fun assertArticleLoaded(articlePageContent: String) {
-    testFlakyView({
-      onWebView()
-        .withElement(
-          findElement(
-            Locator.XPATH,
-            "//*[contains(text(), '$articlePageContent')]"
+    testFlakyView(
+      {
+        onWebView()
+          .withElement(
+            findElement(
+              Locator.XPATH,
+              "//*[contains(text(), '$articlePageContent')]"
+            )
           )
-        )
-    }, 10)
+      },
+      TestUtils.RETRY_COUNT_FOR_WEBVIEW_CONTENT_LOAD
+    )
   }
 
   fun openAndroidArticleInNewTab(composeTestRule: ComposeContentTestRule) {
