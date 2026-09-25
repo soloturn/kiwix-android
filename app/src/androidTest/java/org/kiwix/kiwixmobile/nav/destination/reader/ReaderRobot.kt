@@ -18,12 +18,13 @@
 
 package org.kiwix.kiwixmobile.nav.destination.reader
 
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onNodeWithTag
 import applyWithViewHierarchyPrinting
 import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.main.reader.READER_SCREEN_TESTING_TAG
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 
 fun reader(func: ReaderRobot.() -> Unit) = ReaderRobot().applyWithViewHierarchyPrinting(func)
 
@@ -31,7 +32,9 @@ class ReaderRobot : BaseRobot() {
   fun assertReaderScreenDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitForIdle()
-      waitUntilTimeout()
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+        onNodeWithTag(READER_SCREEN_TESTING_TAG).isDisplayed()
+      }
       onNodeWithTag(READER_SCREEN_TESTING_TAG).assertExists()
     }
   }
