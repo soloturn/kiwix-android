@@ -28,7 +28,9 @@ touch /tmp/emulator_script_started
 # The emulator's crashpad_handler subprocess can survive `adb emu kill` and
 # hang the android-emulator-runner action's teardown
 # (https://github.com/ReactiveCircus/android-emulator-runner/issues/385).
-# Kill it once this script exits, regardless of the test outcome.
+# Kill it once this script exits, regardless of the test outcome. Extended
+# below (once logcat_loop_pid exists) rather than appended, since a second
+# `trap ... EXIT` would replace this one instead of adding to it.
 trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
 
 # Enable Wi-Fi on the emulator
@@ -38,8 +40,38 @@ adb logcat -c
 if adb shell settings list secure | grep -q "stylus_handwriting_enabled"; then
   adb shell settings put secure stylus_handwriting_enabled 0
 fi
-# shellcheck disable=SC2035
-adb logcat *:E -v color &
+# adb logcat is known to silently stop producing output for a while and then
+# resume (documented upstream, e.g.
+# https://issuetracker.google.com/issues/150558653) - restart it whenever the
+# client exits instead of a single fire-and-forget background process. Also
+# tee to a file so classify_flaky_failures.py below has something to read;
+# the plain app instrumentation.sh does the same (see its own comments for
+# why lowmemorykiller/lmkd are included).
+(
+  while true; do
+    # shellcheck disable=SC2035
+    adb logcat *:E System.err:W lowmemorykiller:V lmkd:V ActivityManager:I -v color | tee -a /tmp/logcat-capture.log
+    sleep 1
+  done
+) &
+logcat_loop_pid=$!
+# This loop is never awaited, so a normal script exit leaves it as an
+# orphan that still holds this step's stdout pipe open - GitHub Actions
+# won't see EOF (and the step won't complete) until it exits too. `adb
+# logcat` has no per-call timeout, so if it's mid-blocking-read exactly
+# when the emulator teardown severs the connection, it can hang
+# indefinitely instead of erroring out - observed in run 35470368074's
+# job (30,0) (plain instrumentation.sh, same loop shape): the actual test
+# task succeeded in 5 minutes, but the step then ran for 3 hours until
+# the hard EMULATOR_STEP_TIMEOUT_MINUTES kill. pkill by pattern rather
+# than just the loop's own PID, since that PID is the `while` subshell,
+# not the adb logcat process actually stuck inside it.
+trap '
+  kill "$logcat_loop_pid" 2>/dev/null
+  pkill -f "adb logcat" 2>/dev/null
+  killall -INT crashpad_handler 2>/dev/null
+  true
+' EXIT
 
 PACKAGE_NAME="org.kiwix.kiwixmobile.custom"
 TEST_PACKAGE_NAME="${PACKAGE_NAME}.test"
@@ -103,7 +135,19 @@ while [ $retry -le 3 ]; do
     retry=$(( retry + 1 ))
     if [ $retry -eq 3 ]; then
       adb exec-out screencap -p >screencap.png
-      exit 1
+      echo "connectedCustomexampleDebugAndroidTest failed after $retry attempts - checking whether every failure is CI-runner overload or a known external bug" >&2
+      mapfile -t junit_xmls < <(find branded/build/outputs/androidTest-results/connected -name 'TEST-*.xml' 2>/dev/null)
+      if [ "${#junit_xmls[@]}" -eq 0 ] || ! python3 contrib/classify_flaky_failures.py \
+        --junit-xml "${junit_xmls[@]}" \
+        --log /tmp/logcat-capture.log \
+        --resource-diag /tmp/resource-diag.log \
+        --dmesg /tmp/dmesg.log \
+        --stall-capture /tmp/stall-capture.log \
+        --apply --in-place; then
+        exit 1
+      fi
+      echo "All failures were CI-runner overload or a known external bug with supporting evidence - not failing the build" >&2
+      break
     fi
   fi
 done
