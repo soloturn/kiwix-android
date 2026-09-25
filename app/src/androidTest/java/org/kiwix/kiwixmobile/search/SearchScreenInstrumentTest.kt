@@ -17,7 +17,6 @@
  */
 package org.kiwix.kiwixmobile.search
 
-import android.os.Build
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.hilt.navigation.HiltViewModelFactory
@@ -30,7 +29,6 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import okhttp3.ResponseBody
 import org.junit.After
-import org.junit.Assume
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -84,7 +82,6 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
 
   @Test
   fun searchScreenSimple() {
-    Assume.assumeTrue(Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA)
     activityScenario.onActivity {
       kiwixMainActivity = it
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
