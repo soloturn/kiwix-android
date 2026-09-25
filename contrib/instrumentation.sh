@@ -29,10 +29,15 @@ stop_diagnostics() {
   wait "$diagnostics_pid" 2>/dev/null || true
 }
 start_logcat() {
-  # Keep the adb client PID so it cannot outlive this script and hold the
-  # emulator action's output pipe open during teardown.
-  # shellcheck disable=SC2035
-  adb logcat TestRunner:I System.err:W AndroidRuntime:E ActivityManager:W *:E -v color &
+  # adb logcat can stop producing output or hang during emulator teardown.
+  # Restart it when it exits and retain the wider diagnostics in the artifact.
+  (
+    while true; do
+      # shellcheck disable=SC2035
+      adb logcat TestRunner:I AndroidRuntime:E System.err:W lowmemorykiller:V lmkd:V ActivityManager:I *:E -v color | tee -a /tmp/logcat-capture.log
+      sleep 1
+    done
+  ) &
   logcat_pid=$!
   adb logcat TestRunner:I '*:S' -v brief >>"$progress_log" &
   progress_pid=$!
@@ -40,10 +45,12 @@ start_logcat() {
 stop_logcat() {
   if [ -n "$logcat_pid" ]; then
     kill "$logcat_pid" "$progress_pid" 2>/dev/null || true
+    pkill -f '[a]db logcat' 2>/dev/null || true
     wait "$logcat_pid" "$progress_pid" 2>/dev/null || true
     logcat_pid=
     progress_pid=
   fi
+  killall -INT crashpad_handler 2>/dev/null || true
 }
 # Keep runner evidence alongside the JUnit failures for the classifier below.
 bash contrib/ci_emulator_diagnostics.sh &
