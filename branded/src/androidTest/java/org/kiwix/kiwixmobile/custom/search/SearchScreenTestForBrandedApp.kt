@@ -21,6 +21,7 @@ package org.kiwix.kiwixmobile.custom.search
 import android.Manifest
 import android.content.Context
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -50,6 +51,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.extensions.closeKeyboard
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
+import org.kiwix.kiwixmobile.core.main.reader.READER_SCREEN_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.viewmodel.Action
 import org.kiwix.kiwixmobile.core.search.viewmodel.SearchViewModel
 import org.kiwix.kiwixmobile.core.ui.components.NAVIGATION_ICON_TESTING_TAG
@@ -64,7 +66,6 @@ import org.kiwix.kiwixmobile.custom.testutils.TestUtils.closeSystemDialogs
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.getOkkHttpClientForTesting
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.isSystemUINotRespondingDialogVisible
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.testFlakyView
-import org.kiwix.kiwixmobile.custom.testutils.TestUtils.waitUntilTimeout
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URI
@@ -330,9 +331,12 @@ class SearchScreenTestForBrandedApp {
     UiThreadStatement.runOnUiThread {
       brandedMainActivity.readerIntentManager.openZimFileFromPath(zimFile.path, "")
     }
-    // Wait a bit to properly load the ZIM file in reader.
-    composeTestRule.waitForIdle()
-    composeTestRule.waitUntilTimeout()
+    composeTestRule.apply {
+      waitForIdle()
+      waitUntil(TestUtils.TEST_PAUSE_MS.toLong()) {
+        onNodeWithTag(READER_SCREEN_TESTING_TAG).isDisplayed()
+      }
+    }
   }
 
   private fun writeZimFileData(responseBody: ResponseBody, file: File) {

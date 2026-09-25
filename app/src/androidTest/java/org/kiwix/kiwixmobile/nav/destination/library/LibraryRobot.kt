@@ -56,7 +56,6 @@ import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.refresh
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilDisplayedWithScrollNudge
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.kiwixmobile.ui.BookItemScreen.BOOK_ITEM_TESTING_TAG
 
 fun library(func: LibraryRobot.() -> Unit) = LibraryRobot().applyWithViewHierarchyPrinting(func)
@@ -115,6 +114,9 @@ class LibraryRobot : BaseRobot() {
   private fun assertNoFilesTextDisplayed(composeTestRule: ComposeContentTestRule) {
     testFlakyView({
       composeTestRule.waitForIdle()
+      composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+        composeTestRule.onNodeWithTag(NO_FILE_TEXT_TESTING_TAG).isDisplayed()
+      }
       composeTestRule.onNodeWithTag(NO_FILE_TEXT_TESTING_TAG).assertIsDisplayed()
     })
   }
@@ -170,7 +172,6 @@ class LibraryRobot : BaseRobot() {
       bookItemList.performTouchInput { swipeDown() }
       clickOnFileDeleteIcon(composeTestRule)
       clickOnDeleteZimFile(composeTestRule)
-      composeTestRule.waitUntilTimeout()
       assertNoFilesTextDisplayed(composeTestRule)
     } catch (e: AssertionError) {
       Log.i(
@@ -284,7 +285,6 @@ class LibraryRobot : BaseRobot() {
     }
     clickOnValidateZimFileIcon(composeTestRule)
     clickOnYesDialogButton(composeTestRule)
-    composeTestRule.waitUntilTimeout()
     assertZIMFileValidatingDialogDisplayed(composeTestRule)
     clickOnYesDialogButton(composeTestRule)
   }

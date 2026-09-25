@@ -21,6 +21,7 @@ package org.kiwix.kiwixmobile.custom.testutils
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.os.SystemClock
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -40,6 +41,16 @@ object TestUtils {
   private const val TAG = "TESTUTILS"
   const val TEST_PAUSE_MS_FOR_SEARCH_TEST = 10000
   const val TEST_PAUSE_MS = 3000
+
+  // Mirrors the app module's RETRY_COUNT_FOR_WEBVIEW_CONTENT_LOAD - branded
+  // doesn't share androidTest sources with app, so this is duplicated as a
+  // plain constant rather than a cross-module import.
+  const val RETRY_COUNT_FOR_WEBVIEW_CONTENT_LOAD = 40
+
+  // testFlakyView's retries need to survive a transient condition that takes
+  // actual time to resolve (e.g. a WebView renderer respawn) - mirrors the
+  // same fix already applied to the app module's TestUtils.kt.
+  private const val RETRY_DELAY_FOR_FLAKY_VIEW_MS = 500L
   private const val READ_AND_CALL_TIMEOUT = 5L
   private const val CONNECTION_TIMEOUT = 1L
 
@@ -93,6 +104,7 @@ object TestUtils {
       action()
     } catch (ignore: Throwable) {
       if (retryCount > 0) {
+        SystemClock.sleep(RETRY_DELAY_FOR_FLAKY_VIEW_MS)
         testFlakyView(action, retryCount - 1)
       } else {
         throw ignore // No more retries, rethrow the exception

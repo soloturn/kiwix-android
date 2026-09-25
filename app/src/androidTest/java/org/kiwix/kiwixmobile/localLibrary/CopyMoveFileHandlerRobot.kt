@@ -39,6 +39,7 @@ import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_DISMISS_BUTTON_TESTI
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_MESSAGE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.nav.destination.library.local.NO_FILE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.storage.STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG
+import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.FIVE_SECOND_DELAY
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
@@ -149,18 +150,20 @@ class CopyMoveFileHandlerRobot : BaseRobot() {
         false
       }
     }
-    testFlakyView({
-      composeTestRule.waitUntilTimeout()
-      composeTestRule.mainClock.advanceTimeByFrame()
-      Web
-        .onWebView()
-        .withElement(
-          DriverAtoms.findElement(
-            Locator.XPATH,
-            "//*[contains(text(), 'Android_(operating_system)')]"
+    testFlakyView(
+      {
+        composeTestRule.mainClock.advanceTimeByFrame()
+        Web
+          .onWebView()
+          .withElement(
+            DriverAtoms.findElement(
+              Locator.XPATH,
+              "//*[contains(text(), 'Android_(operating_system)')]"
+            )
           )
-        )
-    })
+      },
+      TestUtils.RETRY_COUNT_FOR_WEBVIEW_CONTENT_LOAD
+    )
   }
 
   fun assertZimFileAddedInTheLocalLibrary(composeTestRule: ComposeContentTestRule) {
