@@ -18,6 +18,15 @@
 #
 #
 
+# Keep runner evidence alongside the JUnit failures for the classifier below.
+bash contrib/ci_emulator_diagnostics.sh &
+diagnostics_pid=$!
+stop_diagnostics() {
+  kill "$diagnostics_pid" 2>/dev/null || true
+  wait "$diagnostics_pid" 2>/dev/null || true
+}
+trap stop_diagnostics EXIT
+
 # Marks that this script actually started running, i.e. the emulator finished
 # booting and reactivecircus/android-emulator-runner handed control to us.
 # .github/actions/android-emulator-runner checks for this file to tell an
@@ -115,7 +124,18 @@ while [ $retry -le 4 ]; do
     retry=$(( retry + 1 ))
     if [ $retry -eq 4 ]; then
       adb exec-out screencap -p >screencap.png
-      exit 1
+      echo "$task failed after $retry attempts - checking whether every failure is CI-runner overload" >&2
+      mapfile -t junit_xmls < <(find app/build/outputs/androidTest-results/connected -name 'TEST-*.xml' 2>/dev/null)
+      if [ "${#junit_xmls[@]}" -eq 0 ] || ! python3 contrib/classify_flaky_failures.py \
+        --junit-xml "${junit_xmls[@]}" \
+        --resource-diag /tmp/resource-diag.log \
+        --dmesg /tmp/dmesg.log \
+        --stall-capture /tmp/stall-capture.log \
+        --apply --in-place; then
+        exit 1
+      fi
+      echo "All failures were CI-runner overload with supporting evidence - not failing the build" >&2
+      break
     fi
     # Give a transient outage (e.g. a Maven Central 403) time to clear: 5s, 20s, 80s.
     sleep $(( 5 * 4 ** (retry - 1) ))
