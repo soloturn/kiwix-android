@@ -104,6 +104,7 @@ jobs:
           profile: pixel_2
           sdcard-path-or-size: 1024M
           cores: 4
+          heap-size: 1024M
 
       - name: Create instrumentation coverage
         uses: ./.github/actions/android-emulator-runner
@@ -123,6 +124,8 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
           cores: 4
+          ram-size: 4096M
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation.sh
 
       - name: Upload JUnit test report
@@ -169,6 +172,9 @@ jobs:
           arch: x86_64
           profile: pixel_2
           cores: 4
+          ram-size: 3072M
+          heap-size: 1024M
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: ./gradlew :benchmark:connectedBenchmarkAndroidTest
 
   # Merges api-level 30's shards' .ec files into one coverage report.
@@ -307,6 +313,7 @@ jobs:
           profile: pixel_2
           sdcard-path-or-size: 1024M
           cores: 4
+          heap-size: 1024M
 
       - name: Create instrumentation coverage for PlayStore variant
         uses: ./.github/actions/android-emulator-runner
@@ -317,6 +324,8 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
           cores: 4
+          ram-size: 4096M
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation-release.sh
 
       - name: Upload JUnit test report
@@ -400,6 +409,7 @@ jobs:
           profile: pixel_2
           sdcard-path-or-size: 1024M
           cores: 4
+          heap-size: 1024M
 
       - name: Test branded app
         uses: ./.github/actions/android-emulator-runner
@@ -410,6 +420,8 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
           cores: 4
+          ram-size: 4096M
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation-brandedapps.sh
 
       - name: Upload JUnit test report
@@ -493,6 +505,7 @@ jobs:
           profile: pixel_c
           sdcard-path-or-size: 1024M
           cores: 4
+          heap-size: 1024M
 
       - name: File Opening test on Tablet
         uses: ./.github/actions/android-emulator-runner
@@ -503,6 +516,8 @@ jobs:
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_c
           cores: 4
+          ram-size: 4096M
+          gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
           script: bash contrib/instrumentation-file-opening-on-tablet.sh
 
       - name: Upload JUnit test report
