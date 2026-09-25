@@ -62,7 +62,8 @@ runs:
         ram-size: ${{ inputs.ram-size }}
         cores: ${{ inputs.cores }}
         heap-size: ${{ inputs.heap-size }}
-        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
+        # ANGLE over SwiftShader's Vulkan backend supports WebView GLES 3.1/3.2.
+        emulator-options: -no-snapshot-save -no-window -gpu swangle_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
         sdcard-path-or-size: 1024M
         disable-animations: true
         force-avd-creation: false
@@ -91,7 +92,7 @@ runs:
         ram-size: ${{ inputs.ram-size }}
         cores: ${{ inputs.cores }}
         heap-size: ${{ inputs.heap-size }}
-        emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
+        emulator-options: -no-snapshot -no-window -gpu swangle_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
         sdcard-path-or-size: 1024M
         disable-animations: true
         force-avd-creation: true
@@ -115,7 +116,7 @@ runs:
         ram-size: ${{ inputs.ram-size }}
         cores: ${{ inputs.cores }}
         heap-size: ${{ inputs.heap-size }}
-        emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
+        emulator-options: -no-snapshot -no-window -gpu swangle_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
         sdcard-path-or-size: 1024M
         disable-animations: true
         force-avd-creation: true

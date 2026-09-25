@@ -138,7 +138,6 @@ class SearchScreenTestForBrandedApp {
 
   @Test
   fun searchScreen() {
-    Assume.assumeTrue(Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA)
     activityScenario.onActivity {
       brandedMainActivity = it
     }
