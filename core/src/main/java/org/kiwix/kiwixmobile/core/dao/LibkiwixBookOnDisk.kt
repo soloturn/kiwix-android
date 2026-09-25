@@ -392,7 +392,8 @@ class LibkiwixBookOnDisk @Inject constructor(
             } else {
               null
             }
-          } catch (_: Exception) {
+          } catch (ignore: Exception) {
+            Log.e(TAG, "Failed to check book: ${book.title} - ${ignore.message}")
             null
           }
         }
