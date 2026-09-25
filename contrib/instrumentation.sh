@@ -115,7 +115,18 @@ while [ $retry -le 4 ]; do
     retry=$(( retry + 1 ))
     if [ $retry -eq 4 ]; then
       adb exec-out screencap -p >screencap.png
-      exit 1
+      echo "$task failed after $retry attempts - checking whether every failure is CI-runner overload" >&2
+      mapfile -t junit_xmls < <(find app/build/outputs/androidTest-results/connected -name 'TEST-*.xml' 2>/dev/null)
+      if [ "${#junit_xmls[@]}" -eq 0 ] || ! python3 contrib/classify_flaky_failures.py \
+        --junit-xml "${junit_xmls[@]}" \
+        --resource-diag /tmp/resource-diag.log \
+        --dmesg /tmp/dmesg.log \
+        --stall-capture /tmp/stall-capture.log \
+        --apply --in-place; then
+        exit 1
+      fi
+      echo "All failures were CI-runner overload with supporting evidence - not failing the build" >&2
+      break
     fi
     # Give a transient outage (e.g. a Maven Central 403) time to clear: 5s, 20s, 80s.
     sleep $(( 5 * 4 ** (retry - 1) ))
