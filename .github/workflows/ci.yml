@@ -133,7 +133,11 @@ jobs:
         if: failure()
         with:
           name: ${{ matrix.api-level }}-${{ matrix.shard }}
-          path: screencap.png
+          path: |
+            screencap.png
+            /tmp/resource-diag.log
+            /tmp/dmesg.log
+            /tmp/stall-capture.log
 
       # All shards' emulators share the same device serial - prefix avoids collision.
       - name: Prepare shard coverage data for merging
