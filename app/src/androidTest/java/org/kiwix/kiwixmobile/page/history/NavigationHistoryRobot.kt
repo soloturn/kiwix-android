@@ -22,6 +22,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.filter
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -57,7 +58,9 @@ class NavigationHistoryRobot : BaseRobot() {
   fun checkZimFileLoadedSuccessful(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitForIdle()
-      waitUntilTimeout()
+      waitUntil(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+        onNodeWithTag(READER_SCREEN_TESTING_TAG).isDisplayed()
+      }
       onNodeWithTag(READER_SCREEN_TESTING_TAG).assertExists()
     }
   }

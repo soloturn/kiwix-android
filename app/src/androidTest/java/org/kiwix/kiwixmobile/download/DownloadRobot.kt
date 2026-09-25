@@ -209,9 +209,9 @@ class DownloadRobot : BaseRobot() {
           performTextClearance()
           performTextInput(searchZIMFileTitle)
         }
-        waitUntilTimeout(TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
       }
     })
+    waitForDataToLoad(composeTestRule)
   }
 
   private fun refreshOnlineList(composeTestRule: ComposeContentTestRule) {

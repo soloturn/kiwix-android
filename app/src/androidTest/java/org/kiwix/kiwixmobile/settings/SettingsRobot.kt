@@ -25,6 +25,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.filter
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
@@ -49,7 +50,6 @@ import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_T
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 
 /**
  * Authored by Ayush Shrivastava on 25/8/20
@@ -253,7 +253,9 @@ class SettingsRobot : BaseRobot() {
 
   fun assertNightModeDialogDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
-      waitUntilTimeout()
+      waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+        onNodeWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG).isDisplayed()
+      }
       onNodeWithTag(ALERT_DIALOG_TITLE_TEXT_TESTING_TAG)
         .assertTextEquals(context.getString(R.string.pref_theme))
     }
