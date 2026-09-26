@@ -36,8 +36,10 @@ import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.nav.destination.library.library
 import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
 import org.kiwix.kiwixmobile.ui.KiwixDestination
+import java.io.File
 
 @HiltAndroidTest
 class DonationDialogTest : BaseActivityTest() {
@@ -65,12 +67,17 @@ class DonationDialogTest : BaseActivityTest() {
 
   @Test
   fun showDonationPopupWhenApplicationIsThreeMonthOldAndHaveAtleastOneZIMFile() {
-    loadZIMFileInApplication()
+    val zimFile = loadZIMFileInApplication()
     updateKiwixDataStore {
-      setLastDonationPopupShownInMilliSeconds(0L)
+      // firstInstallTime is always "now" in CI, so shouldShowInitialPopup()
+      // can never pass there - seed a non-zero, 3-month-old lastPopup instead
+      // so this goes through isThreeMonthsElapsed() like the test below.
+      setLastDonationPopupShownInMilliSeconds(
+        System.currentTimeMillis() - (THREE_MONTHS_IN_MILLISECONDS + 1000)
+      )
       setLaterClickedMilliSeconds(0L)
     }
-    openReaderScreen()
+    openZimFileInReader(zimFile)
     donation { assertDonationDialogDisplayed(composeTestRule) }
   }
 
@@ -93,8 +100,8 @@ class DonationDialogTest : BaseActivityTest() {
         System.currentTimeMillis() - (THREE_MONTHS_IN_MILLISECONDS / 2)
       )
     }
-    loadZIMFileInApplication()
-    openReaderScreen()
+    val zimFile = loadZIMFileInApplication()
+    openZimFileInReader(zimFile)
     donation { assertDonationDialogIsNotDisplayed(composeTestRule) }
   }
 
@@ -105,30 +112,39 @@ class DonationDialogTest : BaseActivityTest() {
         System.currentTimeMillis() - (THREE_MONTHS_IN_MILLISECONDS + 1000)
       )
     }
-    loadZIMFileInApplication()
-    openReaderScreen()
+    val zimFile = loadZIMFileInApplication()
+    openZimFileInReader(zimFile)
     donation { assertDonationDialogDisplayed(composeTestRule) }
   }
 
   @Test
   fun testShouldShowDonationPopupWhenLaterClickedTimeExceedsThreeMonths() {
     updateKiwixDataStore {
-      setLastDonationPopupShownInMilliSeconds(0L)
+      // Non-zero lastPopup routes shouldShowPopup through isThreeMonthsElapsed()
+      // instead of the firstInstallTime-dependent shouldShowInitialPopup().
+      setLastDonationPopupShownInMilliSeconds(
+        System.currentTimeMillis() - (THREE_MONTHS_IN_MILLISECONDS + 1000)
+      )
       setLaterClickedMilliSeconds(System.currentTimeMillis() - (THREE_MONTHS_IN_MILLISECONDS + 1000))
     }
-    loadZIMFileInApplication()
-    openReaderScreen()
+    val zimFile = loadZIMFileInApplication()
+    openZimFileInReader(zimFile)
     donation { assertDonationDialogDisplayed(composeTestRule) }
   }
 
   @Test
   fun testShouldNotShowPopupIfLaterClickedTimeIsLessThanThreeMonths() {
     updateKiwixDataStore {
-      setLastDonationPopupShownInMilliSeconds(0L)
+      // Non-zero lastPopup isolates this test to the laterClicked gate -
+      // otherwise shouldShowPopup would already be false via
+      // shouldShowInitialPopup() before isTimeToShowDonation() is reached.
+      setLastDonationPopupShownInMilliSeconds(
+        System.currentTimeMillis() - (THREE_MONTHS_IN_MILLISECONDS + 1000)
+      )
       setLaterClickedMilliSeconds(System.currentTimeMillis() - 10000L)
     }
-    loadZIMFileInApplication()
-    openReaderScreen()
+    val zimFile = loadZIMFileInApplication()
+    openZimFileInReader(zimFile)
     donation { assertDonationDialogIsNotDisplayed(composeTestRule) }
   }
 
@@ -138,11 +154,24 @@ class DonationDialogTest : BaseActivityTest() {
     }
   }
 
-  private fun loadZIMFileInApplication() {
+  // Registering a ZIM in the library (loadZIMFileInApplication) doesn't open
+  // it in the reader - ReaderScreen only renders the donation layout once a
+  // book is actually open, so tests expecting the popup must open it too.
+  private fun openZimFileInReader(zimFile: File) {
+    UiThreadStatement.runOnUiThread {
+      kiwixMainActivity.openZimFromFilePath(zimFile.absolutePath)
+    }
+    composeTestRule.waitUntil(TEST_PAUSE_MS.toLong()) {
+      kiwixMainActivity.zimReaderContainer.hasReader
+    }
+  }
+
+  private fun loadZIMFileInApplication(): File {
     openLocalLibraryScreen()
     deleteAllZIMFilesFromApplication()
-    getZimFileFromResourceFolder(context, "testzim.zim")
+    val zimFile = getZimFileFromResourceFolder(context, "testzim.zim")
     refreshZIMFilesList()
+    return zimFile
   }
 
   private fun openLocalLibraryScreen() {
