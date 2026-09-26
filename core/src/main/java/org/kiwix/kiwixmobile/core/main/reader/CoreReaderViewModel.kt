@@ -2044,7 +2044,9 @@ abstract class CoreReaderViewModel(
     if (readAloudManager.tts == null) {
       readAloudManager.setUpTTS()
     }
-    launchInViewModelScope { donationDialogHandler.attemptToShowDonationPopup() }
+    if (!uiState.value.showNoBookOpenInReader) {
+      launchInViewModelScope { donationDialogHandler.attemptToShowDonationPopup() }
+    }
   }
 
   override fun onCleared() {
