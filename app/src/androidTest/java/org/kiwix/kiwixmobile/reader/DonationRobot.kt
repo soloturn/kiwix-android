@@ -18,8 +18,8 @@
 
 package org.kiwix.kiwixmobile.reader
 
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.isDisplayed
-import androidx.compose.ui.test.isNotDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onNodeWithTag
 import applyWithViewHierarchyPrinting
@@ -43,7 +43,7 @@ class DonationRobot : BaseRobot() {
   fun assertDonationDialogIsNotDisplayed(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitUntilTimeout()
-      onNodeWithTag(DONATION_LAYOUT_TESTING_TAG).isNotDisplayed()
+      onNodeWithTag(DONATION_LAYOUT_TESTING_TAG).assertIsNotDisplayed()
     }
   }
 }
