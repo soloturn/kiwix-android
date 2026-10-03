@@ -70,6 +70,8 @@ android {
       matchingFallbacks += "release"
       buildConfigField("boolean", "IS_PLAYSTORE", "true")
       manifestPlaceholders["permission"] = "android.permission.placeholder"
+      // Lets a personal develop-branch build install alongside a main-branch build.
+      applicationIdSuffix = ".dev"
     }
     create("standalone") {
       initWith(getByName("release"))
