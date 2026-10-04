@@ -1485,6 +1485,28 @@ internal class CoreReaderViewModelTest {
   }
 
   @Test
+  fun onSelectionActionModeFinished_thenStartedAgain_reInflatesMenu() {
+    // Regression test: Android creates a new ActionMode instance per text
+    // selection, so the custom menu must be inflated again on every selection,
+    // not just the first one in a reader session.
+    val firstActionMode = mockk<ActionMode>()
+    val secondActionMode = mockk<ActionMode>()
+    val mockMenu = mockk<Menu>(relaxed = true)
+    val mockInflater = mockk<MenuInflater>()
+
+    every { firstActionMode.menu } returns mockMenu
+    every { secondActionMode.menu } returns mockMenu
+    every { coreMainActivity.menuInflater } returns mockInflater
+    every { mockInflater.inflate(R.menu.menu_webview_action, mockMenu) } just Runs
+
+    viewModel.onSelectionActionModeStarted(firstActionMode, coreMainActivity)
+    viewModel.onSelectionActionModeFinished(firstActionMode)
+    viewModel.onSelectionActionModeStarted(secondActionMode, coreMainActivity)
+
+    verify(exactly = 2) { mockInflater.inflate(R.menu.menu_webview_action, mockMenu) }
+  }
+
+  @Test
   fun onSearchMenuClickedMenuClicked_savesSessionAndOpensSearch() = runTest {
     val viewModel = spyk(viewModel)
 
