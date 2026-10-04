@@ -67,9 +67,6 @@ android {
   // required (the plugin checks both).
   experimentalProperties["android.experimental.enableScreenshotTest"] = true
   defaultConfig {
-    // Distinct from upstream's org.kiwix.kiwixmobile so a personal fork build
-    // never collides with the official Play Store app on the same device.
-    applicationId = "com.github.soloturn.kiwix"
     resValue("string", "app_name", "Kiwix")
     resValue("string", "app_search_string", "Search Kiwix")
     versionCode = generateVersionCode()
