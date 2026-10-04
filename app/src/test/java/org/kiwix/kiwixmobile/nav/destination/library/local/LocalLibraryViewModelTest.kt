@@ -662,20 +662,6 @@ class LocalLibraryViewModelTest {
   }
 
   @Test
-  fun `onNavigationIconClick requests drawer toggle in normal mode`() = runTest {
-    viewModel.localLibraryUiActions.test {
-      viewModel.onNavigationIconClick()
-
-      assertThat(awaitItem())
-        .isEqualTo(
-          LocalLibraryViewModel.LocalLibraryUiActions.RequestDrawerToggle
-        )
-
-      cancelAndIgnoreRemainingEvents()
-    }
-  }
-
-  @Test
   fun `onNavigationIconClick finishes multi mode when selection mode is multi`() = runTest {
     val book = mockk<BookOnDisk>(relaxed = true)
 

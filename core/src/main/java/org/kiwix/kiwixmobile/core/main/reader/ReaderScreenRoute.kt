@@ -147,7 +147,7 @@ fun ReaderScreenRoute(
       mainActivityBottomAppBarScrollBehaviour = activity.bottomAppBarScrollBehaviour,
       navigationIcon = {
         key(uiState.showTabSwitcher) {
-          NavigationItem(viewModel, activity)
+          NavigationItem(viewModel)
         }
       }
     )
@@ -256,11 +256,12 @@ private fun BindReadAloudService(
 }
 
 @Composable
-private fun NavigationItem(viewModel: CoreReaderViewModel, activity: CoreMainActivity) {
+private fun NavigationItem(viewModel: CoreReaderViewModel) {
+  val icon = viewModel.navigationIcon() ?: return
   NavigationIcon(
-    iconItem = viewModel.navigationIcon(),
+    iconItem = icon,
     contentDescription = viewModel.navigationIconContentDescription(),
-    onClick = { viewModel.navigationIconClick(activity.navigationDrawerIsOpen()) },
+    onClick = { viewModel.navigationIconClick() },
     iconTint = viewModel.navigationIconTint()
   )
 }
@@ -284,11 +285,7 @@ private fun CollectEffect(
       when (effect) {
         is ReaderEffect.ShowSnackbar -> handleSnackBar(snackBarHostState, effect, lifeCycleScope)
         ReaderEffect.ClearActivityIntentAction -> clearActivityIntent(activity)
-        ReaderEffect.CloseActivitySideBar -> openCloseActivitySidebar(activity, false)
-        ReaderEffect.OpenActivitySideBar -> openCloseActivitySidebar(activity, true)
         is ReaderEffect.ConsumeSavedStateHandle -> consumeSavedStateHandle(effect, activity)
-        ReaderEffect.DisableLeftSideBar -> enableDisableActivitySideBar(activity, false)
-        ReaderEffect.EnableLeftSideBar -> enableDisableActivitySideBar(activity, true)
         ReaderEffect.HideActivityBottomAppBar -> showHideActivityBottomAppBar(activity, false)
         ReaderEffect.ShowActivityBottomAppBar -> showHideActivityBottomAppBar(activity, true)
         is ReaderEffect.NavigateTo -> handleNavigateTo(navHostController, effect)
@@ -402,28 +399,12 @@ private fun showHideActivityBottomAppBar(activity: CoreMainActivity, show: Boole
   }
 }
 
-private fun enableDisableActivitySideBar(activity: CoreMainActivity, enable: Boolean) {
-  if (enable) {
-    activity.enableLeftDrawer()
-  } else {
-    activity.disableLeftDrawer()
-  }
-}
-
 private fun consumeSavedStateHandle(
   effect: ReaderEffect.ConsumeSavedStateHandle,
   activity: CoreMainActivity
 ) {
   effect.keys.forEach { key ->
     activity.safelyConsumeObservable(key)
-  }
-}
-
-private fun openCloseActivitySidebar(activity: CoreMainActivity, open: Boolean) {
-  if (open) {
-    activity.openNavigationDrawer()
-  } else {
-    activity.closeNavigationDrawer()
   }
 }
 

@@ -28,23 +28,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import org.kiwix.kiwixmobile.core.help.HelpScreenRoute
-import org.kiwix.kiwixmobile.core.main.BOOKMARK_SCREEN
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.DOWNLOAD_SCREEN
 import org.kiwix.kiwixmobile.core.main.HELP_SCREEN
-import org.kiwix.kiwixmobile.core.main.HISTORY_SCREEN
-import org.kiwix.kiwixmobile.core.main.NOTES_SCREEN
 import org.kiwix.kiwixmobile.core.main.READER_SCREEN
+import org.kiwix.kiwixmobile.core.main.SAVED_SCREEN
 import org.kiwix.kiwixmobile.core.main.SEARCH_SCREEN
 import org.kiwix.kiwixmobile.core.main.SETTINGS_SCREEN
 import org.kiwix.kiwixmobile.core.main.note.AddNoteViewModel
 import org.kiwix.kiwixmobile.core.main.reader.ReaderScreenRoute
-import org.kiwix.kiwixmobile.core.page.bookmark.BookmarkScreenRoute
-import org.kiwix.kiwixmobile.core.page.bookmark.viewmodel.BookmarkViewModel
-import org.kiwix.kiwixmobile.core.page.history.HistoryScreenRoute
-import org.kiwix.kiwixmobile.core.page.history.viewmodel.HistoryViewModel
-import org.kiwix.kiwixmobile.core.page.notes.NotesScreenRoute
-import org.kiwix.kiwixmobile.core.page.notes.viewmodel.NotesViewModel
+import org.kiwix.kiwixmobile.core.page.saved.SavedScreenRoute
 import org.kiwix.kiwixmobile.core.search.NAV_ARG_SEARCH_STRING
 import org.kiwix.kiwixmobile.core.search.SearchScreenRoute
 import org.kiwix.kiwixmobile.core.settings.SettingsScreenRoute
@@ -77,26 +70,8 @@ fun BrandedNavGraph(
         activity = activity,
       )
     }
-    composable(CustomDestination.History.route) {
-      val historyViewModel: HistoryViewModel = hiltViewModel()
-      HistoryScreenRoute(
-        navigateBack = navController::popBackStack,
-        viewModel = historyViewModel
-      )
-    }
-    composable(CustomDestination.Notes.route) {
-      val notesViewModel: NotesViewModel = hiltViewModel()
-      NotesScreenRoute(
-        navigateBack = navController::popBackStack,
-        notesViewModel = notesViewModel
-      )
-    }
-    composable(CustomDestination.Bookmarks.route) {
-      val bookmarkViewModel: BookmarkViewModel = hiltViewModel()
-      BookmarkScreenRoute(
-        navigateBack = navController::popBackStack,
-        viewModel = bookmarkViewModel
-      )
+    composable(CustomDestination.Saved.route) {
+      SavedScreenRoute(navigateBack = navController::popBackStack)
     }
     composable(CustomDestination.Help.route) {
       val brandedHelpViewModel: BrandedHelpViewModel = hiltViewModel()
@@ -148,9 +123,7 @@ fun BrandedNavGraph(
 sealed class CustomDestination(val route: String) {
   object Reader : CustomDestination(READER_SCREEN)
 
-  object History : CustomDestination(HISTORY_SCREEN)
-  object Notes : CustomDestination(NOTES_SCREEN)
-  object Bookmarks : CustomDestination(BOOKMARK_SCREEN)
+  object Saved : CustomDestination(SAVED_SCREEN)
   object Help : CustomDestination(HELP_SCREEN)
   object Settings : CustomDestination(SETTINGS_SCREEN)
   object Downloads : CustomDestination(DOWNLOAD_SCREEN)

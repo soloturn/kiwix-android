@@ -21,12 +21,8 @@ package org.kiwix.kiwixmobile.custom.main
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.net.toUri
@@ -47,6 +43,7 @@ import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_ABOUT_APP_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_HELP_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.NEW_TAB_SHORTCUT_ID
+import org.kiwix.kiwixmobile.core.main.SecondaryMenuItems
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
 import org.kiwix.kiwixmobile.custom.BuildConfig
 import org.kiwix.kiwixmobile.custom.R
@@ -59,11 +56,9 @@ class BrandedMainActivity : CoreMainActivity() {
   override val appName: String by lazy { getString(R.string.app_name) }
 
   override val searchScreenRoute: String = CustomDestination.Search.route
-  override val bookmarksScreenRoute: String = CustomDestination.Bookmarks.route
   override val settingsScreenRoute: String = CustomDestination.Settings.route
+  override val savedScreenRoute: String = CustomDestination.Saved.route
   override val readerScreenRoute: String = CustomDestination.Reader.route
-  override val historyScreenRoute: String = CustomDestination.History.route
-  override val notesScreenRoute: String = CustomDestination.Notes.route
   override val helpScreenRoute: String = CustomDestination.Help.route
   override val topLevelDestinationsRoute = setOf(CustomDestination.Reader.route)
 
@@ -72,25 +67,11 @@ class BrandedMainActivity : CoreMainActivity() {
     setContent {
       snackBarHostState = remember { SnackbarHostState() }
       navController = rememberNavController()
-      leftDrawerState = rememberDrawerState(DrawerValue.Closed)
-      uiCoroutineScope = rememberCoroutineScope()
-      RestoreDrawerStateOnOrientationChange()
-      PersistDrawerStateOnChange()
       BrandedMainActivityScreen(
         navController = navController,
-        leftDrawerContent = leftDrawerMenu,
-        topLevelDestinationsRoute = topLevelDestinationsRoute,
-        leftDrawerState = leftDrawerState,
-        enableLeftDrawer = enableLeftDrawer.value,
-        uiCoroutineScope = uiCoroutineScope,
-        customBackHandler = customBackHandler,
-        appName = appName
+        customBackHandler = customBackHandler
       )
       DialogHost(alertDialogShower)
-      LaunchedEffect(Unit) {
-        // Load the menu when UI is attached to screen.
-        leftDrawerMenu.addAll(leftNavigationDrawerMenuItems)
-      }
     }
     // run the migration on background thread to avoid any UI related issues.
     CoroutineScope(ioDispatcher).launch {
@@ -99,95 +80,68 @@ class BrandedMainActivity : CoreMainActivity() {
   }
 
   /**
-   * Hide the 'ZimHostScreen' option from the navigation menu
-   * because we are now using fd (FileDescriptor)
-   * to read the zim file from the asset folder. Currently,
-   * 'KiwixServer' is unable to host zim files via fd.
-   * This feature is temporarily removed for custom apps.
-   * We will re-enable it for custom apps once the issue is resolved.
-   * For more info see https://github.com/kiwix/kiwix-android/pull/3516,
-   * https://github.com/kiwix/kiwix-android/issues/4026
+   * Custom apps have no Wi-Fi hotspot (they read the ZIM from a file descriptor, which
+   * KiwixServer cannot host — see kiwix/kiwix-android#4026), so `zimHost` stays null.
+   * Help, Support and About are each optional per build config; Help and About surface
+   * inside Settings, Support in the reader's overflow.
    */
-  override val zimHostDrawerMenuItem: DrawerMenuItem? = null
-
-  /**
-   * If custom app is configured to show the "Help menu" in navigation
-   * then show it in navigation.
-   */
-  override val helpDrawerMenuItem: DrawerMenuItem? by lazy {
-    if (BuildConfig.DISABLE_HELP_MENU) {
-      null
-    } else {
-      DrawerMenuItem(
-        title = getString(string.menu_help),
-        iconRes = drawable.ic_help_24px,
-        visible = true,
-        onClick = { openHelpScreen() },
-        testingTag = LEFT_DRAWER_HELP_ITEM_TESTING_TAG
-      )
-    }
-  }
-
-  override val supportDrawerMenuItem: DrawerMenuItem? by lazy {
-    /**
-     * If custom app is configured to show the "Support app_name" in navigation
-     * then show it in navigation. "app_name" will be replaced with custom app name.
-     */
-    if (BuildConfig.SUPPORT_URL.isNotEmpty()) {
-      DrawerMenuItem(
-        title = getString(
-          string.menu_support_kiwix_for_custom_apps,
-          getString(R.string.app_name)
-        ),
-        iconRes = drawable.ic_support_24px,
-        true,
-        onClick = {
-          closeNavigationDrawer()
-          lifecycleScope.launch {
-            externalLinkOpener.openExternalLinkWithDialog(
-              intent = BuildConfig.SUPPORT_URL.toUri().browserIntent(),
-              destinationText = getString(string.support_donation_platform)
-            )
-          }
-        },
-        testingTag = LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
-      )
-    } else {
-      /**
-       * If custom app is not configured to show the "Support app_name" in navigation
-       * then remove it from navigation.
-       */
-      null
-    }
-  }
-
-  /**
-   * If custom app is configured to show the "About app_name app" in navigation
-   * then show it in navigation. "app_name" will be replaced with custom app name.
-   */
-  override val aboutAppDrawerMenuItem: DrawerMenuItem? by lazy {
-    if (BuildConfig.ABOUT_APP_URL.isNotEmpty()) {
-      DrawerMenuItem(
-        title = getString(
-          string.menu_about_app,
-          getString(R.string.app_name)
-        ),
-        iconRes = drawable.ic_baseline_info,
-        visible = true,
-        onClick = {
-          closeNavigationDrawer()
-          lifecycleScope.launch {
-            externalLinkOpener.openExternalLinkWithDialog(
-              intent = BuildConfig.ABOUT_APP_URL.toUri().browserIntent(),
-              destinationText = getString(string.about_app_page),
-            )
-          }
-        },
-        testingTag = LEFT_DRAWER_ABOUT_APP_ITEM_TESTING_TAG
-      )
-    } else {
-      null
-    }
+  override val secondaryMenuItems: SecondaryMenuItems by lazy {
+    SecondaryMenuItems(
+      zimHost = null,
+      help = if (BuildConfig.DISABLE_HELP_MENU) {
+        null
+      } else {
+        DrawerMenuItem(
+          title = getString(string.menu_help),
+          iconRes = drawable.ic_help_24px,
+          visible = true,
+          onClick = { openHelpScreen() },
+          testingTag = LEFT_DRAWER_HELP_ITEM_TESTING_TAG
+        )
+      },
+      support = if (BuildConfig.SUPPORT_URL.isEmpty()) {
+        null
+      } else {
+        DrawerMenuItem(
+          title = getString(
+            string.menu_support_kiwix_for_custom_apps,
+            getString(R.string.app_name)
+          ),
+          iconRes = drawable.ic_support_24px,
+          visible = true,
+          onClick = {
+            lifecycleScope.launch {
+              externalLinkOpener.openExternalLinkWithDialog(
+                intent = BuildConfig.SUPPORT_URL.toUri().browserIntent(),
+                destinationText = getString(string.support_donation_platform)
+              )
+            }
+          },
+          testingTag = LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
+        )
+      },
+      about = if (BuildConfig.ABOUT_APP_URL.isEmpty()) {
+        null
+      } else {
+        DrawerMenuItem(
+          title = getString(
+            string.menu_about_app,
+            getString(R.string.app_name)
+          ),
+          iconRes = drawable.ic_baseline_info,
+          visible = true,
+          onClick = {
+            lifecycleScope.launch {
+              externalLinkOpener.openExternalLinkWithDialog(
+                intent = BuildConfig.ABOUT_APP_URL.toUri().browserIntent(),
+                destinationText = getString(string.about_app_page),
+              )
+            }
+          },
+          testingTag = LEFT_DRAWER_ABOUT_APP_ITEM_TESTING_TAG
+        )
+      }
+    )
   }
 
   override suspend fun createApplicationShortcuts() {

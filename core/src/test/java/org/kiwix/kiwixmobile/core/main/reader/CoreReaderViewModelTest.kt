@@ -1136,9 +1136,9 @@ internal class CoreReaderViewModelTest {
   @Nested
   inner class NavigationIcon {
     @Test
-    fun `navigationIcon should return valid icon`() {
-      val icon = viewModel.navigationIcon()
-      assertThat(icon).isNotNull()
+    fun `navigationIcon should return null when tab switcher is closed`() {
+      viewModel.updateUiStateForTest { copy(showTabSwitcher = false) }
+      assertThat(viewModel.navigationIcon()).isNull()
     }
 
     @Test
@@ -1149,31 +1149,16 @@ internal class CoreReaderViewModelTest {
     }
 
     @Test
-    fun `navigationIcon should return menu icon when tab switcher is closed`() {
-      viewModel.updateUiStateForTest { copy(showTabSwitcher = false) }
-      val icon = viewModel.navigationIcon()
-      assertThat(icon).isEqualTo(IconItem.Vector(Icons.Filled.Menu))
-    }
-
-    @Test
-    fun `navigationIconContentDescription should return back description when tab switcher is open`() {
-      viewModel.updateUiStateForTest { copy(showTabSwitcher = true) }
+    fun `navigationIconContentDescription should return back description`() {
       assertThat(viewModel.navigationIconContentDescription())
         .isEqualTo(R.string.toolbar_back_button_content_description)
-    }
-
-    @Test
-    fun `navigationIconContentDescription should return open drawer description when tab switcher is closed`() {
-      viewModel.updateUiStateForTest { copy(showTabSwitcher = false) }
-      assertThat(viewModel.navigationIconContentDescription())
-        .isEqualTo(R.string.open_drawer)
     }
 
     @Test
     fun `navigationIconClick should hide tab switcher when tab switcher is open`() = runTest {
       viewModel = spyk(viewModel)
       viewModel.updateUiStateForTest { copy(showTabSwitcher = true) }
-      viewModel.navigationIconClick(isNavigationDrawerOpen = false)
+      viewModel.navigationIconClick()
       advanceUntilIdle()
       assertThat(viewModel.uiState.value.showTabSwitcher).isFalse()
     }
@@ -2128,31 +2113,21 @@ internal class CoreReaderViewModelTest {
   @Nested
   inner class OnFullScreenVideoToggled {
     @Test
-    fun whenIsFullScreen_hidesBottomBarAndEmitsDisableLeftSideBarEffect() = runTest {
-      viewModel.effects.test {
-        viewModel.onFullscreenVideoToggled(true)
-        advanceUntilIdle()
+    fun whenIsFullScreen_hidesBottomBar() = runTest {
+      viewModel.onFullscreenVideoToggled(true)
+      advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.shouldShowFullScreen).isTrue()
-        assertThat(viewModel.uiState.value.showBottomBar).isFalse()
-
-        val effect = awaitItem()
-        assertThat(effect).isEqualTo(ReaderEffect.DisableLeftSideBar)
-      }
+      assertThat(viewModel.uiState.value.shouldShowFullScreen).isTrue()
+      assertThat(viewModel.uiState.value.showBottomBar).isFalse()
     }
 
     @Test
-    fun whenIsNotFullScreen_showsBottomBarAndEmitsEnableLeftSideBarEffect() = runTest {
-      viewModel.effects.test {
-        viewModel.onFullscreenVideoToggled(false)
-        advanceUntilIdle()
+    fun whenIsNotFullScreen_showsBottomBar() = runTest {
+      viewModel.onFullscreenVideoToggled(false)
+      advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.shouldShowFullScreen).isFalse()
-        assertThat(viewModel.uiState.value.showBottomBar).isTrue()
-
-        val effect = awaitItem()
-        assertThat(effect).isEqualTo(ReaderEffect.EnableLeftSideBar)
-      }
+      assertThat(viewModel.uiState.value.shouldShowFullScreen).isFalse()
+      assertThat(viewModel.uiState.value.showBottomBar).isTrue()
     }
   }
 
@@ -2879,12 +2854,12 @@ internal class CoreReaderViewModelTest {
     }
 
     @Test
-    fun whenShowTabSwitcherFalse_returnsOpenDrawer() {
+    fun whenShowTabSwitcherFalse_returnsBackButtonContentDescription() {
       viewModel.updateUiStateForTest { copy(showTabSwitcher = false) }
 
       val result = viewModel.navigationIconContentDescription()
 
-      assertThat(result).isEqualTo(string.open_drawer)
+      assertThat(result).isEqualTo(string.toolbar_back_button_content_description)
     }
   }
 
@@ -2916,23 +2891,8 @@ internal class CoreReaderViewModelTest {
   @Nested
   inner class OnUserBackPress {
     @Test
-    fun wheNavigationDrawerIsOpenTrue_closesNavigationAndBackPressActivityExtensionsSuperShouldNotCall() =
+    fun whenNothingElseHandlesIt_callsBackPressActivityExtensionsSuperShouldCall() =
       runTest {
-        every { coreMainActivity.navigationDrawerIsOpen() } returns true
-        every { coreMainActivity.closeNavigationDrawer() } just Runs
-
-        val result = viewModel.onUserBackPressed(coreMainActivity)
-
-        verify { coreMainActivity.closeNavigationDrawer() }
-
-        assertThat(result).isEqualTo(BackPressActivityExtensions.Super.ShouldNotCall)
-      }
-
-    @Test
-    fun whenNavigationDrawerIsOpenFalse_callsBackPressActivityExtensionsSuperShouldCall() =
-      runTest {
-        every { coreMainActivity.navigationDrawerIsOpen() } returns false
-
         val result = viewModel.onUserBackPressed(coreMainActivity)
 
         assertThat(result).isEqualTo(BackPressActivityExtensions.Super.ShouldCall)
@@ -2941,12 +2901,11 @@ internal class CoreReaderViewModelTest {
     @Nested
     inner class ShowTabSwitcher {
       @Test
-      fun when_navigationDrawerIsOpenFalseAndShowTabSwitcherTrue_selectsCurrentWebViewIndexWhenIndexSmallerThanWebViewListSize() =
+      fun whenShowTabSwitcherTrue_selectsCurrentWebViewIndexWhenIndexSmallerThanWebViewListSize() =
         runTest {
           val viewModel = spyk(viewModel)
 
           viewModel.updateUiStateForTest { copy(showTabSwitcher = true) }
-          every { coreMainActivity.navigationDrawerIsOpen() } returns false
           every { readerWebViewManager.currentWebViewIndex } returns 1
           every { readerWebViewManager.tabsSize() } returns 3
           coEvery { viewModel.hideTabSwitcher() } just Runs
@@ -2960,12 +2919,11 @@ internal class CoreReaderViewModelTest {
         }
 
       @Test
-      fun when_navigationDrawerIsOpenFalseAndShowTabSwitcherTrue_selectsWebViewListSizeIndexWhenCurrentIndexGreaterThanWebViewListSize() =
+      fun whenShowTabSwitcherTrue_selectsWebViewListSizeIndexWhenCurrentIndexGreaterThanWebViewListSize() =
         runTest {
           val viewModel = spyk(viewModel)
 
           viewModel.updateUiStateForTest { copy(showTabSwitcher = true) }
-          every { coreMainActivity.navigationDrawerIsOpen() } returns false
           every { readerWebViewManager.currentWebViewIndex } returns 4
           every { readerWebViewManager.tabsSize() } returns 3
           coEvery { viewModel.hideTabSwitcher() } just Runs
@@ -2980,13 +2938,12 @@ internal class CoreReaderViewModelTest {
     }
 
     @Test
-    fun whenNavigationDrawerIsOpenFalseAndFindInPageUiStateIsVisible_closesFindInPageAndCallsBackPressActivityExtensionsSuperShouldCall() =
+    fun whenFindInPageUiStateIsVisible_closesFindInPageAndCallsBackPressActivityExtensionsSuperShouldCall() =
       runTest {
         viewModel.updateUiStateForTest {
           copy(findInPageUiState = FindInPageManager.FindInPageUiState(visible = true))
         }
         every { findInPageManager.stop() } just Runs
-        every { coreMainActivity.navigationDrawerIsOpen() } returns false
 
         val result = viewModel.onUserBackPressed(coreMainActivity)
 
@@ -2995,11 +2952,10 @@ internal class CoreReaderViewModelTest {
       }
 
     @Test
-    fun whenNavigationDrawerIsOpenFalseAndShowTableOfContentDrawer_closesTocDrawerAndBackPressActivityExtensionsSuperShouldNotCall() =
+    fun whenShowTableOfContentDrawer_closesTocDrawerAndBackPressActivityExtensionsSuperShouldNotCall() =
       runTest {
         val viewModel = spyk(viewModel)
         viewModel.updateUiStateForTest { copy(showTableOfContentDrawer = true) }
-        every { coreMainActivity.navigationDrawerIsOpen() } returns false
 
         val result = viewModel.onUserBackPressed(coreMainActivity)
 
@@ -3008,9 +2964,8 @@ internal class CoreReaderViewModelTest {
       }
 
     @Test
-    fun whenNavigationDrawerIsOpenFalseAndWebViewCanGoBack_invokesWebViewGoBackAndBackPressActivityExtensionsSuperShouldNotCall() =
+    fun whenWebViewCanGoBack_invokesWebViewGoBackAndBackPressActivityExtensionsSuperShouldNotCall() =
       runTest {
-        every { coreMainActivity.navigationDrawerIsOpen() } returns false
         every { mockWebView.canGoBack() } returns true
         every { mockWebView.goBack() } just Runs
 
@@ -3064,7 +3019,7 @@ internal class CoreReaderViewModelTest {
 
       viewModel.updateUiStateForTest { copy(showTabSwitcher = true) }
       viewModel.effects.test {
-        viewModel.navigationIconClick(true)
+        viewModel.navigationIconClick()
         advanceUntilIdle()
 
         coVerify { viewModel.hideTabSwitcher() }
@@ -3073,26 +3028,10 @@ internal class CoreReaderViewModelTest {
     }
 
     @Test
-    fun whenShowTabSwitcherIsFalseAndIsNavigationDrawerOpen_emitsCloseActivitySideBar() = runTest {
+    fun whenShowTabSwitcherIsFalse_emitsNothing() = runTest {
       viewModel.effects.test {
-        viewModel.navigationIconClick(true)
+        viewModel.navigationIconClick()
         advanceUntilIdle()
-
-        val effect = awaitItem()
-        assertThat(effect).isEqualTo(ReaderEffect.CloseActivitySideBar)
-
-        expectNoEvents()
-      }
-    }
-
-    @Test
-    fun whenShowTabSwitcherIsFalseAndIsNavigationDrawerClosed_emitsOpenActivitySideBar() = runTest {
-      viewModel.effects.test {
-        viewModel.navigationIconClick(false)
-        advanceUntilIdle()
-
-        val effect = awaitItem()
-        assertThat(effect).isEqualTo(ReaderEffect.OpenActivitySideBar)
 
         expectNoEvents()
       }

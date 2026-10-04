@@ -38,12 +38,12 @@ import org.kiwix.kiwixmobile.core.ui.components.TOOLBAR_TITLE_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_NATURAL_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.files.Log
+import org.kiwix.kiwixmobile.main.BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.refresh
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.ui.BookItemScreen.BOOK_ITEM_CHECKBOX_TESTING_TAG
 import org.kiwix.kiwixmobile.ui.BookItemScreen.BOOK_ITEM_TESTING_TAG
-import org.kiwix.kiwixmobile.utils.StandardActions.openDrawer
 
 fun zimHost(func: ZimHostRobot.() -> Unit) = ZimHostRobot().applyWithViewHierarchyPrinting(func)
 
@@ -73,14 +73,18 @@ class ZimHostRobot : BaseRobot() {
     })
   }
 
+  /**
+   * Wifi hotspot is a Library app-bar action now (no drawer).
+   */
+  @Suppress("UnusedParameter")
   fun openZimHostScreen(
     coreMainActivity: CoreMainActivity,
     composeTestRule: ComposeContentTestRule
   ) {
-    openDrawer(coreMainActivity)
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
+        onNodeWithTag(BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG).performClick()
         onNodeWithTag(LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG).performClick()
       }
     })

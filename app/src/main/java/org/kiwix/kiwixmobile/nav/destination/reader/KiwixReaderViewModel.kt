@@ -118,7 +118,7 @@ class KiwixReaderViewModel @Inject constructor(
   override fun isBrandedApp(): Boolean = false
 
   override fun openBookmarkScreen() {
-    emitEffect(ReaderEffect.NavigateTo(KiwixDestination.Bookmarks.route))
+    emitEffect(ReaderEffect.NavigateTo(KiwixDestination.Saved.route))
   }
 
   override suspend fun initialize(
@@ -128,7 +128,6 @@ class KiwixReaderViewModel @Inject constructor(
     super.initialize(coreMainActivity, alertDialogShower)
     val appName = kiwixDataStore.appName.first()
     updateState { copy(isTocButtonEnable = true, appName = appName) }
-    enableLeftDrawer()
     openPageInBookFromNavigationArguments(coreMainActivity)
   }
 
@@ -329,7 +328,6 @@ class KiwixReaderViewModel @Inject constructor(
    * @see closeAllTabs
    */
   override suspend fun hideTabSwitcher(shouldCloseZimBook: Boolean) {
-    enableLeftDrawer()
     emitEffect(ReaderEffect.ShowActivityBottomAppBar)
     if (readerWebViewManager.webViewList().isEmpty()) {
       readerMenuState?.hideTabSwitcher()

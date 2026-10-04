@@ -25,7 +25,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.ui.graphics.Color
 import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
@@ -44,8 +43,11 @@ import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNav
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
+import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.main.PAGE_URL_KEY
+import org.kiwix.kiwixmobile.core.main.SAVED_MENU_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel
 import org.kiwix.kiwixmobile.core.main.reader.ReaderMenuState
 import org.kiwix.kiwixmobile.core.main.reader.RestoreOrigin
@@ -62,6 +64,7 @@ import org.kiwix.kiwixmobile.core.main.reader.helper.intent.ReaderIntentManager
 import org.kiwix.kiwixmobile.core.page.history.models.WebViewHistoryItem
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
+import org.kiwix.kiwixmobile.core.ui.models.ActionMenuItem
 import org.kiwix.kiwixmobile.core.ui.models.IconItem
 import org.kiwix.kiwixmobile.core.ui.theme.White
 import org.kiwix.kiwixmobile.core.utils.DonationDialogHandler
@@ -136,7 +139,7 @@ class BrandedReaderViewModel @Inject constructor(
     super.initialize(coreMainActivity, alertDialogShower)
     val appName = kiwixDataStore.appName.first()
     updateState { copy(isTocButtonEnable = !BuildConfig.DISABLE_SIDEBAR, appName = appName) }
-    enableLeftDrawer()
+    readerMenuState?.extraMenuItems = secondaryOverflowItems(coreMainActivity)
     loadPageFromNavigationArguments(coreMainActivity)
     if (BuildConfig.DISABLE_EXTERNAL_LINK) {
       // If "external links" are disabled in a custom app,
@@ -147,8 +150,38 @@ class BrandedReaderViewModel @Inject constructor(
   }
 
   override fun openBookmarkScreen() {
-    emitEffect(ReaderEffect.NavigateTo(CustomDestination.Bookmarks.route))
+    emitEffect(ReaderEffect.NavigateTo(CustomDestination.Saved.route))
   }
+
+  /**
+   * Custom apps have no library screen to hang an app bar off, so the drawer's remaining
+   * entries land in the reader's overflow instead. Help and About are not here: they go
+   * inside Settings (see `SettingsScreen.informationCategory`).
+   */
+  private fun secondaryOverflowItems(coreMainActivity: CoreMainActivity): List<ActionMenuItem> =
+    listOfNotNull(
+      ActionMenuItem(
+        contentDescription = string.bookmarks,
+        onClick = ::openBookmarkScreen,
+        testingTag = SAVED_MENU_BUTTON_TESTING_TAG,
+        isInOverflow = true
+      ),
+      ActionMenuItem(
+        contentDescription = string.menu_settings,
+        onClick = coreMainActivity::openSettings,
+        testingTag = LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG,
+        isInOverflow = true
+      ),
+      coreMainActivity.secondaryMenuItems.support?.let { support ->
+        ActionMenuItem(
+          contentDescription = string.menu_support_kiwix,
+          onClick = support.onClick,
+          iconButtonText = support.title,
+          testingTag = LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG,
+          isInOverflow = true
+        )
+      }
+    )
 
   private suspend fun loadPageFromNavigationArguments(coreMainActivity: CoreMainActivity) {
     val pageUrl =
@@ -354,7 +387,7 @@ class BrandedReaderViewModel @Inject constructor(
       White
     }
 
-  override fun navigationIcon(): IconItem = when {
+  override fun navigationIcon(): IconItem? = when {
     uiState.value.showTabSwitcher -> {
       IconItem.Vector(Icons.AutoMirrored.Filled.ArrowBack)
     }
@@ -365,7 +398,8 @@ class BrandedReaderViewModel @Inject constructor(
       IconItem.MipmapImage(R.mipmap.ic_launcher)
     }
 
-    else -> IconItem.Vector(Icons.Filled.Menu)
+    // No drawer to open any more, so there is nothing to put here.
+    else -> null
   }
 
   /**

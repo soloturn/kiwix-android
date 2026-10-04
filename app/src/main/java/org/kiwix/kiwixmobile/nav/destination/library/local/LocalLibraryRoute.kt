@@ -29,7 +29,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -49,6 +48,10 @@ import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.extensions.CollectSideEffectWithActivity
 import org.kiwix.kiwixmobile.core.extensions.handlePermissionRequest
 import org.kiwix.kiwixmobile.core.extensions.toast
+import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.main.SAVED_MENU_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.note.SHARE_MENU_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.page.DELETE_MENU_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.reader.integrity.ValidateZimViewModel
@@ -118,7 +121,8 @@ fun LocalLibraryRoute(
       actionMenuItems = actionMenuItems(
         navController = navController,
         selectionMode = uiState.value.fileSelectListState.selectionMode,
-        localLibraryViewModel = localLibraryViewModel
+        localLibraryViewModel = localLibraryViewModel,
+        activity = mainActivity
       ) {
         localLibraryViewModel.filePickerMenuButtonClick(filePickerLauncher)
       },
@@ -133,11 +137,14 @@ fun LocalLibraryRoute(
       onUserBackPressed = localLibraryViewModel::handleUserBackPressed,
       navHostController = navController,
       navigationIcon = {
-        NavigationIcon(
-          iconItem = navigationIconItem(uiState.value.fileSelectListState.selectionMode == SelectionMode.MULTI),
-          contentDescription = string.open_drawer,
-          onClick = localLibraryViewModel::onNavigationIconClick
-        )
+        // Only shown in multi-select, to exit it — there is no drawer to open any more.
+        if (uiState.value.fileSelectListState.selectionMode == SelectionMode.MULTI) {
+          NavigationIcon(
+            iconItem = navigationIconItem(),
+            contentDescription = string.toolbar_back_button_content_description,
+            onClick = localLibraryViewModel::onNavigationIconClick
+          )
+        }
       }
     )
     DialogHost(alertDialogShower)
@@ -147,11 +154,7 @@ fun LocalLibraryRoute(
   }
 }
 
-fun navigationIconItem(isMultiMode: Boolean): IconItem = if (isMultiMode) {
-  IconItem.Vector(Icons.AutoMirrored.Filled.ArrowBack)
-} else {
-  IconItem.Vector(Icons.Filled.Menu)
-}
+fun navigationIconItem(): IconItem = IconItem.Vector(Icons.AutoMirrored.Filled.ArrowBack)
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -179,10 +182,11 @@ fun actionMenuItems(
   navController: NavHostController,
   selectionMode: SelectionMode,
   localLibraryViewModel: LocalLibraryViewModel,
+  activity: KiwixMainActivity,
   filePickerButtonClick: () -> Unit
 ) = when (selectionMode) {
   SelectionMode.MULTI -> multiModeMenuItem(localLibraryViewModel)
-  SelectionMode.NORMAL -> normalModeMenuItems(navController, filePickerButtonClick)
+  SelectionMode.NORMAL -> normalModeMenuItems(navController, activity, filePickerButtonClick)
 }
 
 private fun multiModeMenuItem(localLibraryViewModel: LocalLibraryViewModel) = listOf(
@@ -211,9 +215,11 @@ private fun multiModeMenuItem(localLibraryViewModel: LocalLibraryViewModel) = li
 
 private fun normalModeMenuItems(
   navController: NavHostController,
+  activity: KiwixMainActivity,
   filePickerButtonClick: () -> Unit
-) =
-  listOf(
+): List<ActionMenuItem> {
+  val secondaryMenuItems = activity.secondaryMenuItems
+  return listOfNotNull(
     ActionMenuItem(
       IconItem.Drawable(drawable.ic_add_blue_24dp),
       R.string.select_zim_file,
@@ -227,5 +233,39 @@ private fun normalModeMenuItems(
       { navController.navigate(KiwixDestination.LocalFileTransfer.route) },
       isEnabled = true,
       testingTag = LOCAL_FILE_TRANSFER_MENU_BUTTON_TESTING_TAG
-    )
+    ),
+    ActionMenuItem(
+      IconItem.Drawable(drawable.ic_bookmark_black_24dp),
+      string.bookmarks,
+      { navController.navigate(KiwixDestination.Saved.route) },
+      isEnabled = true,
+      testingTag = SAVED_MENU_BUTTON_TESTING_TAG
+    ),
+    secondaryMenuItems.zimHost?.let { zimHost ->
+      ActionMenuItem(
+        IconItem.Drawable(zimHost.iconRes),
+        string.menu_wifi_hotspot,
+        zimHost.onClick,
+        isEnabled = true,
+        testingTag = LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG
+      )
+    },
+    ActionMenuItem(
+      icon = null,
+      contentDescription = string.menu_settings,
+      onClick = activity::openSettings,
+      testingTag = LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG,
+      isInOverflow = true
+    ),
+    secondaryMenuItems.support?.let { support ->
+      ActionMenuItem(
+        icon = null,
+        contentDescription = string.menu_support_kiwix,
+        onClick = support.onClick,
+        iconButtonText = support.title,
+        testingTag = LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG,
+        isInOverflow = true
+      )
+    }
   )
+}
