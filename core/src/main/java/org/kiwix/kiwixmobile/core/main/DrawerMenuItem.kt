@@ -28,4 +28,15 @@ data class DrawerMenuItem(
   val testingTag: String
 )
 
-data class DrawerMenuGroup(val drawerMenuItemList: List<DrawerMenuItem>)
+/**
+ * The secondary (non-primary-navigation) entry points a child activity provides.
+ * Replaces four separate abstract properties on [CoreMainActivity] with one: the main
+ * Kiwix app and custom/branded apps each decide which of these exist (and, for support/about,
+ * what they say) by returning them here instead of overriding four members individually.
+ */
+data class SecondaryMenuItems(
+  val zimHost: DrawerMenuItem? = null,
+  val help: DrawerMenuItem? = null,
+  val support: DrawerMenuItem? = null,
+  val about: DrawerMenuItem? = null
+)

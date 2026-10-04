@@ -88,7 +88,6 @@ import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.MultiModeFinished
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.ReadPermissionDialog
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestDeleteMultiSelection
-import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestDrawerToggle
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestMultiSelection
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestNavigateTo
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestReadWritePermission
@@ -105,7 +104,6 @@ import org.kiwix.kiwixmobile.zimManager.fileselectView.FileSelectListState
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.DeleteFiles
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.DeleteFilesUseCase
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.NavigateToDownloads
-import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.NavigationDrawerToggle
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.None
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.OpenFileWithNavigation
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.ShareFiles
@@ -167,7 +165,6 @@ class LocalLibraryViewModel @Inject constructor(
       LocalLibraryUiActions()
 
     data object ReadPermissionDialog : LocalLibraryUiActions()
-    data object RequestDrawerToggle : LocalLibraryUiActions()
   }
 
   sealed class ReadeWritePermissionResultAction {
@@ -378,8 +375,6 @@ class LocalLibraryViewModel @Inject constructor(
           coroutineScope = viewModelScope,
           ioDispatcher = ioDispatcher
         )
-
-      RequestDrawerToggle -> NavigationDrawerToggle
     }
 
   private fun selectBook(
@@ -682,8 +677,6 @@ class LocalLibraryViewModel @Inject constructor(
   fun onNavigationIconClick() {
     if (uiState.value.fileSelectListState.selectionMode == MULTI) {
       finishMultiModeFinished()
-    } else {
-      sendAction(RequestDrawerToggle)
     }
   }
 

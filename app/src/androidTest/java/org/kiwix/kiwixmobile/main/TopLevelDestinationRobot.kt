@@ -29,6 +29,8 @@ import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_HISTORY_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.main.SAVED_MENU_BUTTON_TESTING_TAG
+import org.kiwix.kiwixmobile.core.ui.components.OVERFLOW_MENU_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.help.HelpRobot
 import org.kiwix.kiwixmobile.help.help
 import org.kiwix.kiwixmobile.nav.destination.library.LibraryRobot
@@ -45,7 +47,6 @@ import org.kiwix.kiwixmobile.settings.SettingsRobot
 import org.kiwix.kiwixmobile.settings.settingsRobo
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilDisplayedWithScrollNudge
-import org.kiwix.kiwixmobile.utils.StandardActions.openDrawer
 import org.kiwix.kiwixmobile.webserver.ZimHostRobot
 import org.kiwix.kiwixmobile.webserver.zimHost
 
@@ -89,16 +90,30 @@ class TopLevelDestinationRobot : BaseRobot() {
     onlineLibrary(func)
   }
 
-  private fun inNavDrawer(
-    coreMainActivity: CoreMainActivity,
+  /**
+   * The drawer is gone; every secondary entry point is on the Library app bar (or behind
+   * its overflow, or inside Settings). Callers still arrive from the Reader, so go to
+   * Library first.
+   */
+  private fun onLibraryAppBar(
+    composeTestRule: ComposeContentTestRule,
     isMultiWindowCompose: Boolean = false,
-    navDrawerAction: () -> Unit
+    action: () -> Unit
   ) {
-    openDrawer(coreMainActivity)
-    navDrawerAction.invoke()
+    composeTestRule.apply {
+      waitUntilDisplayedWithScrollNudge(BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG)
+      onNodeWithTag(BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG).performClick()
+    }
+    action.invoke()
     if (!isMultiWindowCompose) {
       pressBack()
     }
+  }
+
+  private fun openOverflow(composeTestRule: ComposeContentTestRule) {
+    testFlakyView({
+      composeTestRule.onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).performClick()
+    })
   }
 
   fun clickBookmarksOnNavDrawer(
@@ -106,8 +121,9 @@ class TopLevelDestinationRobot : BaseRobot() {
     composeTestRule: ComposeContentTestRule,
     func: BookmarksRobot.() -> Unit
   ) {
-    inNavDrawer(coreMainActivity = coreMainActivity) {
+    onLibraryAppBar(composeTestRule) {
       testFlakyView({
+        composeTestRule.onNodeWithTag(SAVED_MENU_BUTTON_TESTING_TAG).performClick()
         composeTestRule.onNodeWithTag(LEFT_DRAWER_BOOKMARK_ITEM_TESTING_TAG).performClick()
       })
       bookmarks(func)
@@ -120,8 +136,9 @@ class TopLevelDestinationRobot : BaseRobot() {
     composeTestRule: ComposeContentTestRule,
     func: HistoryRobot.() -> Unit
   ) {
-    inNavDrawer(coreMainActivity) {
+    onLibraryAppBar(composeTestRule) {
       testFlakyView({
+        composeTestRule.onNodeWithTag(SAVED_MENU_BUTTON_TESTING_TAG).performClick()
         composeTestRule.onNodeWithTag(LEFT_DRAWER_HISTORY_ITEM_TESTING_TAG).performClick()
       })
       history(func)
@@ -134,7 +151,7 @@ class TopLevelDestinationRobot : BaseRobot() {
     composeTestRule: ComposeContentTestRule,
     func: ZimHostRobot.() -> Unit
   ) {
-    inNavDrawer(coreMainActivity) {
+    onLibraryAppBar(composeTestRule) {
       testFlakyView({
         composeTestRule.onNodeWithTag(LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG).performClick()
       })
@@ -148,7 +165,8 @@ class TopLevelDestinationRobot : BaseRobot() {
     isMultiWindowCompose: Boolean = false,
     func: SettingsRobot.() -> Unit
   ) {
-    inNavDrawer(coreMainActivity, isMultiWindowCompose) {
+    onLibraryAppBar(composeTestRule, isMultiWindowCompose) {
+      openOverflow(composeTestRule)
       testFlakyView({
         composeTestRule.onNodeWithTag(LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG).performClick()
       })
@@ -161,8 +179,11 @@ class TopLevelDestinationRobot : BaseRobot() {
     composeTestRule: ComposeContentTestRule,
     func: HelpRobot.() -> Unit
   ) {
-    inNavDrawer(coreMainActivity) {
+    // Help moved inside Settings's information category.
+    onLibraryAppBar(composeTestRule) {
+      openOverflow(composeTestRule)
       testFlakyView({
+        composeTestRule.onNodeWithTag(LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG).performClick()
         composeTestRule.onNodeWithTag(LEFT_DRAWER_HELP_ITEM_TESTING_TAG).performClick()
       })
       help(func)
@@ -173,7 +194,8 @@ class TopLevelDestinationRobot : BaseRobot() {
     coreMainActivity: CoreMainActivity,
     composeTestRule: ComposeContentTestRule,
   ) {
-    inNavDrawer(coreMainActivity) {
+    onLibraryAppBar(composeTestRule) {
+      openOverflow(composeTestRule)
       testFlakyView({
         composeTestRule.onNodeWithTag(LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG).performClick()
       })

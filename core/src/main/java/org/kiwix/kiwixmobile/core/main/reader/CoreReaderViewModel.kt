@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
@@ -277,10 +276,6 @@ abstract class CoreReaderViewModel(
     data class ShowKiwixDialog(val kiwixDialog: KiwixDialog, val onClick: () -> Unit) : ReaderEffect
     data class ShowNavigationHistoryDialog(val result: HistoryFound) : ReaderEffect
     data object ShowTTSLanguageDialog : ReaderEffect
-    data object DisableLeftSideBar : ReaderEffect
-    data object EnableLeftSideBar : ReaderEffect
-    data object OpenActivitySideBar : ReaderEffect
-    data object CloseActivitySideBar : ReaderEffect
     data object ShowActivityBottomAppBar : ReaderEffect
     data object HideActivityBottomAppBar : ReaderEffect
     data object RequestReadStoragePermission : ReaderEffect
@@ -717,17 +712,18 @@ abstract class CoreReaderViewModel(
   }
 
   /**
-   * Provides the navigationIcon based on condition.
+   * Provides the navigationIcon based on condition. There is no drawer to open any more, so
+   * this is non-null only while the tab switcher is showing (where it means "exit switcher").
    * Subclasses like BrandedReaderViewModel override this method to provide custom
-   * behavior, such as set the app icon on hamburger when configure to not show the title.
+   * behavior, such as showing a branding app icon when the title is configured off.
    *
    * WARNING: If modifying this method, ensure thorough testing with custom apps
    * to verify proper functionality.
    */
-  open fun navigationIcon(): IconItem = if (uiState.value.showTabSwitcher) {
+  open fun navigationIcon(): IconItem? = if (uiState.value.showTabSwitcher) {
     IconItem.Vector(Icons.AutoMirrored.Filled.ArrowBack)
   } else {
-    IconItem.Vector(Icons.Filled.Menu)
+    null
   }
 
   override fun showDonationDialog() {
@@ -1247,21 +1243,10 @@ abstract class CoreReaderViewModel(
     )
   }
 
-  /**
-   * Handles the toggling of fullscreen video mode and adjusts the drawer's behavior accordingly.
-   * - If a video is playing in fullscreen mode, the drawer is disabled to restrict interactions.
-   * - When fullscreen mode is exited, the drawer is re-enabled.
-   */
   override fun onFullscreenVideoToggled(isFullScreen: Boolean) {
     updateState {
       copy(shouldShowFullScreen = isFullScreen, showBottomBar = !isFullScreen)
     }
-    val effect = if (isFullScreen) {
-      ReaderEffect.DisableLeftSideBar
-    } else {
-      ReaderEffect.EnableLeftSideBar
-    }
-    emitEffect(effect)
   }
 
   private suspend fun updateBottomToolbarArrowsAlpha() {
@@ -1396,10 +1381,6 @@ abstract class CoreReaderViewModel(
 
   private fun hideNoBookOpenViews() {
     updateState { copy(showNoBookOpenInReader = false) }
-  }
-
-  open fun enableLeftDrawer() {
-    emitEffect(ReaderEffect.EnableLeftSideBar)
   }
 
   private fun updateUrlFlow() {
@@ -1551,7 +1532,6 @@ abstract class CoreReaderViewModel(
         showTabSwitcher = false
       )
     }
-    enableLeftDrawer()
     emitEffect(ReaderEffect.ShowActivityBottomAppBar)
     showSearchPlaceHolderInToolbar(false)
     readerMenuState?.showWebViewOptions(urlIsValid())
@@ -1656,7 +1636,6 @@ abstract class CoreReaderViewModel(
       )
     }
     emitEffect(ReaderEffect.HideActivityBottomAppBar)
-    emitEffect(ReaderEffect.DisableLeftSideBar)
     showSearchPlaceHolderInToolbar(true)
     readerMenuState?.showTabSwitcherOptions()
   }
@@ -1775,14 +1754,9 @@ abstract class CoreReaderViewModel(
     updateState { copy(showDonationPopup = true) }
   }
 
-  @Suppress("ReturnCount")
+  @Suppress("ReturnCount", "UnusedParameter")
   suspend fun onUserBackPressed(coreMainActivity: CoreMainActivity?): BackPressActivityExtensions.Super {
     when {
-      coreMainActivity?.navigationDrawerIsOpen() == true -> {
-        coreMainActivity.closeNavigationDrawer()
-        return BackPressActivityExtensions.Super.ShouldNotCall
-      }
-
       uiState.value.showTabSwitcher -> {
         launchInViewModelScope {
           val currentWebViewIndex = readerWebViewManager.currentWebViewIndex
@@ -1946,32 +1920,18 @@ abstract class CoreReaderViewModel(
   open fun navigationIconTint() = White
 
   /**
-   * Handles clicks on the navigation icon.
-   * - If the tab switcher is active, exits the tab switcher.
-   * - Otherwise, toggles the navigation drawer: opens it if closed, closes it if open.
+   * Handles clicks on the navigation icon. The icon (and therefore this click) only exists
+   * while the tab switcher is active, where it exits the switcher.
    */
-  open fun navigationIconClick(isNavigationDrawerOpen: Boolean) {
+  open fun navigationIconClick() {
     if (uiState.value.showTabSwitcher) {
       launchInViewModelScope {
         hideTabSwitcher()
       }
-      return
     }
-
-    val effect = if (isNavigationDrawerOpen) {
-      ReaderEffect.CloseActivitySideBar
-    } else {
-      ReaderEffect.OpenActivitySideBar
-    }
-    emitEffect(effect)
   }
 
-  fun navigationIconContentDescription() =
-    if (uiState.value.showTabSwitcher) {
-      string.toolbar_back_button_content_description
-    } else {
-      string.open_drawer
-    }
+  fun navigationIconContentDescription() = string.toolbar_back_button_content_description
 
   override fun onCloseAllTabsClicked() {
     closeAllTabs()

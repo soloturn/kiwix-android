@@ -84,6 +84,16 @@ class ReaderMenuState(
 
   val menuItems = mutableStateListOf<ActionMenuItem>()
 
+  /**
+   * Activity-level entries (Settings, Support, …) appended to every menu rebuild. The drawer
+   * used to hold these; the reader's overflow is where they land now that it is gone.
+   */
+  var extraMenuItems: List<ActionMenuItem> = emptyList()
+    set(value) {
+      field = value
+      updateMenuItems()
+    }
+
   private val menuItemVisibility = mutableMapOf<MenuItemType, Boolean>().apply {
     put(MenuItemType.Search, true)
     put(MenuItemType.TabSwitcher, true)
@@ -199,6 +209,7 @@ class ReaderMenuState(
     addAddToHomeScreenMenuItem()
     addReaderMenuItems()
     addCloseAllTabsMenuItem()
+    menuItems.addAll(extraMenuItems)
   }
 
   private fun addSearchMenuItem() {

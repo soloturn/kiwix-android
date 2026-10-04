@@ -32,16 +32,9 @@ import androidx.annotation.DrawableRes
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.material3.BottomAppBarScrollBehavior
-import androidx.compose.material3.DrawerState
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.net.toUri
@@ -53,7 +46,6 @@ import androidx.navigation.NavOptions
 import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.navOptions
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.BuildConfig
 import org.kiwix.kiwixmobile.core.CoreApp
@@ -92,10 +84,8 @@ private const val ADAPTIVE_ICON_INSET_DP = 36
 const val READER_SCREEN = "readerScreen"
 const val LOCAL_LIBRARY_SCREEN = "localLibraryScreen"
 const val DOWNLOAD_SCREEN = "downloadsScreen"
-const val BOOKMARK_SCREEN = "bookmarkScreen"
-const val NOTES_SCREEN = "notesScreen"
+const val SAVED_SCREEN = "savedScreen"
 const val INTRO_SCREEN = "introScreen"
-const val HISTORY_SCREEN = "historyScreen"
 const val LANGUAGE_SCREEN = "languageScreen"
 const val ZIM_HOST_SCREEN = "zimHostScreen"
 const val HELP_SCREEN = "helpScreen"
@@ -107,7 +97,7 @@ const val LOCAL_FILE_TRANSFER_SCREEN = "localFileTransferScreen"
 const val ZIM_HOST_DEEP_LINK_SCHEME = "kiwix"
 const val ZIM_HOST_NAV_DEEP_LINK = "$ZIM_HOST_DEEP_LINK_SCHEME://zimhost"
 
-// Left drawer items testing tag.
+// Testing tags for the entry points the drawer used to hold (kept names for test stability).
 const val LEFT_DRAWER_BOOKMARK_ITEM_TESTING_TAG = "leftDrawerBookmarkItemTestingTag"
 const val LEFT_DRAWER_HISTORY_ITEM_TESTING_TAG = "leftDrawerHistoryItemTestingTag"
 const val LEFT_DRAWER_NOTES_ITEM_TESTING_TAG = "leftDrawerNotesItemTestingTag"
@@ -116,6 +106,7 @@ const val LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG = "leftDrawerSupportItemTestingTa
 const val LEFT_DRAWER_HELP_ITEM_TESTING_TAG = "leftDrawerHelpItemTestingTag"
 const val LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG = "leftDrawerZimHostItemTestingTag"
 const val LEFT_DRAWER_ABOUT_APP_ITEM_TESTING_TAG = "leftDrawerAboutAppItemTestingTag"
+const val SAVED_MENU_BUTTON_TESTING_TAG = "savedMenuButtonTestingTag"
 
 abstract class CoreMainActivity : BaseActivity() {
   abstract val searchScreenRoute: String
@@ -157,28 +148,7 @@ abstract class CoreMainActivity : BaseActivity() {
   val isNavControllerInitialized: Boolean
     get() = ::navController.isInitialized
 
-  /**
-   * For managing the leftDrawer.
-   */
-  lateinit var leftDrawerState: DrawerState
-
-  /**
-   * The compose coroutine scope for calling the compose based UI elements in coroutine scope.
-   * Such as opening/closing leftDrawer.
-   */
-  lateinit var uiCoroutineScope: CoroutineScope
   lateinit var snackBarHostState: SnackbarHostState
-
-  /**
-   * Managing the leftDrawerMenu in compose way so that when app's language changed
-   * it will update the text in selected language.
-   */
-  protected val leftDrawerMenu = mutableStateListOf<DrawerMenuGroup>()
-
-  /**
-   * Manages the enabling/disabling the left drawer
-   */
-  val enableLeftDrawer = mutableStateOf(true)
 
   /**
    * For managing the back press of compose screens.
@@ -192,24 +162,12 @@ abstract class CoreMainActivity : BaseActivity() {
   var bottomAppBarScrollBehaviour: BottomAppBarScrollBehavior? = null
 
   var activityResultForwarder: ((Int, Int, Intent?) -> Unit)? = null
-  abstract val bookmarksScreenRoute: String
   abstract val settingsScreenRoute: String
-  abstract val historyScreenRoute: String
-  abstract val notesScreenRoute: String
+  abstract val savedScreenRoute: String
   abstract val helpScreenRoute: String
   abstract val readerScreenRoute: String
   abstract val topLevelDestinationsRoute: Set<String>
   abstract val appName: String
-
-  /**
-   * Manages the visibility of the left drawer by tracking its state.
-   * In Compose, when the screen rotates and the screen width is above 600dp,
-   * the drawerState is automatically set to open. This causes unexpected behavior.
-   * To ensure a smooth user experience, we save the drawer state in a boolean so
-   * that it survives configuration changes and is not affected by Compose’s
-   * default implementation.
-   */
-  private var wasLeftDrawerOpen = false
 
   override fun onCreate(savedInstanceState: Bundle?) {
     val splashScreen = installSplashScreen()
@@ -261,38 +219,6 @@ abstract class CoreMainActivity : BaseActivity() {
     kiwixDataStore.setIsDebugBuild(isDebugBuild)
   }
 
-  /**
-   * Restores the drawer state after an orientation change.
-   *
-   * In Compose, rotating the device (especially on large screens) can cause the drawer
-   * to be automatically opened by default. To provide a consistent user experience,
-   * this function syncs the drawer's state (open/closed) with the last known value
-   * stored in [wasLeftDrawerOpen].
-   */
-  @Composable
-  fun RestoreDrawerStateOnOrientationChange() {
-    LaunchedEffect(LocalConfiguration.current.orientation) {
-      if (wasLeftDrawerOpen) {
-        openNavigationDrawer()
-      } else {
-        closeNavigationDrawer()
-      }
-    }
-  }
-
-  /**
-   * Tracks the current drawer state and updates [wasLeftDrawerOpen] whenever the
-   * drawer is opened or closed. This ensures the drawer state is persisted across
-   * configuration changes (e.g., screen rotations) and can be restored later.
-   */
-  @Composable
-  fun PersistDrawerStateOnChange() {
-    LaunchedEffect(leftDrawerState) {
-      snapshotFlow { leftDrawerState.currentValue }
-        .collect { wasLeftDrawerOpen = it == DrawerValue.Open }
-    }
-  }
-
   @Suppress("DEPRECATION")
   override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
     super.onActivityResult(requestCode, resultCode, data)
@@ -341,35 +267,11 @@ abstract class CoreMainActivity : BaseActivity() {
   override fun onSupportNavigateUp(): Boolean =
     navController.navigateUp() || super.onSupportNavigateUp()
 
-  fun enableLeftDrawer() {
-    enableLeftDrawer.value = true
-  }
-
-  open fun disableLeftDrawer() {
-    enableLeftDrawer.value = false
-  }
-
   protected fun openHelpScreen() {
-    handleDrawerOnNavigation()
     navigate(helpScreenRoute)
   }
 
-  fun navigationDrawerIsOpen(): Boolean = leftDrawerState.isOpen
-
-  fun closeNavigationDrawer() {
-    uiCoroutineScope.launch {
-      leftDrawerState.close()
-    }
-  }
-
-  fun openNavigationDrawer() {
-    uiCoroutineScope.launch {
-      leftDrawerState.open()
-    }
-  }
-
   fun openSupportKiwixExternalLink() {
-    closeNavigationDrawer()
     lifecycleScope.launch {
       externalLinkOpener.openExternalLinkWithDialog(
         KIWIX_SUPPORT_URL.toUri().browserIntent(),
@@ -392,14 +294,8 @@ abstract class CoreMainActivity : BaseActivity() {
     navigate(route, navOptions(builder))
   }
 
-  private fun openSettings() {
-    handleDrawerOnNavigation()
+  fun openSettings() {
     navigate(settingsScreenRoute)
-  }
-
-  private fun openHistory() {
-    handleDrawerOnNavigation()
-    navigate(historyScreenRoute)
   }
 
   abstract fun openSearch(
@@ -429,21 +325,6 @@ abstract class CoreMainActivity : BaseActivity() {
     setNavigationResultOnCurrent(shouldOpenInNewTab, SHOULD_OPEN_IN_NEW_TAB)
   }
 
-  private fun openBookmarks() {
-    handleDrawerOnNavigation()
-    navigate(bookmarksScreenRoute)
-  }
-
-  private fun openNotes() {
-    handleDrawerOnNavigation()
-    navigate(notesScreenRoute)
-  }
-
-  protected fun handleDrawerOnNavigation() {
-    closeNavigationDrawer()
-    disableLeftDrawer()
-  }
-
   private fun cancelBackgroundTimeoutNotification() {
     runCatching {
       val notificationManager =
@@ -452,95 +333,11 @@ abstract class CoreMainActivity : BaseActivity() {
     }
   }
 
-  private val bookRelatedDrawerGroup by lazy {
-    DrawerMenuGroup(
-      listOfNotNull(
-        DrawerMenuItem(
-          title = getString(R.string.bookmarks),
-          iconRes = R.drawable.ic_bookmark_black_24dp,
-          visible = true,
-          onClick = { openBookmarks() },
-          testingTag = LEFT_DRAWER_BOOKMARK_ITEM_TESTING_TAG
-        ),
-        DrawerMenuItem(
-          title = getString(R.string.history),
-          iconRes = R.drawable.ic_history_24px,
-          visible = true,
-          onClick = { openHistory() },
-          testingTag = LEFT_DRAWER_HISTORY_ITEM_TESTING_TAG
-        ),
-        DrawerMenuItem(
-          title = getString(R.string.pref_notes),
-          iconRes = R.drawable.ic_add_note,
-          visible = true,
-          onClick = { openNotes() },
-          testingTag = LEFT_DRAWER_NOTES_ITEM_TESTING_TAG
-        ),
-        zimHostDrawerMenuItem
-      )
-    )
-  }
-
-  private val settingDrawerGroup by lazy {
-    DrawerMenuGroup(
-      listOf(
-        DrawerMenuItem(
-          title = getString(R.string.menu_settings),
-          iconRes = R.drawable.ic_settings_24px,
-          visible = true,
-          onClick = { openSettings() },
-          testingTag = LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG
-        )
-      )
-    )
-  }
-
-  private val helpAndSupportDrawerGroup by lazy {
-    DrawerMenuGroup(
-      listOfNotNull(
-        helpDrawerMenuItem,
-        supportDrawerMenuItem,
-        aboutAppDrawerMenuItem
-      )
-    )
-  }
-
   /**
-   * Returns the "Wi-Fi Hotspot" menu item in the left drawer.
-   * Currently, this feature is only included in the main Kiwix app.
-   * Custom apps do not include this item.
+   * The secondary entry points (Wi-Fi hotspot, Help, Support, About) each app variant exposes.
+   * See [SecondaryMenuItems] for where each ends up in the UI.
    */
-  abstract val zimHostDrawerMenuItem: DrawerMenuItem?
-
-  /**
-   * Returns the "Help" menu item in the left drawer.
-   * In custom apps, this item is hidden.
-   * Each app (main Kiwix or custom) provides its own implementation.
-   */
-  abstract val helpDrawerMenuItem: DrawerMenuItem?
-
-  /**
-   * Returns the "Support" menu item in the left drawer.
-   * In custom apps, this item displays the application name dynamically.
-   * Child activities are responsible for defining this drawer item.
-   */
-  abstract val supportDrawerMenuItem: DrawerMenuItem?
-
-  /**
-   * Returns the "About App" menu item in the left drawer.
-   * For custom apps, this item is shown if configured.
-   * It is not included in the main Kiwix app.
-   * Child activities are responsible for defining this drawer item.
-   */
-  abstract val aboutAppDrawerMenuItem: DrawerMenuItem?
-
-  protected val leftNavigationDrawerMenuItems by lazy {
-    listOf<DrawerMenuGroup>(
-      bookRelatedDrawerGroup,
-      settingDrawerGroup,
-      helpAndSupportDrawerGroup
-    )
-  }
+  abstract val secondaryMenuItems: SecondaryMenuItems
 
   protected fun createShortcutIcon(
     @DrawableRes foregroundRes: Int

@@ -27,16 +27,13 @@ import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.view.ActionMode
 import androidx.compose.material3.BottomAppBarDefaults
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -84,6 +81,7 @@ import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.NEW_TAB_SHORTCUT_ID
 import org.kiwix.kiwixmobile.core.main.PAGE_URL_KEY
+import org.kiwix.kiwixmobile.core.main.SecondaryMenuItems
 import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
 import org.kiwix.kiwixmobile.core.main.ZIM_HOST_DEEP_LINK_SCHEME
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Companion.CONTENT_PREFIX
@@ -119,10 +117,8 @@ class KiwixMainActivity : CoreMainActivity() {
   lateinit var externalZimIntentHandler: ExternalZimIntentHandler
   override val appName: String by lazy { getString(R.string.app_name) }
 
-  override val bookmarksScreenRoute: String = KiwixDestination.Bookmarks.route
   override val settingsScreenRoute: String = KiwixDestination.Settings.route
-  override val historyScreenRoute: String = KiwixDestination.History.route
-  override val notesScreenRoute: String = KiwixDestination.Notes.route
+  override val savedScreenRoute: String = KiwixDestination.Saved.route
   override val readerScreenRoute: String = KiwixDestination.Reader.route
   override val helpScreenRoute: String = KiwixDestination.Help.route
   override val topLevelDestinationsRoute =
@@ -162,8 +158,6 @@ class KiwixMainActivity : CoreMainActivity() {
           )
         }
       }
-      leftDrawerState = rememberDrawerState(DrawerValue.Closed)
-      uiCoroutineScope = rememberCoroutineScope()
       bottomAppBarScrollBehaviour = BottomAppBarDefaults.exitAlwaysScrollBehavior()
       val startDestination = remember {
         if (runBlocking { kiwixDataStore.showIntro.first() } && !isIntroScreenNotVisible()) {
@@ -172,25 +166,14 @@ class KiwixMainActivity : CoreMainActivity() {
           KiwixDestination.Reader.route
         }
       }
-      RestoreDrawerStateOnOrientationChange()
-      PersistDrawerStateOnChange()
       KiwixMainActivityScreen(
         navController = navController,
-        leftDrawerContent = leftDrawerMenu,
         startDestination = startDestination,
         topLevelDestinationsRoute = topLevelDestinationsRoute,
-        leftDrawerState = leftDrawerState,
-        uiCoroutineScope = uiCoroutineScope,
-        enableLeftDrawer = enableLeftDrawer.value,
         shouldShowBottomAppBar = shouldShowBottomAppBar.value,
         bottomAppBarScrollBehaviour = bottomAppBarScrollBehaviour,
-        snackBarHostState = snackBarHostState,
-        appName = appName
+        snackBarHostState = snackBarHostState
       )
-      LaunchedEffect(Unit) {
-        // Load the menu when UI is attached to screen.
-        leftDrawerMenu.addAll(leftNavigationDrawerMenuItems)
-      }
       LaunchedEffect(navController) {
         navController.addOnDestinationChangedListener(finishActionModeOnDestinationChange)
       }
@@ -392,44 +375,35 @@ class KiwixMainActivity : CoreMainActivity() {
     readerIntentManager.openZimFileFromPath(path, pageUrl.orEmpty())
   }
 
-  override val zimHostDrawerMenuItem: DrawerMenuItem? by lazy {
-    DrawerMenuItem(
-      title = getString(string.menu_wifi_hotspot),
-      iconRes = drawable.ic_mobile_screen_share_24px,
-      visible = true,
-      onClick = { openZimHostScreen() },
-      testingTag = LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG
+  override val secondaryMenuItems: SecondaryMenuItems by lazy {
+    SecondaryMenuItems(
+      zimHost = DrawerMenuItem(
+        title = getString(string.menu_wifi_hotspot),
+        iconRes = drawable.ic_mobile_screen_share_24px,
+        visible = true,
+        onClick = { openZimHostScreen() },
+        testingTag = LEFT_DRAWER_ZIM_HOST_ITEM_TESTING_TAG
+      ),
+      help = DrawerMenuItem(
+        title = getString(string.menu_help),
+        iconRes = drawable.ic_help_24px,
+        visible = true,
+        onClick = { openHelpScreen() },
+        testingTag = LEFT_DRAWER_HELP_ITEM_TESTING_TAG
+      ),
+      support = DrawerMenuItem(
+        title = getString(string.menu_support_kiwix),
+        iconRes = drawable.ic_support_24px,
+        visible = true,
+        onClick = { openSupportKiwixExternalLink() },
+        testingTag = LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
+      ),
+      // In the main Kiwix app we don't show an "About app" item.
+      about = null
     )
   }
-
-  override val helpDrawerMenuItem: DrawerMenuItem? by lazy {
-    DrawerMenuItem(
-      title = getString(string.menu_help),
-      iconRes = drawable.ic_help_24px,
-      visible = true,
-      onClick = { openHelpScreen() },
-      testingTag = LEFT_DRAWER_HELP_ITEM_TESTING_TAG
-    )
-  }
-
-  override val supportDrawerMenuItem: DrawerMenuItem? by lazy {
-    DrawerMenuItem(
-      title = getString(string.menu_support_kiwix),
-      iconRes = drawable.ic_support_24px,
-      visible = true,
-      onClick = { openSupportKiwixExternalLink() },
-      testingTag = LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
-    )
-  }
-
-  /**
-   * In kiwix app we are not showing the "About app" item so returning null.
-   */
-  override val aboutAppDrawerMenuItem: DrawerMenuItem? = null
 
   private fun openZimHostScreen() {
-    disableLeftDrawer()
-    handleDrawerOnNavigation()
     navigate(KiwixDestination.ZimHost.route)
   }
 

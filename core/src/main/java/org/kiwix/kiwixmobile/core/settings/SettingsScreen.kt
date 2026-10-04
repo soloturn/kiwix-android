@@ -449,6 +449,7 @@ private fun LazyListScope.informationCategory(
   settingsUiState: SettingsUiState,
 ) {
   item {
+    val activity = LocalActivity.current as? CoreMainActivity
     SettingsCategory(stringResource(R.string.pref_info_title)) {
       PreferenceItem(
         stringResource(R.string.pref_info_version),
@@ -458,6 +459,12 @@ private fun LazyListScope.informationCategory(
         stringResource(R.string.pref_credits),
         stringResource(R.string.pref_credits_title),
       ) { coreSettingsViewModel.sendAction(OpenCredits) }
+      activity?.secondaryMenuItems?.help?.let { help ->
+        PreferenceItem(help.title, "", help.testingTag, help.onClick)
+      }
+      activity?.secondaryMenuItems?.about?.let { about ->
+        PreferenceItem(about.title, "", about.testingTag, about.onClick)
+      }
     }
   }
 }
@@ -783,14 +790,19 @@ private fun ListOptions(
 }
 
 @Composable
-private fun PreferenceItem(title: String, summary: String, onClick: () -> Unit) {
+private fun PreferenceItem(
+  title: String,
+  summary: String,
+  testingTag: String = PREFERENCE_ITEM_TESTING_TAG + title,
+  onClick: () -> Unit
+) {
   Column(
     modifier = Modifier
       .fillMaxWidth()
       .clickable(onClick = onClick)
       .padding(vertical = TWELVE_DP)
       .semantics {
-        testTag = PREFERENCE_ITEM_TESTING_TAG + title
+        testTag = testingTag
         hideFromAccessibility()
       }
   ) {

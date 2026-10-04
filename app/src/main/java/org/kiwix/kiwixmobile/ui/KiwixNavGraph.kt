@@ -33,17 +33,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import org.kiwix.kiwixmobile.core.help.HelpScreenRoute
-import org.kiwix.kiwixmobile.core.main.BOOKMARK_SCREEN
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.DOWNLOAD_SCREEN
 import org.kiwix.kiwixmobile.core.main.HELP_SCREEN
-import org.kiwix.kiwixmobile.core.main.HISTORY_SCREEN
 import org.kiwix.kiwixmobile.core.main.INTRO_SCREEN
 import org.kiwix.kiwixmobile.core.main.LANGUAGE_SCREEN
 import org.kiwix.kiwixmobile.core.main.LOCAL_FILE_TRANSFER_SCREEN
 import org.kiwix.kiwixmobile.core.main.LOCAL_LIBRARY_SCREEN
-import org.kiwix.kiwixmobile.core.main.NOTES_SCREEN
 import org.kiwix.kiwixmobile.core.main.READER_SCREEN
+import org.kiwix.kiwixmobile.core.main.SAVED_SCREEN
 import org.kiwix.kiwixmobile.core.main.SEARCH_SCREEN
 import org.kiwix.kiwixmobile.core.main.SETTINGS_SCREEN
 import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
@@ -51,12 +49,7 @@ import org.kiwix.kiwixmobile.core.main.ZIM_HOST_NAV_DEEP_LINK
 import org.kiwix.kiwixmobile.core.main.ZIM_HOST_SCREEN
 import org.kiwix.kiwixmobile.core.main.note.AddNoteViewModel
 import org.kiwix.kiwixmobile.core.main.reader.ReaderScreenRoute
-import org.kiwix.kiwixmobile.core.page.bookmark.BookmarkScreenRoute
-import org.kiwix.kiwixmobile.core.page.bookmark.viewmodel.BookmarkViewModel
-import org.kiwix.kiwixmobile.core.page.history.HistoryScreenRoute
-import org.kiwix.kiwixmobile.core.page.history.viewmodel.HistoryViewModel
-import org.kiwix.kiwixmobile.core.page.notes.NotesScreenRoute
-import org.kiwix.kiwixmobile.core.page.notes.viewmodel.NotesViewModel
+import org.kiwix.kiwixmobile.core.page.saved.SavedScreenRoute
 import org.kiwix.kiwixmobile.core.reader.integrity.ValidateZimViewModel
 import org.kiwix.kiwixmobile.core.search.NAV_ARG_SEARCH_STRING
 import org.kiwix.kiwixmobile.core.search.SearchScreenRoute
@@ -137,19 +130,8 @@ fun KiwixNavGraph(
         activity = activity
       )
     }
-    composable(KiwixDestination.Bookmarks.route) {
-      val bookmarkViewModel: BookmarkViewModel = hiltViewModel()
-      BookmarkScreenRoute(
-        navigateBack = navController::popBackStack,
-        viewModel = bookmarkViewModel
-      )
-    }
-    composable(KiwixDestination.Notes.route) {
-      val notesViewModel: NotesViewModel = hiltViewModel()
-      NotesScreenRoute(
-        navigateBack = navController::popBackStack,
-        notesViewModel = notesViewModel
-      )
+    composable(KiwixDestination.Saved.route) {
+      SavedScreenRoute(navigateBack = navController::popBackStack)
     }
     composable(KiwixDestination.Intro.route) {
       IntroScreenRoute(
@@ -160,13 +142,6 @@ fun KiwixNavGraph(
             .build()
           navController.navigate(KiwixDestination.Library.route, navOptions)
         }
-      )
-    }
-    composable(KiwixDestination.History.route) {
-      val historyViewModel: HistoryViewModel = hiltViewModel()
-      HistoryScreenRoute(
-        navigateBack = navController::popBackStack,
-        viewModel = historyViewModel
       )
     }
     composable(KiwixDestination.Language.route) {
@@ -259,10 +234,8 @@ sealed class KiwixDestination(val route: String) {
   }
 
   object Downloads : KiwixDestination(DOWNLOAD_SCREEN)
-  object Bookmarks : KiwixDestination(BOOKMARK_SCREEN)
-  object Notes : KiwixDestination(NOTES_SCREEN)
+  object Saved : KiwixDestination(SAVED_SCREEN)
   object Intro : KiwixDestination(INTRO_SCREEN)
-  object History : KiwixDestination(HISTORY_SCREEN)
   object Language : KiwixDestination(LANGUAGE_SCREEN)
   object ZimHost : KiwixDestination(ZIM_HOST_SCREEN)
   object Help : KiwixDestination(HELP_SCREEN)

@@ -21,6 +21,8 @@ package org.kiwix.kiwixmobile.note
 import android.os.Build
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -31,6 +33,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.kiwix.kiwixmobile.BaseActivityTest
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
+import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_NOTES_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.COMPOSE_TEST_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.HILT_RULE_ORDER
 import org.kiwix.kiwixmobile.core.utils.TestingUtils.RETRY_RULE_ORDER
@@ -71,8 +74,9 @@ class NoteScreenTest : BaseActivityTest() {
   @Test
   fun verifyNoteScreen() {
     activityScenario.onActivity {
-      it.navigate(KiwixDestination.Notes.route)
+      it.navigate(KiwixDestination.Saved.route)
     }
+    composeTestRule.onNodeWithTag(LEFT_DRAWER_NOTES_ITEM_TESTING_TAG).performClick()
     note {
       assertToolbarExist(composeTestRule)
       assertSwitchWidgetExist(composeTestRule)

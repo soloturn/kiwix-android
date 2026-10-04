@@ -22,26 +22,37 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.ui.components.OVERFLOW_MENU_BUTTON_TESTING_TAG
+import org.kiwix.kiwixmobile.main.BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 
 /**
  * Created by mhutti1 on 27/04/17.
  */
 object StandardActions {
+  /**
+   * Settings now lives in the Library app bar's overflow menu (no more drawer).
+   * Callers arrive from anywhere, so go to Library first.
+   */
   fun enterSettings(composeContentTest: ComposeContentTestRule) {
     testFlakyView({
       composeContentTest.apply {
         waitForIdle()
+        onNodeWithTag(BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG).performClick()
+        onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).performClick()
         onNodeWithTag(LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG).performClick()
       }
     })
   }
 
-  fun openDrawer(coreMainActivity: CoreMainActivity) {
-    coreMainActivity.openNavigationDrawer()
-  }
+  /**
+   * No-ops: there is no drawer any more. Kept (rather than deleted) so the many call
+   * sites that used these purely as a "make sure drawer isn't covering the screen"
+   * precondition don't all need touching — that precondition is trivially true now.
+   */
+  @Suppress("UnusedParameter")
+  fun openDrawer(coreMainActivity: CoreMainActivity) = Unit
 
-  fun closeDrawer(coreMainActivity: CoreMainActivity) {
-    coreMainActivity.closeNavigationDrawer()
-  }
+  @Suppress("UnusedParameter")
+  fun closeDrawer(coreMainActivity: CoreMainActivity) = Unit
 }

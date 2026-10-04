@@ -39,6 +39,7 @@ import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_NOTES_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.main.SAVED_MENU_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.note.ADD_NOTE_DIALOG_CLOSE_IMAGE_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.note.ADD_NOTE_TEXT_FILED_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.note.DELETE_MENU_BUTTON_TESTING_TAG
@@ -54,10 +55,10 @@ import org.kiwix.kiwixmobile.core.ui.components.TOOLBAR_TITLE_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_CONFIRM_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_DISMISS_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.utils.dialog.ALERT_DIALOG_TITLE_TEXT_TESTING_TAG
+import org.kiwix.kiwixmobile.main.BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
-import org.kiwix.kiwixmobile.utils.StandardActions.openDrawer
 
 fun note(func: NoteRobot.() -> Unit) = NoteRobot().apply(func)
 
@@ -137,14 +138,19 @@ class NoteRobot : BaseRobot() {
     })
   }
 
+  /**
+   * Notes live on the Saved screen now: Library app bar → Saved → Notes segment.
+   */
+  @Suppress("UnusedParameter")
   fun openNoteScreen(
     coreMainActivity: CoreMainActivity,
     composeTestRule: ComposeContentTestRule
   ) {
-    openDrawer(coreMainActivity)
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
+        onNodeWithTag(BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG).performClick()
+        onNodeWithTag(SAVED_MENU_BUTTON_TESTING_TAG).performClick()
         onNodeWithTag(LEFT_DRAWER_NOTES_ITEM_TESTING_TAG).performClick()
       }
     })

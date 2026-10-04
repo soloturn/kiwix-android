@@ -41,11 +41,13 @@ import com.adevinta.android.barista.interaction.BaristaSleepInteractions
 import org.hamcrest.CoreMatchers.containsString
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_NOTES_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.main.SAVED_MENU_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.reader.READER_BOTTOM_BAR_HOME_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.main.reader.READER_SCREEN_TESTING_TAG
 import org.kiwix.kiwixmobile.core.page.SEARCH_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.SEARCH_FIELD_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.SEARCH_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.ui.components.OVERFLOW_MENU_BUTTON_TESTING_TAG
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.RETRY_COUNT_FOR_WEBVIEW_CONTENT_LOAD
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.TEST_PAUSE_MS
 import org.kiwix.kiwixmobile.custom.testutils.TestUtils.TEST_PAUSE_MS_FOR_SEARCH_TEST
@@ -198,14 +200,20 @@ class SearchRobot {
     })
   }
 
+  /**
+   * Notes live on the Saved screen now. Custom apps reach it from the reader's overflow,
+   * which is the only app bar they have.
+   */
+  @Suppress("UnusedParameter")
   fun openNoteScreen(
     coreMainActivity: CoreMainActivity,
     composeTestRule: ComposeContentTestRule
   ) {
-    coreMainActivity.openNavigationDrawer()
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
+        onNodeWithTag(OVERFLOW_MENU_BUTTON_TESTING_TAG).performClick()
+        onNodeWithTag(SAVED_MENU_BUTTON_TESTING_TAG).performClick()
         onNodeWithTag(LEFT_DRAWER_NOTES_ITEM_TESTING_TAG).performClick()
       }
     })

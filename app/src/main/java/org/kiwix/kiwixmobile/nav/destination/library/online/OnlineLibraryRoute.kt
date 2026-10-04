@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -55,6 +54,8 @@ import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
 import org.kiwix.kiwixmobile.core.extensions.navigateToSettings
 import org.kiwix.kiwixmobile.core.extensions.snack
 import org.kiwix.kiwixmobile.core.extensions.toast
+import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG
+import org.kiwix.kiwixmobile.core.main.LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.core.page.SEARCH_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.ui.components.NavigationIcon
 import org.kiwix.kiwixmobile.core.ui.models.ActionMenuItem
@@ -138,25 +139,14 @@ fun OnlineLibraryRoute(
       },
       navHostController = navController,
       navigationIcon = {
-        NavigationIcon(
-          iconItem = if (uiState.isSearchActive) {
-            IconItem.Vector(Icons.AutoMirrored.Filled.ArrowBack)
-          } else {
-            IconItem.Vector(Icons.Filled.Menu)
-          },
-          contentDescription = string.open_drawer,
-          onClick = {
-            if (uiState.isSearchActive) {
-              onlineLibraryViewModel.closeSearchView()
-            } else {
-              if (activity.navigationDrawerIsOpen()) {
-                activity.closeNavigationDrawer()
-              } else {
-                activity.openNavigationDrawer()
-              }
-            }
-          }
-        )
+        // Only shown while search is active, to close it — there is no drawer to open any more.
+        if (uiState.isSearchActive) {
+          NavigationIcon(
+            iconItem = IconItem.Vector(Icons.AutoMirrored.Filled.ArrowBack),
+            contentDescription = string.toolbar_back_button_content_description,
+            onClick = { onlineLibraryViewModel.closeSearchView() }
+          )
+        }
       }
     )
     DialogHost(alertDialogShower)
@@ -282,57 +272,73 @@ private fun buildActionMenuItems(
   onCategoryClick: () -> Unit,
   activity: KiwixMainActivity,
   navController: NavHostController
-): List<ActionMenuItem> = listOfNotNull(
-  if (!isSearchActive) {
-    ActionMenuItem(
-      icon = IconItem.Drawable(R.drawable.action_search),
-      contentDescription = string.search_label,
-      onClick = onSearchClick,
-      testingTag = SEARCH_ICON_TESTING_TAG
-    )
-  } else {
-    null
-  },
-  ActionMenuItem(
-    IconItem.Drawable(drawable.ic_category),
-    org.kiwix.kiwixmobile.R.string.select_category,
-    onCategoryClick,
-    isEnabled = true,
-    testingTag = CATEGORY_MENU_ICON_TESTING_TAG
-  ),
-  ActionMenuItem(
-    IconItem.Drawable(drawable.ic_language_white_24dp),
-    string.pref_language_chooser,
-    {
-      navController.navigate(KiwixDestination.Language.route)
-      activity.currentFocus?.closeKeyboard()
+): List<ActionMenuItem> {
+  val secondaryMenuItems = activity.secondaryMenuItems
+  return listOfNotNull(
+    if (!isSearchActive) {
+      ActionMenuItem(
+        icon = IconItem.Drawable(R.drawable.action_search),
+        contentDescription = string.search_label,
+        onClick = onSearchClick,
+        testingTag = SEARCH_ICON_TESTING_TAG
+      )
+    } else {
+      null
     },
-    isEnabled = true,
-    testingTag = LANGUAGE_MENU_ICON_TESTING_TAG
+    ActionMenuItem(
+      IconItem.Drawable(drawable.ic_category),
+      org.kiwix.kiwixmobile.R.string.select_category,
+      onCategoryClick,
+      isEnabled = true,
+      testingTag = CATEGORY_MENU_ICON_TESTING_TAG
+    ),
+    ActionMenuItem(
+      IconItem.Drawable(drawable.ic_language_white_24dp),
+      string.pref_language_chooser,
+      {
+        navController.navigate(KiwixDestination.Language.route)
+        activity.currentFocus?.closeKeyboard()
+      },
+      isEnabled = true,
+      testingTag = LANGUAGE_MENU_ICON_TESTING_TAG
+    ),
+    ActionMenuItem(
+      icon = null,
+      contentDescription = string.menu_settings,
+      onClick = activity::openSettings,
+      testingTag = LEFT_DRAWER_SETTINGS_ITEM_TESTING_TAG,
+      isInOverflow = true
+    ),
+    secondaryMenuItems.support?.let { support ->
+      ActionMenuItem(
+        icon = null,
+        contentDescription = string.menu_support_kiwix,
+        onClick = support.onClick,
+        iconButtonText = support.title,
+        testingTag = LEFT_DRAWER_SUPPORT_ITEM_TESTING_TAG,
+        isInOverflow = true
+      )
+    }
   )
-)
+}
 
 private fun handleBackPress(
   activity: KiwixMainActivity,
   isSearchActive: Boolean,
   closeSearch: () -> Unit
-): BackPressActivityExtensions.Super =
-  if (activity.navigationDrawerIsOpen()) {
-    activity.closeNavigationDrawer()
+): BackPressActivityExtensions.Super {
+  val decorView = activity.window.decorView
+  val insets = ViewCompat.getRootWindowInsets(decorView)
+  val isKeyboardVisible =
+    insets?.isVisible(WindowInsetsCompat.Type.ime()) == true
+  return if (isKeyboardVisible || isSearchActive) {
+    activity.currentFocus?.closeKeyboard()
+    closeSearch()
     BackPressActivityExtensions.Super.ShouldNotCall
   } else {
-    val decorView = activity.window.decorView
-    val insets = ViewCompat.getRootWindowInsets(decorView)
-    val isKeyboardVisible =
-      insets?.isVisible(WindowInsetsCompat.Type.ime()) == true
-    if (isKeyboardVisible || isSearchActive) {
-      activity.currentFocus?.closeKeyboard()
-      closeSearch()
-      BackPressActivityExtensions.Super.ShouldNotCall
-    } else {
-      BackPressActivityExtensions.Super.ShouldCall
-    }
+    BackPressActivityExtensions.Super.ShouldCall
   }
+}
 
 @Composable
 private fun ShowCategoryDialog(

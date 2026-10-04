@@ -18,20 +18,17 @@
 
 package org.kiwix.kiwixmobile.main
 
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.BottomAppBarScrollBehavior
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
@@ -48,12 +45,10 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collect
 import org.kiwix.kiwixmobile.R.drawable
 import org.kiwix.kiwixmobile.core.R
-import org.kiwix.kiwixmobile.core.main.DrawerMenuGroup
-import org.kiwix.kiwixmobile.core.main.LeftDrawerMenu
 import org.kiwix.kiwixmobile.core.ui.theme.KiwixTheme
 import org.kiwix.kiwixmobile.core.ui.theme.White
 import org.kiwix.kiwixmobile.ui.KiwixDestination
@@ -68,59 +63,38 @@ const val BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG = "bottomNavDownloadsItemTesting
 @Composable
 fun KiwixMainActivityScreen(
   navController: NavHostController,
-  leftDrawerContent: List<DrawerMenuGroup>,
   startDestination: String,
   topLevelDestinationsRoute: Set<String>,
-  leftDrawerState: DrawerState,
-  uiCoroutineScope: CoroutineScope,
-  enableLeftDrawer: Boolean,
   shouldShowBottomAppBar: Boolean,
   bottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
-  snackBarHostState: SnackbarHostState,
-  appName: String
+  snackBarHostState: SnackbarHostState
 ) {
   val navBackStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = navBackStackEntry?.destination?.route
   val shouldShowBottomBar = currentRoute in topLevelDestinationsRoute && shouldShowBottomAppBar
-  OnUserBackPressed(leftDrawerState, uiCoroutineScope, currentRoute, navController)
+  OnUserBackPressed(currentRoute, navController)
   KiwixTheme {
-    ModalNavigationDrawer(
-      drawerState = leftDrawerState,
-      drawerContent = {
-        Column(modifier = Modifier.fillMaxSize()) {
-          LeftDrawerMenu(leftDrawerContent, appName)
-        }
-      },
-      gesturesEnabled = enableLeftDrawer &&
-        currentRoute in topLevelDestinationsRoute &&
-        // Fixing the webView scrolling is lagging when navigation gesture is enabled,
-        // since navigation consumes the swipes event makes webView lagging.
-        // However, on reader screen navigation drawer can be opened by clicking
-        // on the hamburger button.
-        (currentRoute != KiwixDestination.Reader.route || leftDrawerState.isOpen)
-    ) {
-      Scaffold(
-        bottomBar = {
-          if (shouldShowBottomBar) {
-            BottomNavigationBar(
-              navController = navController,
-              bottomAppBarScrollBehaviour = bottomAppBarScrollBehaviour,
-              navBackStackEntry = navBackStackEntry
-            )
-          }
-        },
-        modifier = Modifier
-          .fillMaxSize()
-          .systemBarsPadding()
-      ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-          KiwixNavGraph(
+    Scaffold(
+      bottomBar = {
+        if (shouldShowBottomBar) {
+          BottomNavigationBar(
             navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.fillMaxSize(),
-            snackBarHostState = snackBarHostState
+            bottomAppBarScrollBehaviour = bottomAppBarScrollBehaviour,
+            navBackStackEntry = navBackStackEntry
           )
         }
+      },
+      modifier = Modifier
+        .fillMaxSize()
+        .systemBarsPadding()
+    ) { paddingValues ->
+      Box(modifier = Modifier.padding(paddingValues)) {
+        KiwixNavGraph(
+          navController = navController,
+          startDestination = startDestination,
+          modifier = Modifier.fillMaxSize(),
+          snackBarHostState = snackBarHostState
+        )
       }
     }
   }
@@ -128,27 +102,28 @@ fun KiwixMainActivityScreen(
 
 @Composable
 private fun OnUserBackPressed(
-  leftDrawerState: DrawerState,
-  uiCoroutineScope: CoroutineScope,
   currentRoute: String?,
   navController: NavHostController
 ) {
   val activity = LocalActivity.current
-  BackHandler(enabled = true) {
-    when {
-      leftDrawerState.isOpen -> uiCoroutineScope.launch { leftDrawerState.close() }
-
-      currentRoute == KiwixDestination.Reader.route &&
-        navController.previousBackStackEntry?.destination?.route != KiwixDestination.Search.route -> {
-        activity?.finish()
-      }
-
-      else -> {
-        val popped = navController.popBackStack()
-        if (!popped) {
+  PredictiveBackHandler(enabled = true) { progress ->
+    try {
+      progress.collect { }
+      when {
+        currentRoute == KiwixDestination.Reader.route &&
+          navController.previousBackStackEntry?.destination?.route != KiwixDestination.Search.route -> {
           activity?.finish()
         }
+
+        else -> {
+          val popped = navController.popBackStack()
+          if (!popped) {
+            activity?.finish()
+          }
+        }
       }
+    } catch (e: CancellationException) {
+      // Gesture was cancelled mid-swipe; nothing to do.
     }
   }
 }
