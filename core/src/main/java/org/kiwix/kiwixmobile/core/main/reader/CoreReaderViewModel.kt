@@ -932,7 +932,10 @@ abstract class CoreReaderViewModel(
 
   @Suppress("UnusedParameter")
   fun onSelectionActionModeFinished(actionMode: ActionMode) {
-    // Do nothing
+    // Android creates a new ActionMode per selection; clear the reference so
+    // onSelectionActionModeStarted's null-check inflates the custom menu again
+    // next time, instead of only on the first selection of the session.
+    this.actionMode = null
   }
 
   override fun onSearchMenuClickedMenuClicked() {
