@@ -70,6 +70,8 @@ android {
       matchingFallbacks += "release"
       buildConfigField("boolean", "IS_PLAYSTORE", "true")
       manifestPlaceholders["permission"] = "android.permission.placeholder"
+      // Branch-named suffix lets every personal build install side by side.
+      applicationIdSuffix = ".develop"
     }
     create("standalone") {
       initWith(getByName("release"))
