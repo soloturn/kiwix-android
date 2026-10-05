@@ -31,6 +31,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -87,6 +88,7 @@ import org.kiwix.kiwixmobile.core.main.PAGE_URL_KEY
 import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
 import org.kiwix.kiwixmobile.core.main.ZIM_HOST_DEEP_LINK_SCHEME
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Companion.CONTENT_PREFIX
+import org.kiwix.kiwixmobile.core.ui.components.rememberLibraryFolderPicker
 import org.kiwix.kiwixmobile.core.utils.HUNDERED
 import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
@@ -97,6 +99,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 const val ACTION_GET_CONTENT = "GET_CONTENT"
 const val GET_CONTENT_SHORTCUT_ID = "get_content_shortcut"
+private const val LIBRARY_PROMPT_DELAY = 1500L
 
 @AndroidEntryPoint
 class KiwixMainActivity : CoreMainActivity() {
@@ -110,6 +113,8 @@ class KiwixMainActivity : CoreMainActivity() {
   @Inject lateinit var storageDeviceProvider: StorageDeviceProvider
 
   @Inject lateinit var objectBoxDataMigrationHandler: ObjectBoxDataMigrationHandler
+
+  @Inject lateinit var libraryRecoveryPrompts: LibraryRecoveryPrompts
 
   @Inject
   @MainDispatcher
@@ -208,10 +213,25 @@ class KiwixMainActivity : CoreMainActivity() {
           }
       }
       DialogHost(alertDialogShower)
+      LibraryRecoveryPromptEffect()
     }
     runMigrations()
     intent?.let {
       pendingIntentFlow.value = it
+    }
+  }
+
+  @Composable
+  private fun LibraryRecoveryPromptEffect() {
+    val pickFolder = rememberLibraryFolderPicker { treeUri ->
+      lifecycleScope.launch { libraryRecoveryPrompts.onFolderPicked(treeUri) }
+    }
+    LaunchedEffect(Unit) {
+      // After the migrations above, so the library already reflects moved user data.
+      delay(LIBRARY_PROMPT_DELAY.milliseconds)
+      if (!kiwixDataStore.showIntro.first()) {
+        libraryRecoveryPrompts.show(alertDialogShower, lifecycleScope, pickFolder)
+      }
     }
   }
 
@@ -258,7 +278,10 @@ class KiwixMainActivity : CoreMainActivity() {
   }
 
   private suspend fun migrateInternalToPublicAppDirectory() {
-    if (!kiwixDataStore.isAppDirectoryMigrated.first()) {
+    if (!kiwixDataStore.isAppDirectoryMigrated.first() && !kiwixDataStore.hasExplicitStorage()) {
+      // Fresh install: keep the Documents/Kiwix default instead of an app-specific directory.
+      kiwixDataStore.setAppDirectoryMigrated(true)
+    } else if (!kiwixDataStore.isAppDirectoryMigrated.first()) {
       val storagePath =
         storageDeviceProvider
           .getWritableStorage()

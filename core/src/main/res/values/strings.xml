@@ -455,4 +455,21 @@
   <string name="shortcut_name_label">Shortcut name</string>
   <string name="open_xiaomi_settings">Open Settings</string>
   <string name="xiaomi_permission_required">This device requires shortcut permission to be granted before adding a shortcut to the home screen. Please grant the permission in settings.</string>
+  <string name="library_folder_title">Library folder</string>
+  <string name="library_folder_summary">Books are kept in %1$s, also after uninstalling Kiwix. Tap to choose another folder.</string>
+  <string name="library_folder_app_specific_summary">Books are kept in app storage and are deleted when Kiwix is uninstalled. Tap to choose a folder.</string>
+  <string name="choose_library_folder">Choose folder…</string>
+  <string name="restore_library_title">Restore your library</string>
+  <string name="restore_library_summary">Allow Kiwix to read %1$s again to get your books back.</string>
+  <string name="library_folder_access_denied">Kiwix could not get access to this folder.</string>
+  <string name="library_folder_books_added">Books added to the library: %1$d</string>
+  <string name="move_books_title">Keep your books after uninstall?</string>
+  <string name="move_books_message">Books in app storage (count: %1$d, size: %2$s) are deleted when Kiwix is uninstalled. Move them to %3$s?</string>
+  <string name="move_books_action">Move</string>
+  <string name="not_now">Not now</string>
+  <string name="moving_books_progress">Moving books: %1$d of %2$d</string>
+  <string name="move_books_done">Books moved: %1$d</string>
+  <string name="move_books_failed">Some books could not be moved: %1$d</string>
+  <string name="unknown_free_space">Unknown</string>
+  <string name="file_too_large_for_folder">This folder cannot store files larger than 4 GB. Choose another folder.</string>
 </resources>
