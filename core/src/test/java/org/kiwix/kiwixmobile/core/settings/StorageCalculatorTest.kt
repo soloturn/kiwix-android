@@ -18,12 +18,17 @@
 
 package org.kiwix.kiwixmobile.core.settings
 
+import android.net.Uri
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.kiwix.kiwixmobile.core.R
+import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.sharedFunctions.MainDispatcherRule
 import java.io.File
 
@@ -31,8 +36,32 @@ internal class StorageCalculatorTest {
   @RegisterExtension
   @JvmField
   val mainDispatcherRule = MainDispatcherRule()
-  private val storageCalculator = StorageCalculator(mockk(), mainDispatcherRule.dispatcher)
+  private val libraryFolder: LibraryFolder = mockk {
+    coEvery { activeTreeUri() } returns null
+  }
+  private val kiwixDataStore: KiwixDataStore = mockk(relaxed = true)
+  private val storageCalculator =
+    StorageCalculator(kiwixDataStore, mainDispatcherRule.dispatcher, libraryFolder)
   private val file: File = mockk()
+
+  @Test
+  fun `library folder free space comes from its volume`() = runTest {
+    val tree: Uri = mockk()
+    coEvery { libraryFolder.activeTreeUri() } returns tree
+    every { libraryFolder.availableBytes(tree) } returns 2048L
+    assertThat(storageCalculator.availableBytes()).isEqualTo(2048L)
+    assertThat(storageCalculator.calculateAvailableSpace()).isEqualTo("2 KB")
+  }
+
+  @Test
+  fun `unknown library folder volume does not block and is shown as unknown`() = runTest {
+    val tree: Uri = mockk()
+    coEvery { libraryFolder.activeTreeUri() } returns tree
+    every { libraryFolder.availableBytes(tree) } returns null
+    every { kiwixDataStore.context.getString(R.string.unknown_free_space) } returns "Unknown"
+    assertThat(storageCalculator.availableBytes()).isEqualTo(Long.MAX_VALUE)
+    assertThat(storageCalculator.calculateAvailableSpace()).isEqualTo("Unknown")
+  }
 
   @Test
   fun `calculate available space with existing file`() =
