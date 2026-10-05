@@ -43,6 +43,7 @@ import org.kiwix.libkiwix.Library
 import org.kiwix.libkiwix.Manager
 import org.kiwix.sharedFunctions.TestApplication
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -66,7 +67,9 @@ class LibkiwixBookmarksTest {
 
   @Before
   fun setUp() {
+    every { kiwixDataStore.context } returns RuntimeEnvironment.getApplication()
     coEvery { kiwixDataStore.defaultStorage() } returns temporaryFolder.root.path
+    coEvery { libkiwixBookOnDisk.getBooks() } returns emptyList()
     every { library.booksIds } returns arrayOf(FIRST_BOOK_ID, SECOND_BOOK_ID)
     every { library.getBookById(FIRST_BOOK_ID) } returns book(FIRST_BOOK_ID)
     every { library.getBookById(SECOND_BOOK_ID) } returns book(SECOND_BOOK_ID)

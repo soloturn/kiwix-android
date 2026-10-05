@@ -55,7 +55,7 @@ import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.utils.TAG_KIWIX
 import java.io.BufferedReader
 import java.io.File
-import java.io.FileInputStream
+import java.io.FileDescriptor
 import java.io.FileNotFoundException
 import java.io.IOException
 
@@ -987,7 +987,9 @@ object FileUtils {
       val assetFileDescriptor = context.contentResolver.openAssetFileDescriptor(uri, "r")
       // Verify whether libkiwix can successfully open this file descriptor or not.
       return if (
-        isFileDescriptorCanOpenWithLibkiwix(assetFileDescriptor?.parcelFileDescriptor?.fd)
+        isFileDescriptorCanOpenWithLibkiwix(
+          assetFileDescriptor?.parcelFileDescriptor?.fileDescriptor
+        )
       ) {
         assetFileDescriptor?.let(::listOf)
       } else {
@@ -1004,19 +1006,14 @@ object FileUtils {
     }
   }
 
+  /**
+   * Whether [fd] is a live descriptor libkiwix can be handed. Checks validity directly
+   * ([FileDescriptor.valid]) rather than by re-opening it through `/dev/fd/<n>` — that path
+   * previously used (see https://github.com/kiwix/kiwix-android/pull/3636) fails with EACCES
+   * for descriptors from another process's content provider (e.g. a SAF folder), since
+   * self-fd re-opening is blocked across process/SELinux domains even for a fully usable fd.
+   */
   @JvmStatic
-  fun isFileDescriptorCanOpenWithLibkiwix(fdNumber: Int?): Boolean =
-    try {
-      // Attempt to create a FileInputStream object using the specified path.
-      // Since libkiwix utilizes this path to create the archive object internally,
-      // it is crucial to verify if we can successfully read the file descriptor (fd)
-      // via the given file path before passing it to libkiwix.
-      // This precaution helps prevent runtime crashes.
-      // For more details, refer to https://github.com/kiwix/kiwix-android/pull/3636.
-      FileInputStream("dev/fd/$fdNumber")
-      true
-    } catch (ignore: Exception) {
-      ignore.printStackTrace()
-      false
-    }
+  fun isFileDescriptorCanOpenWithLibkiwix(fd: FileDescriptor?): Boolean =
+    fd?.valid() == true
 }
