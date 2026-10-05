@@ -19,21 +19,28 @@
 package org.kiwix.kiwixmobile.settings
 
 import android.app.Application
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import eu.mhutti1.utils.storage.StorageDevice
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
+import org.kiwix.kiwixmobile.core.StorageObserver
 import org.kiwix.kiwixmobile.core.ThemeConfig
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.data.DataSource
 import org.kiwix.kiwixmobile.core.settings.StorageCalculator
+import org.kiwix.kiwixmobile.core.settings.viewmodel.Action.ShowToast
 import org.kiwix.kiwixmobile.core.settings.viewmodel.CoreSettingsViewModel
+import org.kiwix.kiwixmobile.core.settings.viewmodel.CoreSettingsViewModel.LibraryFolderState
 import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
 import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import javax.inject.Inject
 
 @Suppress("LongParameterList")
@@ -46,7 +53,9 @@ class KiwixSettingsViewModel @Inject constructor(
   themeConfig: ThemeConfig,
   libkiwixBookmarks: LibkiwixBookmarks,
   kiwixPermissionChecker: KiwixPermissionChecker,
-  storageDeviceProvider: StorageDeviceProvider
+  storageDeviceProvider: StorageDeviceProvider,
+  private val libraryFolder: LibraryFolder,
+  private val storageObserver: StorageObserver
 ) : CoreSettingsViewModel(
     context,
     kiwixDataStore,
@@ -71,11 +80,48 @@ class KiwixSettingsViewModel @Inject constructor(
     setUpStoragePreference()
   }
 
-  private fun setUpStoragePreference() {
+  private suspend fun setUpStoragePreference() {
     settingsUiState.value =
       settingsUiState.value.copy(storageDeviceList = emptyList())
     settingsUiState.value =
-      settingsUiState.value.copy(storageDeviceList = storageDeviceList)
+      settingsUiState.value.copy(
+        storageDeviceList = storageDeviceList,
+        libraryFolder = libraryFolderState()
+      )
+  }
+
+  private suspend fun libraryFolderState(): LibraryFolderState {
+    val summary = when (val kind = libraryFolder.current()) {
+      is LibraryFolder.Kind.Tree ->
+        context.getString(R.string.library_folder_summary, libraryFolder.describe(kind.treeUri))
+
+      is LibraryFolder.Kind.PublicDocuments ->
+        context.getString(
+          R.string.library_folder_summary,
+          "${Environment.DIRECTORY_DOCUMENTS}/${LibraryFolder.KIWIX_DIRECTORY}"
+        )
+
+      is LibraryFolder.Kind.AppSpecific ->
+        context.getString(R.string.library_folder_app_specific_summary)
+    }
+    val restoreSummary = libraryFolder.savedTreeUri()
+      ?.takeIf { libraryFolder.needsAccessRestore() }
+      ?.let { context.getString(R.string.restore_library_summary, libraryFolder.describe(it)) }
+    return LibraryFolderState(summary, restoreSummary)
+  }
+
+  override suspend fun libraryFolderPickerUri(): Uri = libraryFolder.pickerInitialUri()
+
+  override fun onLibraryFolderPicked(treeUri: Uri) {
+    viewModelScope.launch {
+      if (!libraryFolder.onTreePicked(treeUri)) {
+        sendAction(ShowToast(context.getString(R.string.library_folder_access_denied)))
+        return@launch
+      }
+      setUpStoragePreference()
+      val added = storageObserver.syncLibraryTree()
+      sendAction(ShowToast(context.getString(R.string.library_folder_books_added, added)))
+    }
   }
 
   override suspend fun showExternalLinksPreference() {

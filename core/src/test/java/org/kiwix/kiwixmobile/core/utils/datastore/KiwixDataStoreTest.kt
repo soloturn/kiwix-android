@@ -21,6 +21,7 @@ package org.kiwix.kiwixmobile.core.utils.datastore
 import android.content.Context
 import android.content.ContextWrapper
 import android.os.Build
+import android.os.Environment
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
@@ -66,23 +67,19 @@ class KiwixDataStoreTest {
     kiwixDataStore = KiwixDataStore(context, mainDispatcherRule.dispatcher)
   }
 
-  private fun expectedDefaultPublicStorage(storageContext: Context): String {
-    val defaultPublicStorage =
-      ContextWrapper(storageContext).externalMediaDirs.firstOrNull()?.path
-        ?: storageContext.filesDir.path
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      defaultPublicStorage
-    } else {
-      defaultPublicStorage.substringBefore("/Android")
-    }
-  }
+  // From Android 10 the default library is public Documents (books go to Documents/Kiwix).
+  private fun expectedDefaultPublicStorage(storageContext: Context): String =
+    File(
+      storageContext.getExternalFilesDirs(null).first().parentFile!!.parentFile!!
+        .parentFile!!.parentFile,
+      Environment.DIRECTORY_DOCUMENTS
+    ).path
 
   private suspend fun storageAwareDataStore(): Pair<Context, KiwixDataStore> {
     val storageContext = object : ContextWrapper(context) {
-      private val externalMediaDir = File(filesDir, "test-external-media").apply { mkdirs() }
-      private val externalFilesDir = File(filesDir, "test-external-files").apply { mkdirs() }
+      private val externalFilesDir =
+        File(filesDir, "storage/Android/data/test-package/files").apply { mkdirs() }
 
-      override fun getExternalMediaDirs(): Array<File> = arrayOf(externalMediaDir)
       override fun getExternalFilesDirs(type: String?): Array<File> = arrayOf(externalFilesDir)
     }
     storageContext.kiwixDataStore.edit { it.clear() }
@@ -748,13 +745,55 @@ class KiwixDataStoreTest {
   }
 
   @Test
-  fun `selectedStorage stores default path on first read`() = runTest {
+  fun `selectedStorage defaults to public documents without persisting it`() = runTest {
     val (storageContext, storageDataStore) = storageAwareDataStore()
 
     val selectedStorage = storageDataStore.selectedStorage.first()
 
     assertThat(selectedStorage).isEqualTo(expectedDefaultPublicStorage(storageContext))
+    assertThat(storageContext.kiwixDataStore.data.first()[PreferencesKeys.PREF_STORAGE]).isNull()
+    assertThat(storageDataStore.hasExplicitStorage()).isFalse()
+  }
+
+  @Test
+  @Config(sdk = [Build.VERSION_CODES.P])
+  fun `below Q without write permission the default stays public documents`() = runTest {
+    val (storageContext, storageDataStore) = storageAwareDataStore()
+    assertThat(storageDataStore.selectedStorage.first())
+      .isEqualTo(expectedDefaultPublicStorage(storageContext))
+  }
+
+  @Test
+  fun `selectedStorage moves an empty legacy app folder to public documents`() = runTest {
+    val (storageContext, storageDataStore) = storageAwareDataStore()
+    val legacyDirectory = File(tempFolder.root, "Android/media/com.github.soloturn.kiwix")
+      .apply { mkdirs() }
+    storageDataStore.setSelectedStorage(legacyDirectory.absolutePath)
+
+    assertThat(storageDataStore.selectedStorage.first())
+      .isEqualTo(expectedDefaultPublicStorage(storageContext))
     assertThat(storageContext.kiwixDataStore.data.first()[PreferencesKeys.PREF_STORAGE])
+      .isEqualTo(expectedDefaultPublicStorage(storageContext))
+  }
+
+  @Test
+  fun `selectedStorage keeps legacy app folder when it contains an epub`() = runTest {
+    val (_, storageDataStore) = storageAwareDataStore()
+    val legacyDirectory = File(tempFolder.root, "Android/media/com.github.soloturn.kiwix")
+      .apply { mkdirs() }
+    File(legacyDirectory, "book.EPUB").createNewFile()
+    storageDataStore.setSelectedStorage(legacyDirectory.absolutePath)
+
+    assertThat(storageDataStore.selectedStorage.first()).isEqualTo(legacyDirectory.absolutePath)
+  }
+
+  @Test
+  @Config(sdk = [Build.VERSION_CODES.P])
+  fun `below Q with write permission the default is public documents`() = runTest {
+    org.robolectric.Shadows.shadowOf(context as android.app.Application)
+      .grantPermissions(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    val (storageContext, storageDataStore) = storageAwareDataStore()
+    assertThat(storageDataStore.selectedStorage.first())
       .isEqualTo(expectedDefaultPublicStorage(storageContext))
   }
 
