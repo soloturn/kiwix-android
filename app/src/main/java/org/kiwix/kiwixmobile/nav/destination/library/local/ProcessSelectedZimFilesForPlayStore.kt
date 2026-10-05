@@ -46,6 +46,7 @@ import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils.isSplittedZimFile
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.nav.destination.library.CopyMoveFileHandler
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
 import java.io.File
@@ -159,23 +160,26 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
       return
     }
 
+    // Files inside the granted library folder are read in place; copying them would only
+    // duplicate them.
+    val libraryDocument = LibraryFolder.documentInGrantedTree(context.contentResolver, uri)
     // If the file is already in one of the app's public directories,
     // open it directly without copying/moving.
-    val existingFile = getExistingFileInAppDirectory(documentFile)
-    if (existingFile != null) {
-      validateAndOpenZimInReader(existingFile)
-      return
+    val existingFile =
+      if (libraryDocument == null) getExistingFileInAppDirectory(documentFile) else null
+    when {
+      libraryDocument != null -> openLibraryDocument(libraryDocument)
+      existingFile != null -> validateAndOpenZimInReader(existingFile)
+      else -> copyMoveFileHandler.showMoveFileToPublicDirectoryDialog(
+        storageDeviceProvider.getWritableStorage(),
+        uri,
+        documentFile,
+        // pass if fileName is null then we will validate it after copying/moving
+        fileName == null,
+        multipleFilesProcessAction,
+        isSingleFileSelected
+      )
     }
-
-    copyMoveFileHandler.showMoveFileToPublicDirectoryDialog(
-      storageDeviceProvider.getWritableStorage(),
-      uri,
-      documentFile,
-      // pass if fileName is null then we will validate it after copying/moving
-      fileName == null,
-      multipleFilesProcessAction,
-      isSingleFileSelected
-    )
   }
 
   /**
@@ -363,6 +367,16 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
         selectedZimFileCallback?.addBookToLibkiwixBookOnDisk(file)
         processSelectedFiles(selectedZimFileUriList.drop(ONE), true)
       }
+    }
+  }
+
+  private suspend fun openLibraryDocument(documentUri: Uri) {
+    if (isSingleFileSelected) {
+      selectedZimFileCallback?.openLibraryDocument(documentUri, openInReader = true)
+      multipleFilesProcessAction = null
+    } else {
+      selectedZimFileCallback?.openLibraryDocument(documentUri, openInReader = false)
+      processSelectedFiles(selectedZimFileUriList.drop(ONE), true)
     }
   }
 

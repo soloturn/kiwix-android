@@ -23,6 +23,7 @@ import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.app.Application
 import android.content.Intent
 import android.net.ConnectivityManager
+import android.net.Uri
 import android.provider.Settings
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
@@ -58,6 +59,7 @@ import org.kiwix.kiwixmobile.core.data.remote.KiwixService.Companion.ITEMS_PER_P
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.downloader.Downloader
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
+import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.ui.components.ONE
 import org.kiwix.kiwixmobile.core.utils.BookUtils
 import org.kiwix.kiwixmobile.core.utils.EXTERNAL_SELECT_POSITION
@@ -69,6 +71,7 @@ import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
 import org.kiwix.kiwixmobile.core.utils.files.Log
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.core.zim_manager.ConnectivityObserver
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
@@ -139,7 +142,8 @@ class OnlineLibraryViewModel @Inject constructor(
   private val refreshLibraryAction: ResolveRefreshLibraryAction,
   private val observeNetworkState: ObserveNetworkState,
   private val storageDeviceProvider: StorageDeviceProvider,
-  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
+  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  private val libraryFolder: LibraryFolder
 ) : ViewModel() {
   data class OnlineLibraryRequest(
     val query: String? = null,
@@ -666,9 +670,22 @@ class OnlineLibraryViewModel @Inject constructor(
         storageCalculator = availableSpaceCalculator.storageCalculator,
         kiwixDataStore = kiwixDataStore,
         shouldShowCheckboxSelected = showCheckboxSelected,
-        onSelectAction = { onStorageDeviceClick(it) }
+        onSelectAction = { onStorageDeviceClick(it) },
+        folderPickerInitialUri = libraryFolder.pickerInitialUri(),
+        onFolderPicked = ::onLibraryFolderPicked
       )
       sendUiEvent(SideEffects(UISideEffects.StorageSelectionDialog(dialogConfig)))
+    }
+  }
+
+  private fun onLibraryFolderPicked(treeUri: Uri) {
+    viewModelScope.launch {
+      if (libraryFolder.onTreePicked(treeUri)) {
+        kiwixDataStore.setShowStorageOption(false)
+        downloadBookItem?.let { onBookItemClick(it) }
+      } else {
+        context.toast(context.getString(R.string.library_folder_access_denied))
+      }
     }
   }
 
