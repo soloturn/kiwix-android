@@ -2,6 +2,14 @@ import com.slack.keeper.optInToKeeper
 import plugin.KiwixConfigurationPlugin
 import plugin.RenameTarakFileTask
 import plugin.TrackedFileRestoreRegistrar
+import java.text.SimpleDateFormat
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 plugins {
   android
@@ -16,7 +24,27 @@ plugins.apply(KiwixConfigurationPlugin::class)
 
 apply(from = rootProject.file("jacoco.gradle"))
 
-fun generateVersionName() = "${Config.versionMajor}.${Config.versionMinor}.${Config.versionPatch}"
+// Personal build only: a build-timestamp + git-hash version, so every build is
+// its own distinct, always-increasing version — no same-day rebuild ever
+// shares a version with another, which a date-only scheme could.
+fun buildTimestamp() = SimpleDateFormat("yyMMddHHmm", Locale.ROOT).apply {
+  timeZone = TimeZone.getTimeZone("UTC")
+}.format(Date())
+
+fun gitShortHash(): String = providers.exec {
+  commandLine("git", "rev-parse", "--short=7", "HEAD")
+}.standardOutput.asText.get().trim()
+
+fun generateVersionName() = "${buildTimestamp()}-${gitShortHash()}"
+
+fun generateVersionCode(): Int {
+  val epoch = LocalDateTime.of(2024, 1, 1, 0, 0).toInstant(ZoneOffset.UTC)
+  val minutesSinceEpoch = Duration.between(epoch, Instant.now()).toMinutes()
+  // Offset clears the old day-based*abi-prefixed scheme's historical ceiling
+  // (abiCode 1-7 * 1_000_000 + up to 999_999, so under 8_000_000) with a wide
+  // margin, so this is always a higher (never-downgrading) version code.
+  return (100_000_000L + minutesSinceEpoch).toInt()
+}
 
 val apkPrefix get() = System.getenv("TAG") ?: "kiwix"
 // Project.properties (Map) is deprecated (removed in Gradle 10); providers.gradleProperty
@@ -41,7 +69,7 @@ android {
   defaultConfig {
     resValue("string", "app_name", "Kiwix")
     resValue("string", "app_search_string", "Search Kiwix")
-    versionCode = "".getVersionCode()
+    versionCode = generateVersionCode()
     versionName = generateVersionName()
     manifestPlaceholders["permission"] = "android.permission.MANAGE_EXTERNAL_STORAGE"
     testInstrumentationRunner = "org.kiwix.kiwixmobile.testutils.HiltTestRunner"
@@ -161,7 +189,7 @@ tasks.register("generateVersionCodeAndName") {
   val file = File("VERSION_INFO")
   if (!file.exists()) file.createNewFile()
   file.printWriter().use {
-    it.print("${generateVersionName()}\n7${"".getVersionCode()}")
+    it.print("${generateVersionName()}\n7${generateVersionCode()}")
   }
 }
 
