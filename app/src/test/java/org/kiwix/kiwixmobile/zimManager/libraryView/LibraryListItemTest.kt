@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadModel
 import org.kiwix.kiwixmobile.core.downloader.model.Seconds
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
-import org.kiwix.kiwixmobile.zimManager.Fat32Checker.Companion.FOUR_GIGABYTES_IN_KILOBYTES
+import org.kiwix.kiwixmobile.zimManager.Fat32Checker.Companion.FOUR_GIGABYTES_IN_BYTES
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.CanWrite4GbFile
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.CannotWrite4GbFile
@@ -75,7 +75,7 @@ internal class LibraryListItemTest {
 
   @Test
   internal fun `Unknown file system state greater than 4GB can't be downloaded`() {
-    every { book.size } returns (FOUR_GIGABYTES_IN_KILOBYTES + 1).toString()
+    every { book.size } returns (FOUR_GIGABYTES_IN_BYTES + 1).toString()
     assertThat(canBeDownloaded(book, DetectingFileSystem)).isFalse
   }
 
@@ -92,7 +92,7 @@ internal class LibraryListItemTest {
 
   @Test
   internal fun `CannotWrite4GbFile file system state cannot be downloaded if file is too big`() {
-    every { book.size } returns (FOUR_GIGABYTES_IN_KILOBYTES + 1).toString()
+    every { book.size } returns (FOUR_GIGABYTES_IN_BYTES + 1).toString()
     assertThat(canBeDownloaded(book, CannotWrite4GbFile)).isFalse
   }
 
