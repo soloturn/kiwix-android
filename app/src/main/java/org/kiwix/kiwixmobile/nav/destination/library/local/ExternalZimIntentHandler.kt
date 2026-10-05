@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.LibkiwixBookFactory
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
@@ -179,6 +180,16 @@ class ExternalZimIntentHandler @Inject constructor(
           }
       }.onFailure {
         Log.e("ExternalZimIntentHandler", "Failed to save book: ${file.path}", it)
+      }
+    }
+  }
+
+  override fun openLibraryDocument(documentUri: Uri, openInReader: Boolean) {
+    val activity = requireMainActivity()
+    requireLifecycleScope().launch(ioDispatcher) {
+      activity.libkiwixBookOnDisk.insertUriBook(documentUri)
+      if (openInReader) {
+        withContext(mainDispatcher) { activity.openZimFromFilePath("$documentUri") }
       }
     }
   }

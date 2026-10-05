@@ -19,11 +19,13 @@
 package org.kiwix.kiwixmobile.webserver
 
 import android.content.Context
+import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
+import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils.getDemoFilePathForBrandedApp
 import org.kiwix.kiwixmobile.core.utils.files.Log
 import org.kiwix.libkiwix.Book
@@ -39,9 +41,11 @@ private const val TAG = "KiwixServer"
 // is working on. See https://github.com/kiwix/java-libkiwix/issues/51
 // Suppressing the detekt not to show the error for the `library` object for being unused.
 @Suppress("UnusedPrivateProperty")
-class KiwixServer @Inject constructor(
+class KiwixServer(
   private val library: Library,
-  private val jniKiwixServer: Server
+  private val jniKiwixServer: Server,
+  // URI-backed books keep their descriptors open for as long as they are served.
+  private val openedSources: List<ZimReaderSource> = emptyList()
 ) {
   class Factory @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -52,6 +56,7 @@ class KiwixServer @Inject constructor(
     suspend fun createKiwixServer(selectedBooksPath: ArrayList<String>): KiwixServer =
       withContext(ioDispatcher) {
         val kiwixLibrary = Library()
+        val openedSources = mutableListOf<ZimReaderSource>()
         selectedBooksPath.forEach { path ->
           try {
             val book =
@@ -69,6 +74,11 @@ class KiwixServer @Inject constructor(
                       startOffset,
                       size
                     )
+                  } else if (path.startsWith("content://")) {
+                    // Books in a SAF library folder are opened through descriptors.
+                    ZimReaderSource(path.toUri()).also(openedSources::add)
+                      .createArchive(ioDispatcher)
+                      ?: throw IllegalStateException("Cannot open $path")
                   } else {
                     // For regular files, create an Archive from the file path
                     Archive(path)
@@ -85,7 +95,7 @@ class KiwixServer @Inject constructor(
             )
           }
         }
-        return@withContext KiwixServer(kiwixLibrary, Server(kiwixLibrary))
+        return@withContext KiwixServer(kiwixLibrary, Server(kiwixLibrary), openedSources)
       }
   }
 
@@ -103,5 +113,8 @@ class KiwixServer @Inject constructor(
     return jniKiwixServer.start()
   }
 
-  fun stopServer() = jniKiwixServer.stop()
+  fun stopServer() {
+    jniKiwixServer.stop()
+    openedSources.forEach(ZimReaderSource::releaseDescriptors)
+  }
 }

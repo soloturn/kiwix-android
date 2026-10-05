@@ -31,6 +31,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.Environment.DIRECTORY_DOWNLOADS
+import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.os.storage.StorageVolume
 import android.provider.DocumentsContract
@@ -55,6 +56,7 @@ import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.utils.TAG_KIWIX
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileDescriptor
 import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -987,7 +989,9 @@ object FileUtils {
       val assetFileDescriptor = context.contentResolver.openAssetFileDescriptor(uri, "r")
       // Verify whether libkiwix can successfully open this file descriptor or not.
       return if (
-        isFileDescriptorCanOpenWithLibkiwix(assetFileDescriptor?.parcelFileDescriptor?.fd)
+        assetFileDescriptor?.let {
+          isFileDescriptorCanOpenWithLibkiwix(it.parcelFileDescriptor.fileDescriptor)
+        } == true
       ) {
         assetFileDescriptor?.let(::listOf)
       } else {
@@ -1004,19 +1008,31 @@ object FileUtils {
     }
   }
 
+  /**
+   * Checks the descriptor directly, then verifies it is readable without disturbing the
+   * caller's descriptor. Reopening `/dev/fd/<n>` fails for some SAF content-provider fds.
+   */
   @JvmStatic
-  fun isFileDescriptorCanOpenWithLibkiwix(fdNumber: Int?): Boolean =
-    try {
-      // Attempt to create a FileInputStream object using the specified path.
-      // Since libkiwix utilizes this path to create the archive object internally,
-      // it is crucial to verify if we can successfully read the file descriptor (fd)
-      // via the given file path before passing it to libkiwix.
-      // This precaution helps prevent runtime crashes.
-      // For more details, refer to https://github.com/kiwix/kiwix-android/pull/3636.
-      FileInputStream("dev/fd/$fdNumber")
+  fun isFileDescriptorCanOpenWithLibkiwix(fileDescriptor: FileDescriptor?): Boolean {
+    if (fileDescriptor?.valid() != true) {
+      return false
+    }
+    return try {
+      // Verify the fd is actually readable before handing it to libkiwix, to prevent
+      // runtime crashes. dup() it first so this check doesn't disturb the file position
+      // of the fd the caller is about to pass on, and don't reopen it by path - some
+      // Android content-provider fds reject that reopen with EACCES even though the fd
+      // itself is perfectly readable. For more details, see
+      // https://github.com/kiwix/kiwix-android/pull/3636.
+      // dup(FileDescriptor) never returns null -- it throws IOException on failure --
+      // so a plain try/catch around it is all the null-handling this needs.
+      ParcelFileDescriptor.dup(fileDescriptor).use { duped ->
+        FileInputStream(duped.fileDescriptor).use { it.read(ByteArray(1)) }
+      }
       true
     } catch (ignore: Exception) {
       ignore.printStackTrace()
       false
     }
+  }
 }

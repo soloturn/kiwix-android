@@ -18,8 +18,11 @@
 
 package org.kiwix.kiwixmobile.core.dao
 
+import android.net.Uri
 import android.os.Build
 import android.os.FileObserver
+import android.provider.DocumentsContract
+import androidx.core.net.toUri
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,10 +53,13 @@ import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.utils.files.Log
+import org.kiwix.kiwixmobile.core.utils.files.UserDataFiles
+import org.kiwix.kiwixmobile.core.utils.files.saf.DocumentTree
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.libkiwix.Book
 import org.kiwix.libkiwix.Library
 import org.kiwix.libkiwix.Manager
+import org.kiwix.libzim.Archive
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -213,34 +219,47 @@ class LibkiwixBookOnDisk @Inject constructor(
     }?.let { delete(it.id) }
   }
 
-  private suspend fun localBookFolderPath(): String =
-    if (Build.DEVICE.contains("generic")) {
-      // Workaround for emulators: Emulators have limited memory and
-      // restrictions on creating folders, so we will use the default
-      // path for saving the bookmark file.
-      kiwixDataStore.context.filesDir.path
-    } else {
-      "${kiwixDataStore.defaultStorage()}/ZIMFiles/"
-    }
+  private val uriBookIndex by lazy {
+    UriBookIndex(
+      UserDataFiles.internalFile(
+        kiwixDataStore.context,
+        UserDataFiles.LOCAL_LIBRARY_DIR,
+        UriBookIndex.FILE_NAME
+      )
+    )
+  }
 
-  private suspend fun libraryFile(): File =
-    File("${localBookFolderPath()}/library.xml")
+  private fun libraryFile(): File =
+    UserDataFiles.internalFile(
+      kiwixDataStore.context,
+      UserDataFiles.LOCAL_LIBRARY_DIR,
+      UserDataFiles.LIBRARY_FILE
+    )
 
   private suspend fun ensureInitialized() {
     if (isManagerInitialized) return
     initMutex.withLock {
       if (isManagerInitialized) return@withLock true
       withContext(ioDispatcher) {
-        // Check if ZIM files folder exist if not then create the folder first.
-        val folder = File(localBookFolderPath())
-        if (!folder.isFileExist(ioDispatcher)) folder.mkdirs()
-        check(folder.exists()) { "Could not create ZIM files folder: ${folder.path}" }
-        // Check if library file exist if not then create the file to save the library with book information.
-        val libraryXmlFile = libraryFile()
-        if (!libraryXmlFile.isFileExist(ioDispatcher)) libraryXmlFile.createNewFile()
-        check(libraryXmlFile.exists()) { "Could not create library file: ${libraryXmlFile.path}" }
-        // set up manager to read the library from this file
-        manager.readFile(libraryXmlFile.canonicalPath)
+        val libraryFile = libraryFile()
+        val legacyLibrary = UserDataFiles.migrationSource(
+          kiwixDataStore.context,
+          UserDataFiles.LOCAL_LIBRARY_DIR,
+          UserDataFiles.LIBRARY_FILE
+        )
+        val folder = libraryFile.parentFile
+        folder?.mkdirs()
+        check(folder?.exists() == true) { "Could not create library folder: ${folder?.path}" }
+        if (legacyLibrary != null) {
+          // Read through libkiwix rather than copying: book paths are stored relative to the
+          // library file, so a byte copy would point them at the wrong place.
+          manager.readFile(legacyLibrary.canonicalPath)
+          library.writeToFile(libraryFile.canonicalPath)
+        } else {
+          if (!libraryFile.isFileExist(ioDispatcher)) libraryFile.createNewFile()
+          check(libraryFile.exists()) { "Could not create library file: ${libraryFile.path}" }
+          manager.readFile(libraryFile.canonicalPath)
+        }
         isManagerInitialized = true
       }
     }
@@ -268,17 +287,95 @@ class LibkiwixBookOnDisk @Inject constructor(
       val booksIds = library.booksIds.toList()
       libraryBooksList = booksIds
       // Create a list to store LibkiwixBook objects.
-      localBooksList =
+      val libkiwixBooks =
         booksIds.mapNotNull { bookId ->
           val book = library.getBookById(bookId)
-          return@mapNotNull LibkiwixBook(book).also {
-            // set the books change to false to avoid reloading the data from libkiwix
-            booksChanged = false
-          }
+          return@mapNotNull LibkiwixBook(book)
         }
+      val libkiwixIds = booksIds.toSet()
+      localBooksList = libkiwixBooks + uriBookIndex.all().filterNot { it.id in libkiwixIds }
+      // set the books change to false to avoid reloading the data from libkiwix
+      booksChanged = false
 
       return@withContext localBooksList.distinctBy(LibkiwixBook::path)
     }
+
+  /**
+   * Adds a book that can only be read through [uri] (a document in the user's SAF library
+   * folder, or a MediaStore row). Returns the stored book, or null if [uri] is not a valid ZIM.
+   */
+  suspend fun insertUriBook(uri: Uri): LibkiwixBook? = withContext(ioDispatcher) {
+    ensureInitialized()
+    val book = readUriBook(uri) ?: return@withContext null
+    val sameBookAsFile = book.id.takeIf { it in library.booksIds }
+      ?.let(library::getBookById)
+      ?.let(::LibkiwixBook)
+      ?.takeIf { it.zimReaderSource.exists(ioDispatcher) }
+    // Direct file access is cheaper than a descriptor per book, so a readable file entry wins.
+    sameBookAsFile ?: book.also {
+      uriBookIndex.put(it)
+      booksChanged = true
+      updateLocalBooksFlow()
+    }
+  }
+
+  private suspend fun readUriBook(uri: Uri): LibkiwixBook? {
+    val source = ZimReaderSource(uri)
+    return runCatching {
+      source.createArchive(ioDispatcher)?.let { archive ->
+        try {
+          LibkiwixBook(Book().apply { update(archive) }).apply { path = "$uri" }
+        } finally {
+          archive.dispose()
+        }
+      }
+    }.onFailure { Log.e(TAG, "Could not read $uri: $it") }
+      .getOrNull()
+      .also { source.releaseDescriptors() }
+  }
+
+  /** Adds the ZIM at [path], or at [path] as content:// URI, to the library. */
+  suspend fun insertLocation(path: String) {
+    if (path.startsWith("content://")) {
+      insertUriBook(path.toUri())
+    } else {
+      withContext(ioDispatcher) {
+        val archive = Archive(path)
+        try {
+          insert(listOf(Book().apply { update(archive) }))
+        } finally {
+          archive.dispose()
+        }
+      }
+    }
+  }
+
+  /** Deletes the document(s) behind a URI book, including split parts, then forgets it. */
+  suspend fun deleteUriBook(bookId: String, uri: Uri): Boolean = withContext(ioDispatcher) {
+    val resolver = kiwixDataStore.context.contentResolver
+    val tree = DocumentTree(resolver)
+    val deleted = if (DocumentTree.isDocumentInTree(uri)) {
+      tree.splitZimParts(uri).map(tree::delete).all { it }
+    } else {
+      runCatching { resolver.delete(uri, null, null) > 0 }.getOrDefault(false)
+    }
+    if (deleted) delete(bookId)
+    deleted
+  }
+
+  /**
+   * URI books are only dropped when we still hold access to their folder. Without a grant
+   * (e.g. after reinstall, before the user re-picks the folder) they are kept so that a
+   * restore brings bookmarks and notes back to the same books.
+   */
+  private fun canVerifyExistence(book: LibkiwixBook): Boolean {
+    val uri = book.zimReaderSource.uri?.takeIf(DocumentTree::isDocumentInTree) ?: return true
+    val treeId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
+    return kiwixDataStore.context.contentResolver.persistedUriPermissions.any { permission ->
+      permission.uri.authority == uri.authority &&
+        runCatching { DocumentsContract.getTreeDocumentId(permission.uri) }.getOrNull() == treeId
+    }
+  }
 
   @OptIn(ExperimentalCoroutinesApi::class)
   fun books() =
@@ -315,7 +412,9 @@ class LibkiwixBookOnDisk @Inject constructor(
         .toSet()
 
       val newBooks = libkiwixBooks.filterNot { book ->
-        book.id in existingBookIds || book.path in existingBookPaths
+        book.id in existingBookIds ||
+          book.path in existingBookPaths ||
+          uriBookIndex.contains(book.id)
       }
       newBooks.forEach { book ->
         runCatching {
@@ -361,7 +460,7 @@ class LibkiwixBookOnDisk @Inject constructor(
   private suspend fun removeBooksThatDoNotExist(
     books: MutableList<LibkiwixBook>
   ) {
-    delete(books.filterNot { it.zimReaderSource.exists(ioDispatcher) })
+    delete(books.filter { canVerifyExistence(it) && !it.zimReaderSource.exists(ioDispatcher) })
   }
 
   // Remove the existing books from database which are showing on the library screen.
@@ -380,6 +479,7 @@ class LibkiwixBookOnDisk @Inject constructor(
       books.forEach {
         library.removeBookById(it.id)
       }
+      uriBookIndex.remove(books.map(LibkiwixBook::id))
     }.onFailure { it.printStackTrace() }
     writeBookMarksAndSaveLibraryToFile()
     updateLocalBooksFlow()
@@ -390,6 +490,7 @@ class LibkiwixBookOnDisk @Inject constructor(
     runCatching {
       ensureInitialized()
       library.removeBookById(bookId)
+      uriBookIndex.remove(listOf(bookId))
       writeBookMarksAndSaveLibraryToFile()
       updateLocalBooksFlow()
       _bookRemoved.tryEmit(Unit)

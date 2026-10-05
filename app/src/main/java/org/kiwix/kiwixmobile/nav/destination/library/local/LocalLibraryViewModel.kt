@@ -77,6 +77,7 @@ import org.kiwix.kiwixmobile.core.utils.effects.ManageExternalFilesPermissionDia
 import org.kiwix.kiwixmobile.core.utils.effects.ReadPermissionRequiredDialog
 import org.kiwix.kiwixmobile.core.utils.files.Log
 import org.kiwix.kiwixmobile.core.utils.files.ScanningProgressListener
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.SelectionMode.MULTI
@@ -482,6 +483,8 @@ class LocalLibraryViewModel @Inject constructor(
     localBooksFromLibkiwix: Flow<List<Book>>,
     scanningProgressListener: ScanningProgressListener
   ): Flow<List<Book>> = flow {
+    // Books in the SAF library folder are added directly; they have no path to return.
+    runCatching { storageObserver.syncLibraryTree() }.onFailure { it.printStackTrace() }
     val scannedBooks = storageObserver.getBooksOnFileSystem(scanningProgressListener).first()
     val daoBookIds = localBooksFromLibkiwix.first().map { it.id }
     emit(removeBooksAlreadyInDao(scannedBooks, daoBookIds))
@@ -771,6 +774,8 @@ class LocalLibraryViewModel @Inject constructor(
   }
 
   private fun takePersistableUriPermission(uri: Uri) {
+    // Per-file grants are capped; files in a granted library folder are covered by its grant.
+    if (LibraryFolder.documentInGrantedTree(context.contentResolver, uri) != null) return
     runCatching {
       context.applicationContext?.contentResolver?.takePersistableUriPermission(
         uri,
@@ -824,6 +829,16 @@ class LocalLibraryViewModel @Inject constructor(
           }
       }.onFailure {
         Log.e("LocalLibraryViewModel", "Failed to save book. Original Exception = ", it)
+      }
+    }
+  }
+
+  override fun openLibraryDocument(documentUri: Uri, openInReader: Boolean) {
+    viewModelScope.launch {
+      if (libkiwixBookOnDisk.insertUriBook(documentUri) == null) {
+        context.toast(string.unable_to_read_zim_file)
+      } else if (openInReader) {
+        sendAction(RequestNavigateTo(ZimReaderSource(documentUri)))
       }
     }
   }

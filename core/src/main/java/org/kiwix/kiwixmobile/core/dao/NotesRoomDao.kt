@@ -73,6 +73,20 @@ abstract class NotesRoomDao : PageDao {
   @Query("DELETE FROM NotesRoomEntity WHERE noteTitle=:noteTitle")
   abstract fun deleteNote(noteTitle: String)
 
+  @Query(
+    "UPDATE NotesRoomEntity SET noteFilePath = :newPrefix || " +
+      "substr(noteFilePath, length(:oldPrefix) + 1) " +
+      "WHERE substr(noteFilePath, 1, length(:oldPrefix)) = :oldPrefix"
+  )
+  abstract fun replaceNoteFilePathPrefix(oldPrefix: String, newPrefix: String): Int
+
+  /** Points notes at a book's new location after it was moved. */
+  @Query(
+    "UPDATE NotesRoomEntity SET zimReaderSource = :newLocation " +
+      "WHERE zimReaderSource = :oldLocation"
+  )
+  abstract fun relocateBook(oldLocation: String, newLocation: String): Int
+
   suspend fun deleteNotes(notesList: List<NoteListItem>, ioDispatcher: CoroutineDispatcher) {
     notesList.forEachIndexed { _, note ->
       val notesRoomEntity = NotesRoomEntity(note)

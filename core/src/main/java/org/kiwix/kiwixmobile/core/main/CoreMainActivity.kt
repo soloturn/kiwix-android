@@ -67,6 +67,7 @@ import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorServ
 import org.kiwix.kiwixmobile.core.error.ErrorActivity
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationResultOnCurrent
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
+import org.kiwix.kiwixmobile.core.main.note.NotesStorageMigrator
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.ReaderIntentManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.selection.WebViewSelectionActionMode
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
@@ -146,6 +147,9 @@ abstract class CoreMainActivity : BaseActivity() {
 
   @Inject
   lateinit var downloadMonitorServiceManager: DownloadMonitorServiceManager
+
+  @Inject
+  lateinit var notesStorageMigrator: NotesStorageMigrator
 
   private var selectionActionModeListener: WebViewSelectionActionMode? = null
 
@@ -243,6 +247,7 @@ abstract class CoreMainActivity : BaseActivity() {
       setAppName()
       setIsBrandedApp()
       createApplicationShortcuts()
+      notesStorageMigrator.migrate()
     }
 
     intent?.let {
