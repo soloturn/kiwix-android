@@ -19,6 +19,7 @@
 package org.kiwix.kiwixmobile.core.utils.files
 
 import android.content.Context
+import android.net.Uri
 import android.provider.MediaStore.Files
 import android.provider.MediaStore.MediaColumns
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,9 +30,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.extensions.forEachRow
 import org.kiwix.kiwixmobile.core.extensions.get
+import org.kiwix.kiwixmobile.core.utils.files.saf.DocumentEntry
+import org.kiwix.kiwixmobile.core.utils.files.saf.DocumentTree
 import java.io.File
 import javax.inject.Inject
 
@@ -55,6 +59,22 @@ class FileSearch @Inject constructor(
     return combine(fileSystemFlow, mediaStoreFlow) { filesSystemFiles, mediaStoreFiles ->
       filesSystemFiles + mediaStoreFiles
     }
+  }
+
+  /**
+   * Finds ZIM files inside a SAF tree the user granted. Unlike [scan] the result is document
+   * URIs, since such files may have no file path we are allowed to open.
+   */
+  suspend fun scanTree(
+    treeUri: Uri,
+    scanningProgressListener: ScanningProgressListener? = null
+  ): List<Uri> = withContext(ioDispatcher) {
+    DocumentTree(context.contentResolver)
+      .findZimFiles(treeUri) { scanned ->
+        // The directory count is only known at the end of a tree walk.
+        scanningProgressListener?.onProgressUpdate(scanned, scanned + 1)
+      }
+      .map(DocumentEntry::uri)
   }
 
   private fun scanMediaStore() =

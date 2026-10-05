@@ -20,6 +20,7 @@ package org.kiwix.kiwixmobile.core.utils
 import android.content.Context
 import android.os.Environment.MEDIA_MOUNTED
 import android.os.Environment.getExternalStorageState
+import org.kiwix.kiwixmobile.core.utils.files.UserDataFiles
 
 object StorageUtils {
   @JvmStatic fun getFileNameFromUrl(url: String?): String =
@@ -29,6 +30,5 @@ object StorageUtils {
   fun isExternalStorageWritable(): Boolean =
     MEDIA_MOUNTED == getExternalStorageState()
 
-  fun getNotesDirectory(context: Context) =
-    context.getExternalFilesDir("").toString() + "/Kiwix/Notes/"
+  fun getNotesDirectory(context: Context) = UserDataFiles.notesDirectory(context)
 }

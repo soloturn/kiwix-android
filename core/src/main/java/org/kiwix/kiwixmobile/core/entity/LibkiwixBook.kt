@@ -138,8 +138,9 @@ data class LibkiwixBook(
       _path = path
     }
 
+  // Books in a user-picked SAF folder carry their content:// URI as path.
   val zimReaderSource: ZimReaderSource
-    get() = ZimReaderSource(File(path.orEmpty()))
+    get() = ZimReaderSource.fromDatabaseValue(path) ?: ZimReaderSource(File(""))
 
   // Two books are equal if their ids match
   override fun equals(other: Any?): Boolean = other is LibkiwixBook && other.id == id
