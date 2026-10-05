@@ -75,7 +75,7 @@ object Versions {
 
   const val androidx_activity: String = "1.9.3"
 
-  const val libkiwix: String = "2.7.0"
+  const val libkiwix: String = "2.7.0-main-solo-a128f0370272"
 
   const val material: String = "1.14.0"
 
@@ -121,7 +121,6 @@ object Versions {
   const val PLAYSTORE_REVIEW: String = "2.0.2"
   const val KOTLIN_KSP: String = "2.3.11"
   const val ANDROIDX_MEDIA3: String = "1.11.0"
-
   /**
    * https://developer.android.com/studio/preview/compose-screenshot-testing-release-notes
    */

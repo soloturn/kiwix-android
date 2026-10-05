@@ -29,9 +29,11 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkAll
+import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -54,6 +56,7 @@ import org.kiwix.kiwixmobile.core.settings.StorageCalculator
 import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.nav.destination.library.CopyMoveFileHandler
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
 import org.kiwix.kiwixmobile.nav.destination.library.local.ProcessSelectedZimFilesForPlayStore
@@ -259,6 +262,34 @@ class ProcessSelectedZimFilesForPlayStoreTest {
       advanceUntilIdle()
 
       verify { activity.toast("Files added to library", any()) }
+    }
+
+  @Test
+  fun `file inside the granted library folder is opened in place without copying`() =
+    testScope.runTest {
+      val uri = createValidUri()
+      val libraryDocument = mockk<Uri>()
+      mockkObject(LibraryFolder.Companion)
+      try {
+        every { LibraryFolder.documentInGrantedTree(any(), uri) } returns libraryDocument
+
+        processSelectedZimFiles.processSelectedFiles(listOf(uri))
+        advanceUntilIdle()
+
+        verify { selectedZimFileCallback.openLibraryDocument(libraryDocument, true) }
+        coVerify(exactly = 0) {
+          copyMoveFileHandler.showMoveFileToPublicDirectoryDialog(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+          )
+        }
+      } finally {
+        unmockkObject(LibraryFolder.Companion)
+      }
     }
 
   @Test

@@ -148,4 +148,7 @@ interface SelectedZimFileCallback {
   fun addBookToLibkiwixBookOnDisk(file: File)
   fun showFileCopyMoveErrorDialog(errorMessage: String, callBack: suspend () -> Unit)
   fun showStorageSelectionDialog(dialogConfig: StorageSelectDialogConfig)
+
+  /** Adds a ZIM that sits in the granted library folder in place, without copying it. */
+  fun openLibraryDocument(documentUri: Uri, openInReader: Boolean)
 }

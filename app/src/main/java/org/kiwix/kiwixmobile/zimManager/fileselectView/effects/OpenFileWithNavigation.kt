@@ -42,6 +42,8 @@ data class OpenFileWithNavigation(
     coroutineScope.launch {
       val canOpenInLibkiwix = withContext(ioDispatcher) {
         zimReaderSource.canOpenInLibkiwix(ioDispatcher)
+          // The reader opens its own source; don't keep this check's descriptor around.
+          .also { zimReaderSource.releaseDescriptors() }
       }
       if (!canOpenInLibkiwix) {
         activity.toast(
