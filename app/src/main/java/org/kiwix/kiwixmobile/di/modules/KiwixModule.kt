@@ -31,6 +31,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.core.zim_manager.MountPointProducer
 import org.kiwix.kiwixmobile.nav.destination.library.local.CopyMoveProgressBarController
 import org.kiwix.kiwixmobile.nav.destination.library.local.CopyMoveProgressBarControllerImpl
@@ -63,12 +64,14 @@ abstract class KiwixModule {
     fun provideFat32Checker(
       kiwixDataStore: KiwixDataStore,
       mountPointProducer: MountPointProducer,
-      @IoDispatcher ioDispatcher: CoroutineDispatcher
+      @IoDispatcher ioDispatcher: CoroutineDispatcher,
+      libraryFolder: LibraryFolder
     ): Fat32Checker =
       Fat32Checker(
         kiwixDataStore,
         listOf(MountFileSystemChecker(mountPointProducer), FileWritingFileSystemChecker()),
-        ioDispatcher
+        ioDispatcher,
+        libraryFolder
       )
 
     @Provides

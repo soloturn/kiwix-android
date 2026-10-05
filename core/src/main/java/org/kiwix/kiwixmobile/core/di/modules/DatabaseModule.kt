@@ -27,6 +27,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.data.KiwixRoomDatabase
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadTargets
 import javax.inject.Singleton
 
 @InstallIn(SingletonComponent::class)
@@ -62,9 +63,11 @@ open class DatabaseModule {
   fun provideDownloadRoomDao(
     db: KiwixRoomDatabase,
     libkiwixBookOnDisk: LibkiwixBookOnDisk,
-    @IoDispatcher ioDispatcher: CoroutineDispatcher
+    @IoDispatcher ioDispatcher: CoroutineDispatcher,
+    downloadTargets: DownloadTargets
   ) = db.downloadRoomDao().also {
     it.libkiwixBookOnDisk = libkiwixBookOnDisk
     it.ioDispatcher = ioDispatcher
+    it.downloadTargets = downloadTargets
   }
 }
