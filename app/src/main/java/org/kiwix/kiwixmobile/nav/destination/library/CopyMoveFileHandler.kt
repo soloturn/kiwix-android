@@ -43,6 +43,8 @@ import org.kiwix.kiwixmobile.core.utils.INTERNAL_SELECT_POSITION
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
+import org.kiwix.kiwixmobile.core.utils.files.isFileTooLarge
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder.Companion.KIWIX_DIRECTORY
 import org.kiwix.kiwixmobile.nav.destination.library.local.CopyMoveProgressBarController
 import org.kiwix.kiwixmobile.nav.destination.library.local.FileOperationHandler
 import org.kiwix.kiwixmobile.nav.destination.library.local.MultipleFilesProcessAction
@@ -323,11 +325,15 @@ class CopyMoveFileHandler @Inject constructor(
     } catch (ignore: Exception) {
       ignore.printStackTrace()
       handleFileOperationError(
-        context.getString(R.string.copy_file_error_message, ignore.message),
+        fileTooLargeMessage(ignore)
+          ?: context.getString(R.string.copy_file_error_message, ignore.message),
         destinationFile
       )
     }
   }
+
+  private fun fileTooLargeMessage(error: Exception): String? =
+    if (error.isFileTooLarge()) context.getString(R.string.file_too_large_for_folder) else null
 
   private suspend fun moveZimFileToPublicAppDirectory() {
     val destinationFile = getDestinationFile()
@@ -353,7 +359,8 @@ class CopyMoveFileHandler @Inject constructor(
     } catch (ignore: Exception) {
       ignore.printStackTrace()
       handleFileOperationError(
-        context.getString(R.string.move_file_error_message, ignore.message),
+        fileTooLargeMessage(ignore)
+          ?: context.getString(R.string.move_file_error_message, ignore.message),
         destinationFile
       )
     }
@@ -437,8 +444,15 @@ class CopyMoveFileHandler @Inject constructor(
     return destinationFile
   }
 
+  // Books for the public Documents default go to Documents/Kiwix, like downloads.
   private suspend fun getSelectedStorageRoot(): File =
-    unitTestStorage ?: File(kiwixDataStore.selectedStorage.first())
+    unitTestStorage ?: File(kiwixDataStore.selectedStorage.first()).let { storage ->
+      if (storage.path == kiwixDataStore.publicDocumentsDirectory().path) {
+        File(storage, KIWIX_DIRECTORY).apply { mkdirs() }
+      } else {
+        storage
+      }
+    }
 
   private fun requireSelectedFileUri(): Uri =
     selectedFileUri ?: throw FileNotFoundException("Selected file uri not found")
