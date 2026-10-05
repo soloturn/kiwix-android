@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core
 
+import android.net.Uri
 import app.cash.turbine.test
 import io.mockk.clearAllMocks
 import io.mockk.coEvery
@@ -35,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
+import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadModel
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
@@ -43,6 +45,8 @@ import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.files.FileSearch
 import org.kiwix.kiwixmobile.core.utils.files.ScanningProgressListener
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
+import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.libkiwix.Book
 import org.kiwix.libkiwix.Illustration
 import org.kiwix.libzim.Archive
@@ -61,6 +65,8 @@ class StorageObserverTest {
   private val zimFileReader: ZimFileReader = mockk()
   private val libkiwixBookmarks: LibkiwixBookmarks = mockk()
   private val scanningProgressListener: ScanningProgressListener = mockk()
+  private val libraryFolder: LibraryFolder = mockk()
+  private val libkiwixBookOnDisk: LibkiwixBookOnDisk = mockk()
 
   private val files = MutableStateFlow<List<File>>(emptyList())
   private val downloads = MutableStateFlow<List<DownloadModel>>(emptyList())
@@ -88,7 +94,9 @@ class StorageObserverTest {
       readerFactory,
       libkiwixBookmarks,
       libkiwixBookFactory,
-      mainDispatcherRule.dispatcher
+      mainDispatcherRule.dispatcher,
+      libraryFolder,
+      libkiwixBookOnDisk
     )
   }
 
@@ -129,6 +137,32 @@ class StorageObserverTest {
     // test the book is added to bookmark's library.
     coVerify { libkiwixBookmarks.addBookToLibrary(archive = any()) }
     verify { zimFileReader.dispose() }
+  }
+
+  @Test
+  fun `tree sync does nothing without an active library folder`() = runTest {
+    coEvery { libraryFolder.activeTreeUri() } returns null
+    assertThat(storageObserver.syncLibraryTree()).isZero()
+    coVerify(exactly = 0) { fileSearch.scanTree(any(), any()) }
+  }
+
+  @Test
+  fun `tree sync adds only documents not yet in the library`() = runTest {
+    val treeUri: Uri = mockk()
+    val known: Uri = mockk { every { this@mockk.toString() } returns "content://tree/known.zim" }
+    val fresh: Uri = mockk { every { this@mockk.toString() } returns "content://tree/new.zim" }
+    val knownSource: ZimReaderSource = mockk {
+      every { toDatabase() } returns "content://tree/known.zim"
+    }
+    coEvery { libraryFolder.activeTreeUri() } returns treeUri
+    coEvery { libkiwixBookOnDisk.getBooks() } returns listOf(
+      BookOnDisk(book = libkiwixBook("known"), zimReaderSource = knownSource)
+    )
+    coEvery { fileSearch.scanTree(treeUri, null) } returns listOf(known, fresh)
+    coEvery { libkiwixBookOnDisk.insertUriBook(fresh) } returns libkiwixBook("new")
+
+    assertThat(storageObserver.syncLibraryTree()).isEqualTo(1)
+    coVerify(exactly = 0) { libkiwixBookOnDisk.insertUriBook(known) }
   }
 
   private fun booksOnFileSystem() =

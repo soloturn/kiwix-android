@@ -104,6 +104,7 @@ import org.kiwix.kiwixmobile.core.ui.components.ContentLoadingProgressBar
 import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
 import org.kiwix.kiwixmobile.core.ui.components.NavigationIcon
 import org.kiwix.kiwixmobile.core.ui.components.StorageDeviceItem
+import org.kiwix.kiwixmobile.core.ui.components.rememberLibraryFolderPicker
 import org.kiwix.kiwixmobile.core.ui.theme.KiwixTheme
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.CATEGORY_TITLE_TEXT_SIZE
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.DIALOG_DEFAULT_PADDING_FOR_CONTENT
@@ -187,6 +188,10 @@ private fun SetUpViewModelAndPermissionLauncher(
         coreSettingsViewModel.onBookmarkFileSelected(it)
       }
     }
+  val folderPicker = rememberLibraryFolderPicker(coreSettingsViewModel::onLibraryFolderPicked)
+  LaunchedEffect(Unit) {
+    coreSettingsViewModel.libraryFolderPickerRequests.collect { folderPicker(it) }
+  }
   LaunchedEffect(Unit) {
     coreSettingsViewModel.initialize()
     coreSettingsViewModel.actions
@@ -500,6 +505,20 @@ private fun LazyListScope.storageCategory(
               coreSettingsViewModel.storageCalculator,
               coreSettingsViewModel.kiwixDataStore
             )
+          }
+          settingsUiState.libraryFolder?.let { libraryFolder ->
+            PreferenceItem(
+              stringResource(R.string.library_folder_title),
+              libraryFolder.summary,
+              coreSettingsViewModel::chooseLibraryFolder
+            )
+            libraryFolder.restoreSummary?.let { restoreSummary ->
+              PreferenceItem(
+                stringResource(R.string.restore_library_title),
+                restoreSummary,
+                coreSettingsViewModel::chooseLibraryFolder
+              )
+            }
           }
         }
       }

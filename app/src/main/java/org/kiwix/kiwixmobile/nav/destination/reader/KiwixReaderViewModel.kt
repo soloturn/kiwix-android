@@ -204,6 +204,13 @@ class KiwixReaderViewModel @Inject constructor(
     updateTitle()
     val filePath =
       FileUtils.getLocalFilePathByUri(context.applicationContext, zimFileUri.toUri(), ioDispatcher)
+    val uriSource = ZimReaderSource.fromDatabaseValue(zimFileUri)?.takeIf { it.uri != null }
+    if (uriSource != null && (filePath == null || !File(filePath).canRead())) {
+      // A book in a SAF library folder: the path behind it is not readable for us, the
+      // document grant is.
+      openZimFile(uriSource)
+      return
+    }
     if (filePath == null || !File(filePath).isFileExist(ioDispatcher)) {
       // Close the previously opened book in the reader. Since this file is not found,
       // it will not be set in the zimFileReader. The previously opened ZIM file

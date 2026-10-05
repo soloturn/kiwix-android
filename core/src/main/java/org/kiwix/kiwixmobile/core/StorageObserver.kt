@@ -23,7 +23,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
+import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadModel
@@ -31,6 +33,7 @@ import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.files.FileSearch
 import org.kiwix.kiwixmobile.core.utils.files.ScanningProgressListener
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.libkiwix.Book
 import java.io.File
 import javax.inject.Inject
@@ -43,7 +46,24 @@ class StorageObserver @Inject constructor(
   private val libkiwixBookmarks: LibkiwixBookmarks,
   private val libkiwixBookFactory: LibkiwixBookFactory,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  private val libraryFolder: LibraryFolder,
+  private val libkiwixBookOnDisk: LibkiwixBookOnDisk
 ) {
+  /**
+   * Adds the ZIM files of the user's SAF library folder that are not in the library yet.
+   * Tree books have no file path, so they go straight into the book store instead of being
+   * returned by [getBooksOnFileSystem]. Returns how many books were added.
+   */
+  suspend fun syncLibraryTree(scanningProgressListener: ScanningProgressListener? = null): Int =
+    withContext(ioDispatcher) {
+      val treeUri = libraryFolder.activeTreeUri() ?: return@withContext 0
+      val known = libkiwixBookOnDisk.getBooks().map { it.zimReaderSource.toDatabase() }.toSet()
+      // Downloads in progress carry a ".part" suffix, so the walk never returns them.
+      fileSearch.scanTree(treeUri, scanningProgressListener)
+        .filterNot { "$it" in known }
+        .count { libkiwixBookOnDisk.insertUriBook(it) != null }
+    }
+
   fun getBooksOnFileSystem(
     scanningProgressListener: ScanningProgressListener
   ): Flow<List<Book>> = flow {

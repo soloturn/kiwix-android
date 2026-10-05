@@ -280,12 +280,12 @@ class ZimFileReader(
           // Retrieve direct access information for the item
           val infoPair = getDirectAccessInfoOfItem(item, uri)
           val file = infoPair?.filename?.let(::File)
-          // If no file found or file does not exist, return input stream from item data
-          if (infoPair == null || file == null || !file.exists()) {
+          // Neither a usable fd nor a real file on disk - fall back to reading via libzim.
+          if (!infoPair.isUsable(file)) {
             return@loadContent ByteArrayInputStream(item.data?.data)
           }
           // Return the input stream from the direct access information
-          return@loadContent getInputStreamFromDirectAccessInfo(item, file, infoPair)
+          return@loadContent getInputStreamFromDirectAccessInfo(item, file, infoPair!!)
         }
       }
     }
@@ -343,10 +343,10 @@ class ZimFileReader(
         }
       val infoPair = getDirectAccessInfoOfItem(item, uri)
       val file = infoPair?.filename?.let(::File)
-      if (infoPair == null || file == null || !file.exists()) {
+      if (!infoPair.isUsable(file)) {
         return@withContext loadAssetFromCache(uri)
       }
-      return@withContext getInputStreamFromDirectAccessInfo(item, file, infoPair)
+      return@withContext getInputStreamFromDirectAccessInfo(item, file, infoPair!!)
     }
 
   private fun getDirectAccessInfoOfItem(item: Item?, uri: String): DirectAccessInfo? =
@@ -363,16 +363,20 @@ class ZimFileReader(
 
   private fun getInputStreamFromDirectAccessInfo(
     item: Item?,
-    file: File,
+    file: File?,
     infoPair: DirectAccessInfo
   ): InputStream? =
     item?.itemSize()?.let {
       AssetFileDescriptor(
-        parcelFileDescriptor(file),
+        parcelFileDescriptor(file, infoPair),
         infoPair.offset,
         it
       ).createInputStream()
     }
+
+  /** True if [infoPair] can actually be used: a usable fd, or a path that is really there. */
+  private fun DirectAccessInfo?.isUsable(file: File?): Boolean =
+    this != null && (fd != -1 || (file != null && file.exists()))
 
   @Throws(IOException::class)
   private fun loadAssetFromCache(uri: String): FileInputStream = File(
@@ -500,8 +504,18 @@ val String.truncateMimeType: String
 val String.replaceWithEncodedString: String
   get() = replace("?", "%3F")
 
-private fun parcelFileDescriptor(file: File): ParcelFileDescriptor? =
-  ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+/**
+ * Prefers the already-open descriptor libzim handed us ([DirectAccessInfo.fd]) over
+ * reopening [DirectAccessInfo.filename] by path: that path can be a synthetic `/dev/fd/N`
+ * (or, for a SAF-backed archive, a real path the app has no standing grant to reopen) that
+ * fails with EACCES even though the original descriptor is perfectly valid.
+ */
+private fun parcelFileDescriptor(file: File?, info: DirectAccessInfo): ParcelFileDescriptor? =
+  if (info.fd != -1) {
+    ParcelFileDescriptor.adoptFd(info.fd)
+  } else {
+    ParcelFileDescriptor.open(requireNotNull(file), ParcelFileDescriptor.MODE_READ_ONLY)
+  }
 
 // Default illustration size for ZIM file favicons
 const val ILLUSTRATION_SIZE = 48

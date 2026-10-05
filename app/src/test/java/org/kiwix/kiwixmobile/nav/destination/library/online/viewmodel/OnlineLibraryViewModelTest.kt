@@ -59,6 +59,7 @@ import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
 import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.core.zim_manager.ConnectivityObserver
 import org.kiwix.kiwixmobile.core.zim_manager.NetworkState
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
@@ -123,6 +124,7 @@ class OnlineLibraryViewModelTest {
   private val refreshAction: ResolveRefreshLibraryAction = mockk(relaxed = true)
   private val observeNetwork: ObserveNetworkState = mockk(relaxed = true)
   private val storageDeviceProvider: StorageDeviceProvider = mockk(relaxed = true)
+  private val libraryFolder: LibraryFolder = mockk(relaxed = true)
   private lateinit var viewModel: OnlineLibraryViewModel
 
   @BeforeEach
@@ -152,7 +154,8 @@ class OnlineLibraryViewModelTest {
       refreshAction,
       observeNetwork,
       storageDeviceProvider,
-      mainDispatcherRule.dispatcher
+      mainDispatcherRule.dispatcher,
+      libraryFolder
     )
     viewModel.networkBooks.tryEmit(emptyList())
   }
@@ -514,7 +517,8 @@ class OnlineLibraryViewModelTest {
         refreshAction,
         observeNetwork,
         storageDeviceProvider,
-        mainDispatcherRule.dispatcher
+        mainDispatcherRule.dispatcher,
+        libraryFolder
       )
       verify(exactly = 0) { downloaderProvider.get() }
     }

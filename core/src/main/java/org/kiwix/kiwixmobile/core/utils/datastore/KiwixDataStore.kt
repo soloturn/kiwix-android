@@ -18,12 +18,16 @@
 
 package org.kiwix.kiwixmobile.core.utils.datastore
 
+import android.Manifest
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Environment
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -456,14 +460,11 @@ class KiwixDataStore @Inject constructor(
     context.kiwixDataStore.data.map { prefs ->
       val storage = prefs[PreferencesKeys.PREF_STORAGE]
       return@map when {
-        storage == null ->
-          getPublicDirectoryPath(defaultPublicStorage()).also {
-            setSelectedStorage(it)
-            setSelectedStoragePosition(ZERO)
-          }
+        // Not persisted, so the default follows the storage permission once it is granted.
+        storage == null -> defaultLibraryStorage()
 
         !File(storage).isFileExist(ioDispatcher) ->
-          getPublicDirectoryPath(defaultPublicStorage()).also {
+          defaultLibraryStorage().also {
             setSelectedStoragePosition(ZERO)
           }
 
@@ -471,9 +472,62 @@ class KiwixDataStore @Inject constructor(
       }
     }
 
+  /** Whether the user (or a migration) chose a storage, as opposed to using the default. */
+  suspend fun hasExplicitStorage(): Boolean =
+    context.kiwixDataStore.data.first()[PreferencesKeys.PREF_STORAGE] != null
+
+  /**
+   * Public Documents, so that books land in Documents/Kiwix and survive uninstall. From Android
+   * 10 MediaStore writes there without a permission; below it WRITE_EXTERNAL_STORAGE is needed,
+   * and without it we fall back to the app-specific media directory.
+   */
+  suspend fun defaultLibraryStorage(): String =
+    if (canWritePublicDocuments()) {
+      publicDocumentsDirectory().path
+    } else {
+      getPublicDirectoryPath(defaultPublicStorage())
+    }
+
+  private fun canWritePublicDocuments(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ||
+      ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+      PackageManager.PERMISSION_GRANTED
+
+  @Suppress("DEPRECATION")
+  fun publicDocumentsDirectory(): File =
+    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+
   suspend fun setSelectedStorage(selectedStorage: String) {
     context.kiwixDataStore.edit { prefs ->
       prefs[PreferencesKeys.PREF_STORAGE] = selectedStorage
+    }
+  }
+
+  /**
+   * SAF tree the user picked as library folder. It is kept after the grant is lost (reinstall
+   * restores it from backup) so the picker can reopen at the same place.
+   */
+  val libraryTreeUri: Flow<String?> =
+    context.kiwixDataStore.data.map { prefs -> prefs[PreferencesKeys.PREF_LIBRARY_TREE_URI] }
+
+  suspend fun setLibraryTreeUri(treeUri: String?) {
+    context.kiwixDataStore.edit { prefs ->
+      if (treeUri == null) {
+        prefs.remove(PreferencesKeys.PREF_LIBRARY_TREE_URI)
+      } else {
+        prefs[PreferencesKeys.PREF_LIBRARY_TREE_URI] = treeUri
+      }
+    }
+  }
+
+  val legacyBooksMoveDeclined: Flow<Boolean> =
+    context.kiwixDataStore.data.map { prefs ->
+      prefs[PreferencesKeys.PREF_LEGACY_BOOKS_MOVE_DECLINED] ?: false
+    }
+
+  suspend fun setLegacyBooksMoveDeclined(declined: Boolean) {
+    context.kiwixDataStore.edit { prefs ->
+      prefs[PreferencesKeys.PREF_LEGACY_BOOKS_MOVE_DECLINED] = declined
     }
   }
 
@@ -705,6 +759,8 @@ class KiwixDataStore @Inject constructor(
     // Prefs
     const val PREF_LANG = "pref_language_chooser"
     const val PREF_STORAGE = "pref_select_folder"
+    const val PREF_LIBRARY_TREE_URI = "pref_library_tree_uri"
+    const val PREF_LEGACY_BOOKS_MOVE_DECLINED = "pref_legacy_books_move_declined"
     const val STORAGE_POSITION = "storage_position"
     const val PREF_WIFI_ONLY = "pref_wifi_only"
     const val PREF_KIWIX_MOBILE = "kiwix-mobile"

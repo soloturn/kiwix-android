@@ -33,10 +33,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.CanWrite4GbFile
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.CannotWrite4GbFile
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.NotEnoughSpaceFor4GbFile
-import org.kiwix.kiwixmobile.zimManager.FileSystemCapability.CANNOT_WRITE_4GB
 import org.kiwix.kiwixmobile.zimManager.FileSystemCapability.CAN_WRITE_4GB
 import org.kiwix.kiwixmobile.zimManager.FileSystemCapability.INCONCLUSIVE
 import java.io.File
@@ -44,7 +44,8 @@ import java.io.File
 class Fat32Checker constructor(
   kiwixDataStore: KiwixDataStore,
   private val fileSystemCheckers: List<FileSystemChecker>,
-  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
+  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  private val libraryFolder: LibraryFolder? = null
 ) {
   private val _fileSystemStates =
     MutableStateFlow<FileSystemState>(FileSystemState.DetectingFileSystem)
@@ -62,12 +63,23 @@ class Fat32Checker constructor(
         .onEach { _fileSystemStates.emit(FileSystemState.DetectingFileSystem) }
         .combine(requestCheckSystemFileType) { storage, _ -> storage }
         .collectLatest { storage ->
-          val storageFile = File(storage)
-          if (!storageFile.exists()) {
+          val treeUri = libraryFolder?.activeTreeUri()
+          val storageFile = if (treeUri != null) {
+            libraryFolder.volumeDirectory(treeUri)
+          } else {
+            File(storage)
+          }
+          if (treeUri != null && storageFile == null) {
+            // A picked folder on a volume we cannot inspect: attempt the write and report
+            // EFBIG if it fails, rather than blocking upfront on an unknown filesystem.
+            _fileSystemStates.emit(CanWrite4GbFile)
+            return@collectLatest
+          }
+          if (storageFile?.exists() != true) {
             _fileSystemStates.emit(NotEnoughSpaceFor4GbFile)
             return@collectLatest
           }
-          val systemState = toFileSystemState(storageFile)
+          val systemState = toFileSystemState(storageFile, inconclusiveCanWrite = treeUri != null)
           _fileSystemStates.emit(systemState)
           fileObserver?.stopWatching()
           fileObserver =
@@ -92,10 +104,10 @@ class Fat32Checker constructor(
       }.apply { startWatching() }
     }
 
-  private fun toFileSystemState(storageFile: File) =
+  private fun toFileSystemState(storageFile: File, inconclusiveCanWrite: Boolean = false) =
     when {
       storageFile.freeSpace > FOUR_GIGABYTES_IN_BYTES ->
-        if (canCreate4GbFile(storageFile.path)) {
+        if (canCreate4GbFile(storageFile.path, inconclusiveCanWrite)) {
           CanWrite4GbFile
         } else {
           CannotWrite4GbFile
@@ -104,16 +116,12 @@ class Fat32Checker constructor(
       else -> NotEnoughSpaceFor4GbFile
     }
 
-  private fun canCreate4GbFile(storagePath: String): Boolean {
-    for (checker in fileSystemCheckers) {
-      when (checker.checkFilesystemSupports4GbFiles(storagePath)) {
-        CAN_WRITE_4GB -> return true
-        CANNOT_WRITE_4GB -> return false
-        INCONCLUSIVE -> Unit
-      }
-    }
-    return false
-  }
+  private fun canCreate4GbFile(storagePath: String, inconclusiveCanWrite: Boolean): Boolean =
+    fileSystemCheckers.asSequence()
+      .map { it.checkFilesystemSupports4GbFiles(storagePath) }
+      .firstOrNull { it != INCONCLUSIVE }
+      ?.let { it == CAN_WRITE_4GB }
+      ?: inconclusiveCanWrite
 
   fun dispose() {
     fileObserver?.stopWatching()

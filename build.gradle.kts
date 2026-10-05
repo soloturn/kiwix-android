@@ -23,6 +23,10 @@ plugins {
 
 allprojects {
   repositories {
+    // Local java-libkiwix build carrying openzim/libzim#1119; drop once it ships.
+    mavenLocal {
+      content { includeModule("org.kiwix", "libkiwix") }
+    }
     google()
     mavenCentral()
     maven { setUrl("https://jitpack.io") }

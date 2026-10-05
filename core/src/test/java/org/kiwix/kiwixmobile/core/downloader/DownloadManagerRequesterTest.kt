@@ -23,6 +23,7 @@ import com.tonyodev.fetch2.Fetch
 import com.tonyodev.fetch2.NetworkType
 import com.tonyodev.fetch2.Request
 import com.tonyodev.fetch2core.Func
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -41,6 +42,7 @@ import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.dao.entities.DownloadRoomEntity
 import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadManagerRequester
 import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadMonitorServiceManager
+import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadTargets
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadRequest
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.utils.AUTO_RETRY_MAX_ATTEMPTS
@@ -55,6 +57,7 @@ class DownloadManagerRequesterTest {
   private lateinit var requester: DownloadManagerRequester
   private lateinit var mainActivity: CoreMainActivity
   private lateinit var downloadMonitorServiceManager: DownloadMonitorServiceManager
+  private lateinit var downloadTargets: DownloadTargets
 
   @RegisterExtension
   @JvmField
@@ -68,6 +71,7 @@ class DownloadManagerRequesterTest {
     mainActivity = mockk(relaxed = true)
     context = mockk(relaxed = true)
     downloadMonitorServiceManager = mockk(relaxed = true)
+    downloadTargets = mockk(relaxed = true)
     every { kiwixDataStore.selectedStorage } returns flowOf("/storage/emulated/0")
     every { kiwixDataStore.wifiOnly } returns flowOf(false)
   }
@@ -78,8 +82,23 @@ class DownloadManagerRequesterTest {
       kiwixDataStore,
       downloadRoomDao,
       downloadMonitorServiceManager,
-      mainDispatcherRule.dispatcher
+      mainDispatcherRule.dispatcher,
+      downloadTargets
     )
+  }
+
+  @Test
+  fun `enqueue writes to the target chosen for the file name`() = runTest {
+    createRequester()
+    val target = "content://com.android.externalstorage.documents/tree/t/document/wiki.zim.part"
+    coEvery { downloadTargets.create("wiki.zim") } returns target
+    val requestSlot = slot<Request>()
+    every { fetch.enqueue(capture(requestSlot)) } returns fetch
+
+    requester.enqueue(DownloadRequest("https://download.kiwix.org/zim/wiki.zim"))
+
+    Assertions.assertEquals(target, requestSlot.captured.file)
+    Assertions.assertEquals("https://download.kiwix.org/zim/wiki.zim", requestSlot.captured.url)
   }
 
   @Test

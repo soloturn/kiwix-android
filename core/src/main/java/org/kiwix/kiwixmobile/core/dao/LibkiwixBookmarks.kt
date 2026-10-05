@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.core.dao
 
-import android.os.Build
 import androidx.core.net.toUri
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +46,7 @@ import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils.EXPORT_BOOK_MARK_PATH
 import org.kiwix.kiwixmobile.core.utils.files.Log
+import org.kiwix.kiwixmobile.core.utils.files.UserDataFiles
 import org.kiwix.libkiwix.Book
 import org.kiwix.libkiwix.Bookmark
 import org.kiwix.libkiwix.Library
@@ -89,21 +89,19 @@ class LibkiwixBookmarks @Inject constructor(
     }
   }
 
-  private suspend fun bookmarksFolderPath(): String =
-    if (Build.DEVICE.contains("generic")) {
-      // Workaround for emulators: Emulators have limited memory and
-      // restrictions on creating folders, so we will use the default
-      // path for saving the bookmark file.
-      kiwixDataStore.context.filesDir.path
-    } else {
-      "${kiwixDataStore.defaultStorage()}/Bookmarks/"
-    }
+  private fun bookmarkFile(): File =
+    UserDataFiles.internalFile(
+      kiwixDataStore.context,
+      UserDataFiles.BOOKMARKS_DIR,
+      UserDataFiles.BOOKMARK_FILE
+    )
 
-  private suspend fun bookmarkFile(): File =
-    File("${bookmarksFolderPath()}/bookmark.xml")
-
-  private suspend fun libraryFile(): File =
-    File("${bookmarksFolderPath()}/library.xml")
+  private fun libraryFile(): File =
+    UserDataFiles.internalFile(
+      kiwixDataStore.context,
+      UserDataFiles.BOOKMARKS_DIR,
+      UserDataFiles.LIBRARY_FILE
+    )
 
   /**
    * Ensure initialization runs once. This method performs all file I/O and manager setup
@@ -114,22 +112,35 @@ class LibkiwixBookmarks @Inject constructor(
     initMutex.withLock {
       if (initialized) return@withLock
       withContext(ioDispatcher) {
-        // Check if bookmark folder exist if not then create the folder first.
-        val folder = File(bookmarksFolderPath())
-        if (!folder.isFileExist(ioDispatcher)) folder.mkdirs()
-        check(folder.exists()) { "Could not create bookmarks folder: ${folder.path}" }
-        // Check if library file exist if not then create the file to save the library with book information.
-        val library = libraryFile()
-        if (!library.isFileExist(ioDispatcher)) library.createNewFile()
-        check(library.exists()) { "Could not create library file: ${library.path}" }
-        // set up manager to read the library from this file
-        manager.readFile(library.canonicalPath)
-        // Check if bookmark file exist if not then create the file to save the bookmarks.
-        val bookmark = bookmarkFile()
-        if (!bookmark.isFileExist(ioDispatcher)) bookmark.createNewFile()
-        check(bookmark.exists()) { "Could not create bookmark file: ${bookmark.path}" }
-        // set up manager to read the bookmarks from this file
-        manager.readBookmarkFile(bookmark.canonicalPath)
+        val context = kiwixDataStore.context
+        val legacyLibrary = UserDataFiles.migrationSource(
+          context,
+          UserDataFiles.BOOKMARKS_DIR,
+          UserDataFiles.LIBRARY_FILE
+        )
+        val legacyBookmarks = UserDataFiles.migrationSource(
+          context,
+          UserDataFiles.BOOKMARKS_DIR,
+          UserDataFiles.BOOKMARK_FILE
+        )
+        val folder = libraryFile().parentFile
+        folder?.mkdirs()
+        check(folder?.exists() == true) { "Could not create bookmarks folder: ${folder?.path}" }
+        // Import through libkiwix so relative book paths are rewritten for the new location.
+        legacyLibrary?.let { manager.readFile(it.canonicalPath) }
+        legacyBookmarks?.let { manager.readBookmarkFile(it.canonicalPath) }
+        if (legacyLibrary != null || legacyBookmarks != null) {
+          library.writeToFile(libraryFile().canonicalPath)
+          library.writeBookmarksToFile(bookmarkFile().canonicalPath)
+        }
+        val libraryXml = libraryFile()
+        if (!libraryXml.isFileExist(ioDispatcher)) libraryXml.createNewFile()
+        check(libraryXml.exists()) { "Could not create library file: ${libraryXml.path}" }
+        val bookmarkXml = bookmarkFile()
+        if (!bookmarkXml.isFileExist(ioDispatcher)) bookmarkXml.createNewFile()
+        check(bookmarkXml.exists()) { "Could not create bookmark file: ${bookmarkXml.path}" }
+        if (legacyLibrary == null) manager.readFile(libraryXml.canonicalPath)
+        if (legacyBookmarks == null) manager.readBookmarkFile(bookmarkXml.canonicalPath)
         initialized = true
       }
     }
@@ -349,6 +360,9 @@ class LibkiwixBookmarks @Inject constructor(
       library.getBookmarks(false)?.toList()
         ?: return bookmarkList.distinctBy(LibkiwixBookmarkItem::bookmarkUrl)
 
+    val uriBooks = libkiwixBookOnDisk.getBooks()
+      .filter { it.zimReaderSource.uri != null }
+      .associateBy { it.book.id }
     // Create a list to store LibkiwixBookmarkItem objects.
     bookmarkList =
       bookmarkArray.mapNotNull { bookmark ->
@@ -371,7 +385,10 @@ class LibkiwixBookmarks @Inject constructor(
         // Check if the book has an illustration of the specified size and encode it to Base64.
         val favicon = book?.getFavicon()
 
-        val zimReaderSource = book?.path?.let { ZimReaderSource(File(it)) }
+        // Books read through a content:// URI have no path in libkiwix; resolve them by id.
+        val zimReaderSource =
+          book?.path?.takeIf(String::isNotEmpty)?.let { ZimReaderSource(File(it)) }
+            ?: uriBooks[bookmark.bookId]?.zimReaderSource
         // Return the LibkiwixBookmarkItem, filtering out null results.
         return@mapNotNull LibkiwixBookmarkItem(
           bookmark,
@@ -495,7 +512,16 @@ class LibkiwixBookmarks @Inject constructor(
     }
     // Add the ZIM files to the library for validating the bookmarks.
     libkiwixBookOnDisk.getBooks().forEach {
-      addBookToLibrary(file = it.zimReaderSource.file)
+      val source = it.zimReaderSource
+      if (source.file != null) {
+        addBookToLibrary(file = source.file)
+      } else {
+        source.createArchive(ioDispatcher)?.let { archive ->
+          addBookToLibrary(archive = archive)
+          archive.dispose()
+        }
+        source.releaseDescriptors()
+      }
     }
     // Save the imported bookmarks to the current library. Write to disk only on the
     // last one - avoids an O(n^2) rescan+rewrite per bookmark.

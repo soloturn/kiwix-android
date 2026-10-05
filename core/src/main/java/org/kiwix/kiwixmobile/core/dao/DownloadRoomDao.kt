@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core.dao
 
+import androidx.core.net.toUri
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -37,6 +38,8 @@ import org.kiwix.kiwixmobile.core.dao.entities.DownloadRoomEntity
 import org.kiwix.kiwixmobile.core.dao.entities.PauseReason
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.downloader.DownloadRequester
+import org.kiwix.kiwixmobile.core.downloader.downloadManager.ContentUriStorageResolver
+import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadTargets
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadModel
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadRequest
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
@@ -53,6 +56,9 @@ abstract class DownloadRoomDao {
   @IoDispatcher
   lateinit var ioDispatcher: CoroutineDispatcher
 
+  @Inject
+  lateinit var downloadTargets: DownloadTargets
+
   @Query("SELECT * FROM DownloadRoomEntity")
   abstract fun getAllDownloads(): Flow<List<DownloadRoomEntity>>
 
@@ -68,16 +74,22 @@ abstract class DownloadRoomDao {
       .takeIf(List<DownloadRoomEntity>::isNotEmpty)
       ?.let { completedDownloads ->
         deleteDownloadsList(completedDownloads)
+        val locations = withContext(ioDispatcher) {
+          completedDownloads.mapNotNull { it.file?.let(downloadTargets::finish) }
+        }
         // We now use the OPDS stream instead of the custom library.xml handling.
         // In the OPDS stream, the favicon is a URL instead of a Base64 string.
         // So when a download is completed, we extract the illustration directly from the archive.
-        val booksOnDisk = completedDownloads.map { download ->
-          val archive = withContext(ioDispatcher) {
-            Archive(download.file)
+        val booksOnDisk = locations.filterNot(ContentUriStorageResolver::isContentUri)
+          .map { path ->
+            val archive = withContext(ioDispatcher) {
+              Archive(path)
+            }
+            Book().apply { update(archive) }
           }
-          Book().apply { update(archive) }
-        }
         libkiwixBookOnDisk.insert(booksOnDisk)
+        locations.filter(ContentUriStorageResolver::isContentUri)
+          .forEach { libkiwixBookOnDisk.insertUriBook(it.toUri()) }
       }
   }
 

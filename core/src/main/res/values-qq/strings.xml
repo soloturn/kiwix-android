@@ -350,4 +350,21 @@
   <string name="resuming_state">This text is shown to inform the user that the current state of download is resuming.</string>
   <string name="downloading_state">This text is shown to inform the user that the current state of download is actively in progress.</string>
   <string name="download_failed_state">This text is shown to inform the user when a download has failed.</string>
+  <string name="library_folder_title">Settings item title for the folder where ZIM books are stored.</string>
+  <string name="library_folder_summary">Settings item summary. %1$s is the folder name, e.g. "Documents/Kiwix".</string>
+  <string name="library_folder_app_specific_summary">Settings item summary shown when books are in app storage that is removed on uninstall.</string>
+  <string name="choose_library_folder">Entry in the storage list that opens the system folder picker.</string>
+  <string name="restore_library_title">Title of the entry that re-grants access to the library folder after reinstalling the app.</string>
+  <string name="restore_library_summary">Summary of the restore entry. %1$s is the folder name.</string>
+  <string name="library_folder_access_denied">Error shown when the picked folder cannot be used.</string>
+  <string name="library_folder_books_added">Shown after scanning the picked folder. %1$d is the number of books added.</string>
+  <string name="move_books_title">Title of the dialog offering to move books out of app storage.</string>
+  <string name="move_books_message">Dialog message. %1$d is the number of books, %2$s their total size, %3$s the target folder.</string>
+  <string name="move_books_action">Button that starts moving the books.\n{{Identical|Move}}</string>
+  <string name="not_now">Button that postpones an offer.</string>
+  <string name="moving_books_progress">Progress text. %1$d is the current book, %2$d the number of books.</string>
+  <string name="move_books_done">Shown after moving books. %1$d is the number of books moved.</string>
+  <string name="move_books_failed">Shown when some books were not moved. %1$d is the number of books that failed.</string>
+  <string name="unknown_free_space">Shown instead of the free space when it cannot be determined.\n{{Identical|Unknown}}</string>
+  <string name="file_too_large_for_folder">Error shown when the storage cannot hold files over 4 GB.</string>
 </resources>

@@ -45,7 +45,11 @@ class StorageSelectDialogScreenTest {
   private val storageCalculator = mockk<StorageCalculator>(relaxed = true)
   private val kiwixDataStore = mockk<KiwixDataStore>(relaxed = true)
 
-  private fun setDialogScreen(title: String?, deviceList: List<StorageDevice> = emptyList()) {
+  private fun setDialogScreen(
+    title: String?,
+    deviceList: List<StorageDevice> = emptyList(),
+    onFolderPicked: ((android.net.Uri) -> Unit)? = null
+  ) {
     composeRule.setContent {
       StorageSelectDialogScreen(
         title = title,
@@ -54,9 +58,22 @@ class StorageSelectDialogScreenTest {
         storageCalculator = storageCalculator,
         kiwixDataStore = kiwixDataStore,
         shouldShowStorageSelected = false,
-        onSelectAction = {}
+        onSelectAction = {},
+        onFolderPicked = onFolderPicked
       )
     }
+  }
+
+  @Test
+  fun offersChoosingAFolder_whenFolderPickingIsEnabled() {
+    setDialogScreen("Select Storage", onFolderPicked = {})
+    composeRule.onNodeWithTag(CHOOSE_FOLDER_TESTING_TAG).assertExists()
+  }
+
+  @Test
+  fun hidesChooseFolder_byDefault() {
+    setDialogScreen("Select Storage")
+    composeRule.onNodeWithTag(CHOOSE_FOLDER_TESTING_TAG).assertDoesNotExist()
   }
 
   @Test
