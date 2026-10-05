@@ -48,7 +48,9 @@ data class DeleteFilesUseCase @Inject constructor(
   private suspend fun deleteBook(
     book: BooksOnDiskListItem.BookOnDisk
   ): Boolean {
-    val file = book.zimReaderSource.file ?: return false
+    val file = book.zimReaderSource.file
+      ?: return book.zimReaderSource.uri
+        ?.let { libkiwixBookOnDisk.deleteUriBook(book.book.id, it) } == true
 
     FileUtils.deleteZimFile(file.path, ioDispatcher)
 

@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.utils.effects
 
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.ui.unit.dp
 import eu.mhutti1.utils.storage.StorageDevice
@@ -44,11 +45,18 @@ class ShowStorageSelectionDialog(
             storageCalculator = dialogConfig.storageCalculator,
             kiwixDataStore = dialogConfig.kiwixDataStore,
             shouldShowStorageSelected = dialogConfig.shouldShowCheckboxSelected,
-            onSelectAction = ::handleStorageSelection
+            onSelectAction = ::handleStorageSelection,
+            folderPickerInitialUri = dialogConfig.folderPickerInitialUri,
+            onFolderPicked = dialogConfig.onFolderPicked?.let { { uri -> handleFolderPicked(uri) } }
           )
         }
       )
     )
+  }
+
+  private fun handleFolderPicked(treeUri: Uri) {
+    dialogConfig.onFolderPicked?.invoke(treeUri)
+    dialogShower.dismiss()
   }
 
   internal fun handleStorageSelection(selectedDevice: StorageDevice) {

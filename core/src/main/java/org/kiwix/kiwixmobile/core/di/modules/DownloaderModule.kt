@@ -21,6 +21,7 @@ import android.content.Context
 import com.tonyodev.fetch2.Fetch
 import com.tonyodev.fetch2.FetchConfiguration
 import com.tonyodev.fetch2.FetchNotificationManager
+import com.tonyodev.fetch2core.getFileTempDir
 import com.tonyodev.fetch2okhttp.OkHttpDownloader
 import dagger.Binds
 import dagger.Module
@@ -35,6 +36,7 @@ import org.kiwix.kiwixmobile.core.data.remote.UserAgentInterceptor
 import org.kiwix.kiwixmobile.core.downloader.DownloadRequester
 import org.kiwix.kiwixmobile.core.downloader.Downloader
 import org.kiwix.kiwixmobile.core.downloader.DownloaderImpl
+import org.kiwix.kiwixmobile.core.downloader.downloadManager.ContentUriStorageResolver
 import org.kiwix.kiwixmobile.core.downloader.downloadManager.DownloadManagerRequester
 import org.kiwix.kiwixmobile.core.downloader.downloadManager.FetchDownloadNotificationManager
 import org.kiwix.kiwixmobile.core.utils.CONNECT_TIME_OUT
@@ -78,6 +80,9 @@ abstract class DownloaderModule {
         setHttpDownloader(okHttpDownloader)
         preAllocateFileOnCreation(false)
         setNotificationManager(fetchNotificationManager)
+        setStorageResolver(
+          ContentUriStorageResolver(context, getFileTempDir(context))
+        )
       }.build().also(Fetch.Impl::setDefaultInstanceConfiguration)
 
     @Provides

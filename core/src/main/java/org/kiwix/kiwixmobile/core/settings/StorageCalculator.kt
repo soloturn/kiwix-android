@@ -21,23 +21,32 @@ package org.kiwix.kiwixmobile.core.settings
 import eu.mhutti1.utils.storage.Bytes
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.extensions.freeSpace
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.extensions.totalSpace
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import java.io.File
 import javax.inject.Inject
 
 class StorageCalculator @Inject constructor(
   private val kiwixDataStore: KiwixDataStore,
-  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
+  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  private val libraryFolder: LibraryFolder
 ) {
   private suspend fun getStorageFile(file: File? = null) =
     file ?: File(kiwixDataStore.selectedStorage.first())
 
   suspend fun calculateAvailableSpace(file: File? = null): String =
-    Bytes(availableBytes(getStorageFile(file))).humanReadable
+    if (file == null && libraryFolder.activeTreeUri() != null) {
+      treeAvailableBytes()?.let { Bytes(it).humanReadable }
+        ?: kiwixDataStore.context.getString(R.string.unknown_free_space)
+    } else {
+      Bytes(availableBytes(getStorageFile(file))).humanReadable
+    }
 
   suspend fun calculateTotalSpace(file: File? = null): String =
     Bytes(totalBytes(getStorageFile(file))).humanReadable
@@ -45,13 +54,25 @@ class StorageCalculator @Inject constructor(
   suspend fun calculateUsedSpace(file: File): String =
     Bytes(totalBytes(file) - availableBytes(file)).humanReadable
 
+  /**
+   * Free bytes where the library is written. For a picked SAF folder on a volume we cannot
+   * stat (e.g. a cloud provider) the space is unknown; it is then reported as unlimited so the
+   * write is attempted and fails with a proper error instead of being blocked upfront.
+   */
   suspend fun availableBytes(file: File? = null): Long {
+    if (file == null && libraryFolder.activeTreeUri() != null) {
+      return treeAvailableBytes() ?: Long.MAX_VALUE
+    }
     val storageFile = getStorageFile(file)
     return if (storageFile.isFileExist(ioDispatcher)) {
       storageFile.freeSpace(ioDispatcher)
     } else {
       0L
     }
+  }
+
+  private suspend fun treeAvailableBytes(): Long? = withContext(ioDispatcher) {
+    libraryFolder.activeTreeUri()?.let(libraryFolder::availableBytes)
   }
 
   suspend fun totalBytes(file: File) =

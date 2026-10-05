@@ -26,6 +26,8 @@ import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 data class DownloadRequest(val urlString: String) {
   val uri: Uri get() = urlString.toUri()
 
+  val fileName: String get() = StorageUtils.getFileNameFromUrl(urlString)
+
   suspend fun getDestination(kiwixDataStore: KiwixDataStore): String =
-    "${kiwixDataStore.selectedStorage.first()}/Kiwix/${StorageUtils.getFileNameFromUrl(urlString)}"
+    "${kiwixDataStore.selectedStorage.first()}/Kiwix/$fileName"
 }

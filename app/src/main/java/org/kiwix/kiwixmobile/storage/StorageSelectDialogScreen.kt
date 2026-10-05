@@ -18,6 +18,8 @@
 
 package org.kiwix.kiwixmobile.storage
 
+import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -27,19 +29,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import eu.mhutti1.utils.storage.StorageDevice
+import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.settings.StorageCalculator
 import org.kiwix.kiwixmobile.core.ui.components.StorageDeviceItem
+import org.kiwix.kiwixmobile.core.ui.components.rememberLibraryFolderPicker
 import org.kiwix.kiwixmobile.core.ui.theme.KiwixDialogTheme
+import org.kiwix.kiwixmobile.core.utils.ComposeDimens.SIXTEEN_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.TEN_DP
+import org.kiwix.kiwixmobile.core.utils.ComposeDimens.TWELVE_DP
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 
 const val STORAGE_SELECTION_DIALOG_TITLE_TESTING_TAG = "storageSelectionDialogTestingTag"
+const val CHOOSE_FOLDER_TESTING_TAG = "chooseFolderTestingTag"
 val STORAGE_SELECT_STORAGE_TITLE_TEXTVIEW_SIZE = 16.sp
 
 @Composable
@@ -50,7 +58,9 @@ fun StorageSelectDialogScreen(
   storageCalculator: StorageCalculator,
   kiwixDataStore: KiwixDataStore,
   shouldShowStorageSelected: Boolean,
-  onSelectAction: (StorageDevice) -> Unit
+  onSelectAction: (StorageDevice) -> Unit,
+  folderPickerInitialUri: Uri? = null,
+  onFolderPicked: ((Uri) -> Unit)? = null
 ) {
   KiwixDialogTheme {
     Column(
@@ -66,8 +76,23 @@ fun StorageSelectDialogScreen(
         storageCalculator,
         kiwixDataStore
       )
+      onFolderPicked?.let { ChooseFolderItem(folderPickerInitialUri, it) }
     }
   }
+}
+
+@Composable
+private fun ChooseFolderItem(initialUri: Uri?, onFolderPicked: (Uri) -> Unit) {
+  val pickFolder = rememberLibraryFolderPicker(onFolderPicked)
+  Text(
+    text = stringResource(R.string.choose_library_folder),
+    color = MaterialTheme.colorScheme.primary,
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable { pickFolder(initialUri) }
+      .padding(horizontal = SIXTEEN_DP, vertical = TWELVE_DP)
+      .semantics { testTag = CHOOSE_FOLDER_TESTING_TAG }
+  )
 }
 
 @Composable

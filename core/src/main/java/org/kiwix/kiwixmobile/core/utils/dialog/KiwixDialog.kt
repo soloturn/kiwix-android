@@ -59,6 +59,29 @@ sealed class KiwixDialog(
     constructor(zimNameList: String) : this(listOf(zimNameList))
   }
 
+  data class MoveLegacyBooks(override val args: List<Any>) :
+    KiwixDialog(
+      R.string.move_books_title,
+      R.string.move_books_message,
+      R.string.move_books_action,
+      R.string.not_now
+    ),
+    HasBodyFormatArgs {
+    constructor(count: Int, size: String, destination: String) :
+      this(listOf(count, size, destination))
+  }
+
+  data class RestoreLibrary(override val args: List<Any>) :
+    KiwixDialog(
+      R.string.restore_library_title,
+      R.string.restore_library_summary,
+      R.string.choose_library_folder,
+      R.string.not_now
+    ),
+    HasBodyFormatArgs {
+    constructor(folder: String) : this(listOf(folder))
+  }
+
   data class FileCopyMoveError(override val args: List<Any>) :
     KiwixDialog(
       null,

@@ -19,8 +19,8 @@
 package org.kiwix.kiwixmobile.core.utils.datastore
 
 import android.content.Context
-import android.content.ContextWrapper
 import android.os.Build
+import android.os.Environment
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatDelegate
@@ -456,14 +456,17 @@ class KiwixDataStore @Inject constructor(
     context.kiwixDataStore.data.map { prefs ->
       val storage = prefs[PreferencesKeys.PREF_STORAGE]
       return@map when {
-        storage == null ->
-          getPublicDirectoryPath(defaultPublicStorage()).also {
-            setSelectedStorage(it)
+        // Not persisted, so the default remains Documents/Kiwix until the user picks another volume.
+        storage == null -> defaultLibraryStorage()
+
+        !File(storage).isFileExist(ioDispatcher) ->
+          defaultLibraryStorage().also {
             setSelectedStoragePosition(ZERO)
           }
 
-        !File(storage).isFileExist(ioDispatcher) ->
-          getPublicDirectoryPath(defaultPublicStorage()).also {
+        isEmptyLegacyLibraryStorage(File(storage)) ->
+          defaultLibraryStorage().also {
+            setSelectedStorage(it)
             setSelectedStoragePosition(ZERO)
           }
 
@@ -471,9 +474,47 @@ class KiwixDataStore @Inject constructor(
       }
     }
 
+  /** Whether the user (or a migration) chose a storage, as opposed to using the default. */
+  suspend fun hasExplicitStorage(): Boolean =
+    context.kiwixDataStore.data.first()[PreferencesKeys.PREF_STORAGE] != null
+
+  /** Shared Documents is the default library location, so downloaded books survive uninstall. */
+  suspend fun defaultLibraryStorage(): String = publicDocumentsDirectory().path
+
+  fun publicDocumentsDirectory(): File =
+    context.publicDocumentsDirectory()
+
   suspend fun setSelectedStorage(selectedStorage: String) {
     context.kiwixDataStore.edit { prefs ->
       prefs[PreferencesKeys.PREF_STORAGE] = selectedStorage
+    }
+  }
+
+  /**
+   * SAF tree the user picked as library folder. It is kept after the grant is lost (reinstall
+   * restores it from backup) so the picker can reopen at the same place.
+   */
+  val libraryTreeUri: Flow<String?> =
+    context.kiwixDataStore.data.map { prefs -> prefs[PreferencesKeys.PREF_LIBRARY_TREE_URI] }
+
+  suspend fun setLibraryTreeUri(treeUri: String?) {
+    context.kiwixDataStore.edit { prefs ->
+      if (treeUri == null) {
+        prefs.remove(PreferencesKeys.PREF_LIBRARY_TREE_URI)
+      } else {
+        prefs[PreferencesKeys.PREF_LIBRARY_TREE_URI] = treeUri
+      }
+    }
+  }
+
+  val legacyBooksMoveDeclined: Flow<Boolean> =
+    context.kiwixDataStore.data.map { prefs ->
+      prefs[PreferencesKeys.PREF_LEGACY_BOOKS_MOVE_DECLINED] ?: false
+    }
+
+  suspend fun setLegacyBooksMoveDeclined(declined: Boolean) {
+    context.kiwixDataStore.edit { prefs ->
+      prefs[PreferencesKeys.PREF_LEGACY_BOOKS_MOVE_DECLINED] = declined
     }
   }
 
@@ -486,11 +527,6 @@ class KiwixDataStore @Inject constructor(
 
   suspend fun defaultStorage(): String = withContext(ioDispatcher) {
     context.getExternalFilesDirs(null)[ZERO]?.path
-      ?: context.filesDir.path // a workaround for emulators
-  }
-
-  private suspend fun defaultPublicStorage(): String = withContext(ioDispatcher) {
-    ContextWrapper(context).externalMediaDirs[ZERO]?.path
       ?: context.filesDir.path // a workaround for emulators
   }
 
@@ -705,6 +741,8 @@ class KiwixDataStore @Inject constructor(
     // Prefs
     const val PREF_LANG = "pref_language_chooser"
     const val PREF_STORAGE = "pref_select_folder"
+    const val PREF_LIBRARY_TREE_URI = "pref_library_tree_uri"
+    const val PREF_LEGACY_BOOKS_MOVE_DECLINED = "pref_legacy_books_move_declined"
     const val STORAGE_POSITION = "storage_position"
     const val PREF_WIFI_ONLY = "pref_wifi_only"
     const val PREF_KIWIX_MOBILE = "kiwix-mobile"
@@ -758,4 +796,30 @@ class KiwixDataStore @Inject constructor(
     const val APP_NAME = "appName"
     const val IS_BRANDED_APP = "isBrandedApp"
   }
+}
+
+private fun isEmptyLegacyLibraryStorage(directory: File): Boolean {
+  val path = runCatching { directory.canonicalPath }.getOrDefault(directory.absolutePath)
+  return (path.contains("/Android/media/") || path.contains("/Android/data/")) &&
+    directory.isDirectory &&
+    directory.canRead() &&
+    directory.walkTopDown().none { file ->
+      file.isFile &&
+        file.extension.let { extension ->
+          extension.equals("zim", ignoreCase = true) ||
+            extension.equals("zimaa", ignoreCase = true) ||
+            extension.equals("epub", ignoreCase = true)
+        }
+    }
+}
+
+private fun Context.publicDocumentsDirectory(): File {
+  val storageRoot = getExternalFilesDirs(null).firstOrNull()
+    ?.let { appDirectory ->
+      generateSequence(appDirectory as File?) { it.parentFile }
+        .firstOrNull { it.name == "Android" }
+        ?.parentFile
+    }
+    ?: throw IllegalStateException("Primary shared storage is unavailable")
+  return File(storageRoot, Environment.DIRECTORY_DOCUMENTS)
 }
