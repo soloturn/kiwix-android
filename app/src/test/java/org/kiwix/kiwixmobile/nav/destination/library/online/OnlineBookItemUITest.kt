@@ -48,6 +48,7 @@ import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.kiwixmobile.core.utils.BookUtils
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.zim_manager.Byte
+import org.kiwix.kiwixmobile.zimManager.Fat32Checker.Companion.FOUR_GIGABYTES_IN_BYTES
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.CanWrite4GbFile
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.CannotWrite4GbFile
@@ -310,7 +311,7 @@ class OnlineBookItemUITest {
   @Test
   fun onlineBookItem_whenLargeBookAndCanWrite4GbFile_bookIsClickable() {
     val item = mockBookItem(
-      book = mockLibkiwixBook(size = "5000000"),
+      book = mockLibkiwixBook(size = (FOUR_GIGABYTES_IN_BYTES + 1).toString()),
       fileSystemState = CanWrite4GbFile
     )
     setContent(item = item)
@@ -396,7 +397,7 @@ class OnlineBookItemUITest {
   fun onlineBookItem_whenCannotWrite4GbFile_overlayExistsInTree() {
     setContent(
       item = mockBookItem(
-        book = mockLibkiwixBook(size = "5000000"),
+        book = mockLibkiwixBook(size = (FOUR_GIGABYTES_IN_BYTES + 1).toString()),
         fileSystemState = CannotWrite4GbFile
       )
     )
@@ -409,7 +410,7 @@ class OnlineBookItemUITest {
   fun onlineBookItem_whenLargeBookAndCanWrite4GbFile_overlayDoesNotExist() {
     setContent(
       item = mockBookItem(
-        book = mockLibkiwixBook(size = "5000000"),
+        book = mockLibkiwixBook(size = (FOUR_GIGABYTES_IN_BYTES + 1).toString()),
         fileSystemState = CanWrite4GbFile
       )
     )
@@ -492,7 +493,7 @@ class OnlineBookItemUITest {
   fun onlineBookItem_whenCannotWrite4GbFile_overlayAbsorbsClick() {
     setContent(
       item = mockBookItem(
-        book = mockLibkiwixBook(size = "5000000"),
+        book = mockLibkiwixBook(size = (FOUR_GIGABYTES_IN_BYTES + 1).toString()),
         fileSystemState = CannotWrite4GbFile
       )
     )
