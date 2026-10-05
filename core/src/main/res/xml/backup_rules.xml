@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<!-- excludes any external files -->
+<!-- Used up to Android 11. Bookmarks, notes, library indexes and settings live in internal
+     storage and are backed up. External app dirs can hold multi-GB ZIM files, which would
+     exceed the backup quota and make the whole backup fail, so they are not included. -->
 <full-backup-content>
-  <exclude domain="external" />
+  <include domain="file" path="." />
+  <include domain="database" path="." />
+  <include domain="sharedpref" path="." />
 </full-backup-content>
-

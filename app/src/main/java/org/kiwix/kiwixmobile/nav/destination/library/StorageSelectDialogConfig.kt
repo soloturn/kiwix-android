@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.nav.destination.library
 
+import android.net.Uri
 import androidx.compose.ui.unit.TextUnit
 import eu.mhutti1.utils.storage.StorageDevice
 import org.kiwix.kiwixmobile.core.settings.StorageCalculator
@@ -34,5 +35,8 @@ data class StorageSelectDialogConfig(
   val storageCalculator: StorageCalculator,
   val kiwixDataStore: KiwixDataStore,
   val shouldShowCheckboxSelected: Boolean,
-  val onSelectAction: (StorageDevice) -> Unit
+  val onSelectAction: (StorageDevice) -> Unit,
+  // When set, the dialog also offers picking any folder through the SAF tree picker.
+  val folderPickerInitialUri: Uri? = null,
+  val onFolderPicked: ((Uri) -> Unit)? = null
 )

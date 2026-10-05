@@ -34,15 +34,21 @@ import org.kiwix.kiwixmobile.core.utils.AUTO_RETRY_MAX_ATTEMPTS
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import javax.inject.Inject
 
+@Suppress("LongParameterList")
 class DownloadManagerRequester @Inject constructor(
   private val fetch: Fetch,
   private val kiwixDataStore: KiwixDataStore,
   private val downloadRoomDao: DownloadRoomDao,
   private val downloadMonitorServiceManager: DownloadMonitorServiceManager,
-  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
+  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  private val downloadTargets: DownloadTargets
 ) : DownloadRequester {
   override suspend fun enqueue(downloadRequest: DownloadRequest): Long {
-    val request = downloadRequest.toFetchRequest(kiwixDataStore)
+    val target = downloadTargets.create(downloadRequest.fileName)
+    val request = Request(downloadRequest.urlString, target).apply {
+      networkType = if (kiwixDataStore.wifiOnly.first()) WIFI_ONLY else ALL
+      autoRetryMaxAttempts = AUTO_RETRY_MAX_ATTEMPTS
+    }
     fetch.enqueue(request)
     return request.id.toLong()
   }
@@ -101,9 +107,3 @@ class DownloadManagerRequester @Inject constructor(
     downloadMonitorServiceManager.startDownloadMonitorServiceIfOngoingDownloads()
   }
 }
-
-private suspend fun DownloadRequest.toFetchRequest(kiwixDataStore: KiwixDataStore) =
-  Request("$uri", getDestination(kiwixDataStore)).apply {
-    networkType = if (kiwixDataStore.wifiOnly.first()) WIFI_ONLY else ALL
-    autoRetryMaxAttempts = AUTO_RETRY_MAX_ATTEMPTS
-  }

@@ -24,6 +24,7 @@ import android.app.Application
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.res.Resources
+import android.net.Uri
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.Toast
@@ -94,8 +95,29 @@ abstract class CoreSettingsViewModel(
     val shouldShowPrefWifiOnlyPreference: Boolean = false,
     val versionInformation: String = "",
     val permissionItem: Pair<Boolean, String> = false to "",
-    val shouldShowRatingCategory: Boolean = false
+    val shouldShowRatingCategory: Boolean = false,
+    val libraryFolder: LibraryFolderState? = null
   )
+
+  /** Library folder rows of the storage category; null hides them (branded apps). */
+  data class LibraryFolderState(
+    val summary: String,
+    val restoreSummary: String? = null
+  )
+
+  /** Where the folder picker opens; null leaves it to the system. */
+  open suspend fun libraryFolderPickerUri(): Uri? = null
+
+  open fun onLibraryFolderPicked(treeUri: Uri) = Unit
+
+  private val _libraryFolderPickerRequests = MutableSharedFlow<Uri?>()
+
+  /** Initial locations for the folder picker; the screen owns the launcher. */
+  val libraryFolderPickerRequests: SharedFlow<Uri?> = _libraryFolderPickerRequests
+
+  fun chooseLibraryFolder() {
+    viewModelScope.launch { _libraryFolderPickerRequests.emit(libraryFolderPickerUri()) }
+  }
 
   abstract suspend fun setStorage()
   abstract suspend fun showExternalLinksPreference()
@@ -423,6 +445,8 @@ abstract class CoreSettingsViewModel(
   fun onStorageDeviceSelected(storageDevice: StorageDevice) {
     viewModelScope.launch {
       kiwixDataStore.apply {
+        // Picking a storage device replaces a previously picked library folder.
+        setLibraryTreeUri(null)
         setSelectedStorage(getPublicDirectoryPath(storageDevice.name))
         setSelectedStoragePosition(
           if (storageDevice.isInternal) {

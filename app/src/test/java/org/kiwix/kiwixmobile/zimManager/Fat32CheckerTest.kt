@@ -1,8 +1,10 @@
 package org.kiwix.kiwixmobile.zimManager
 
+import android.net.Uri
 import android.os.Build
 import app.cash.turbine.test
 import io.mockk.clearAllMocks
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
@@ -19,6 +21,7 @@ import org.junit.Test
 import org.junit.experimental.runners.Enclosed
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.CanWrite4GbFile
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.CannotWrite4GbFile
 import org.kiwix.kiwixmobile.zimManager.Fat32Checker.FileSystemState.DetectingFileSystem
@@ -333,5 +336,59 @@ class Fat32CheckerTest {
         assertThat(awaitItem()).isEqualTo(CanWrite4GbFile)
       }
     }
+  }
+
+  @RunWith(RobolectricTestRunner::class)
+  @Config(
+    sdk = [Build.VERSION_CODES.R],
+    manifest = Config.NONE,
+    application = TestApplication::class
+  )
+  class LibraryFolderTests : BaseTest() {
+    private val libraryFolder: LibraryFolder = mockk()
+    private val treeUri: Uri = mockk()
+
+    private fun createTreeChecker(volume: File?): Fat32Checker {
+      coEvery { libraryFolder.activeTreeUri() } returns treeUri
+      every { libraryFolder.volumeDirectory(treeUri) } returns volume
+      selectedStorage = MutableStateFlow(pathWithoutSpace)
+      every { kiwixDataStore.selectedStorage } returns selectedStorage
+      return Fat32Checker(
+        kiwixDataStore,
+        listOf(fileSystemChecker),
+        mainDispatcherRule.dispatcher,
+        libraryFolder
+      ).also { fat32Checker = it }
+    }
+
+    @Test
+    fun `unknown volume of a picked folder does not block 4GB files`() =
+      runTest(mainDispatcherRule.dispatcher) {
+        createTreeChecker(volume = null).fileSystemStates.test {
+          assertThat(awaitItem()).isEqualTo(DetectingFileSystem)
+          assertThat(awaitItem()).isEqualTo(CanWrite4GbFile)
+        }
+        verify(exactly = 0) { fileSystemChecker.checkFilesystemSupports4GbFiles(any()) }
+      }
+
+    @Test
+    fun `inconclusive check on a picked folder fails open`() =
+      runTest(mainDispatcherRule.dispatcher) {
+        every { fileSystemChecker.checkFilesystemSupports4GbFiles(any()) } returns INCONCLUSIVE
+        createTreeChecker(File(pathWithSpace)).fileSystemStates.test {
+          assertThat(awaitItem()).isEqualTo(DetectingFileSystem)
+          assertThat(awaitItem()).isEqualTo(CanWrite4GbFile)
+        }
+      }
+
+    @Test
+    fun `fat32 volume of a picked folder is still detected`() =
+      runTest(mainDispatcherRule.dispatcher) {
+        every { fileSystemChecker.checkFilesystemSupports4GbFiles(any()) } returns CANNOT_WRITE_4GB
+        createTreeChecker(File(pathWithSpace)).fileSystemStates.test {
+          assertThat(awaitItem()).isEqualTo(DetectingFileSystem)
+          assertThat(awaitItem()).isEqualTo(CannotWrite4GbFile)
+        }
+      }
   }
 }
