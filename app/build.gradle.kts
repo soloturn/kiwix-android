@@ -2,7 +2,6 @@ import com.slack.keeper.optInToKeeper
 import plugin.KiwixConfigurationPlugin
 import plugin.RenameTarakFileTask
 import plugin.TrackedFileRestoreRegistrar
-import java.io.StringWriter
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.time.Instant
@@ -11,12 +10,6 @@ import java.time.ZoneOffset
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-import javax.inject.Inject
-import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.transform.OutputKeys
-import javax.xml.transform.TransformerFactory
-import javax.xml.transform.dom.DOMSource
-import javax.xml.transform.stream.StreamResult
 
 plugins {
   android
