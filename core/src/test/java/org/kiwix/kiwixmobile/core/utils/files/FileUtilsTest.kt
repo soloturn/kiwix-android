@@ -25,6 +25,7 @@ import android.util.Log
 import android.webkit.URLUtil
 import io.mockk.clearAllMocks
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -180,6 +181,14 @@ class FileUtilsTest {
     coEvery { any<File>().isFileExist(testDispatcher) } returns false
     coEvery { any<File>().deleteFile(testDispatcher) } returns true
     FileUtils.deleteZimFile("/storage/emulated/0/wiki.zimaa.part.part", testDispatcher)
+  }
+
+  @Test
+  fun deleteZimFile_whenEpub_deletesOnlyThatFile() = runTest {
+    coEvery { any<File>().isFileExist(testDispatcher) } returns true
+    coEvery { any<File>().deleteFile(testDispatcher) } returns true
+    FileUtils.deleteZimFile("/storage/emulated/0/book.epub", testDispatcher)
+    coVerify(exactly = 1) { any<File>().deleteFile(testDispatcher) }
   }
 
   // ======== isValidZimFile ========
