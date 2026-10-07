@@ -234,6 +234,8 @@
   <string name="unable_to_add_to_bookmarks">Unable to add to bookmarks</string>
   <string name="go_to_previous_page">Go to previous page</string>
   <string name="go_to_next_page">Go to next page</string>
+  <string name="go_to_previous_chapter">Go to previous chapter</string>
+  <string name="go_to_next_chapter">Go to next chapter</string>
   <string name="table_of_contents">Table of contents</string>
   <string name="select_language" tools:keep="@string/select_language">Select language</string>
   <string name="save_languages" tools:keep="@string/save_languages">Save languages</string>
