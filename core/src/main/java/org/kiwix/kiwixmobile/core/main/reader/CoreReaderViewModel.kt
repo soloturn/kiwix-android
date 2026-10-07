@@ -22,6 +22,7 @@ import android.Manifest.permission.POST_NOTIFICATIONS
 import android.app.Activity
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
 import android.view.ActionMode
 import android.view.Menu
 import android.view.ViewGroup
@@ -109,6 +110,7 @@ import org.kiwix.kiwixmobile.core.main.reader.helper.documentparser.DocumentPars
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.None
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenBookmarks
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenEpub
+import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenEpubContent
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenSearch
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenZim
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.ReaderIntentManager
@@ -139,6 +141,9 @@ import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
 import org.kiwix.kiwixmobile.core.utils.dialog.UnsupportedMimeTypeHandler
 import org.kiwix.kiwixmobile.core.utils.files.Log
+import org.kiwix.kiwixmobile.core.utils.files.EpubImportResult
+import org.kiwix.kiwixmobile.core.utils.files.importEpubContentUriResult
+import org.kiwix.kiwixmobile.core.utils.files.isAppPrivateFile
 import org.kiwix.kiwixmobile.core.utils.titleToUrl
 import org.kiwix.kiwixmobile.core.utils.urlSuffixToParsableUrl
 import java.io.File
@@ -715,6 +720,7 @@ abstract class CoreReaderViewModel(
 
   @Volatile var isWebViewHistoryRestoring = false
   protected var zimReaderSource: ZimReaderSource? = null
+  private var pendingEpubFile: File? = null
 
   /**
    * Returns true if user enables the backToTop setting from setting screen.
@@ -767,6 +773,7 @@ abstract class CoreReaderViewModel(
   }
 
   override fun onAddNoteMenuClicked() {
+    if (zimReaderContainer.isEpubOpen) return
     launchInViewModelScope {
       emitEffect(ReaderEffect.ShowAddNoteDialog(getCurrentWebView()))
     }
@@ -944,6 +951,7 @@ abstract class CoreReaderViewModel(
   }
 
   override fun onSearchMenuClickedMenuClicked() {
+    if (zimReaderContainer.isEpubOpen) return
     launchInViewModelScope {
       readerSessionManager.saveReaderSession {
         // Pass this function to saveTabStates so that after saving
@@ -969,7 +977,7 @@ abstract class CoreReaderViewModel(
   }
 
   override fun onAddToHomeScreenMenuClicked() {
-    if (!zimReaderContainer.hasReader) {
+    if (!zimReaderContainer.hasReader || zimReaderContainer.isEpubOpen) {
       Log.e(TAG_KIWIX, "Reader or ZimFileReader is null, cannot add to home screen")
       return
     }
@@ -1080,17 +1088,21 @@ abstract class CoreReaderViewModel(
       updateBottomToolbarArrowsAlpha()
       onEpubPageFinished()
       val currentWebView = getCurrentWebView()
-      readerHistoryManager.saveHistory(
-        currentWebView.url,
-        currentWebView.title,
-        zimReaderContainer.id,
-        zimReaderContainer.name,
-        zimReaderContainer.zimReaderSource,
-        zimReaderContainer.favicon
-      )
+      // History and session restore are ZIM-keyed; EPUB persistence lands separately.
+      val isEpub = zimReaderContainer.isEpubOpen
+      if (!isEpub) {
+        readerHistoryManager.saveHistory(
+          currentWebView.url,
+          currentWebView.title,
+          zimReaderContainer.id,
+          zimReaderContainer.name,
+          zimReaderContainer.zimReaderSource,
+          zimReaderContainer.favicon
+        )
+      }
       kiwixDataStore.incrementRateAppReadingCount()
       updateBottomToolbarVisibility()
-      if (!isWebViewHistoryRestoring) {
+      if (!isWebViewHistoryRestoring && !isEpub) {
         readerSessionManager.saveReaderSession()
       }
     }
@@ -1334,23 +1346,45 @@ abstract class CoreReaderViewModel(
       }
     } else {
       this.zimReaderSource = zimReaderSource
+      pendingEpubFile = null
       emitEffect(ReaderEffect.RequestReadStoragePermission)
     }
+  }
+
+  /** Copies a `content://` EPUB to app-private storage (off the main thread), then opens it. */
+  private suspend fun openEpubContentUri(uri: Uri) {
+    updateState { copy(loading = true) }
+    val file = try {
+      (importEpubContentUriResult(context, uri) as? EpubImportResult.Imported)?.file
+    } finally {
+      updateState { copy(loading = false) }
+    }
+    if (file == null) {
+      emitEffect(ReaderEffect.ShowToast(context.getString(string.error_file_invalid, "$uri")))
+      return
+    }
+    openEpubFile(file)
   }
 
   /**
    * Opens [file] in the native EPUB reader and renders its first spine page.
    * TODO(epub-reader): library entry/persistence, bookmarks, in-book search, and hiding
-   *  ZIM-only menu items (random page, search) while an EPUB is open.
+   * ZIM-only menu items (random page, search) while an EPUB is open.
    */
   open suspend fun openEpubFile(file: File) {
     if (uiState.value.ttsControlsItem.isTtsPlaying) {
       stopReadAloud()
     }
-    if (!isBrandedApp() && !kiwixPermissionChecker.hasReadExternalStoragePermission()) {
+    // App-private copies (e.g. imported content:// EPUBs) need no storage permission.
+    if (!isAppPrivateFile(context, file) &&
+      !isBrandedApp() &&
+      !kiwixPermissionChecker.hasReadExternalStoragePermission()
+    ) {
+      pendingEpubFile = file
       emitEffect(ReaderEffect.RequestReadStoragePermission)
       return
     }
+    pendingEpubFile = null
     // Same as openZimFile: WebViews must not outlive the reader they were serving.
     readerWebViewManager.destroyAllTabs()
     if (!zimReaderContainer.setEpubFile(file)) {
@@ -1373,7 +1407,7 @@ abstract class CoreReaderViewModel(
     }
     hideNoBookOpenViews()
     pendingEpubRestore?.let { loadUrlWithCurrentWebview(it.url) } ?: openMainPage()
-    readerMenuState?.onFileOpened(urlIsValid())
+    readerMenuState?.onFileOpened(urlIsValid(), isEpub = true)
     updateState { copy(showTabSwitcher = false) }
     updateTitle()
   }
@@ -1584,6 +1618,9 @@ abstract class CoreReaderViewModel(
 
       is OpenEpub ->
         launchInViewModelScope { openEpubFile(File(result.epubFilePath)) }
+
+      is OpenEpubContent ->
+        launchInViewModelScope { openEpubContentUri(result.uri.toUri()) }
 
       is OpenZim ->
         launchInViewModelScope {
@@ -1805,7 +1842,8 @@ abstract class CoreReaderViewModel(
   fun onReadStoragePermissionResult(isGranted: Boolean) {
     if (isGranted) {
       launchInViewModelScope {
-        zimReaderSource?.let { openZimFile(it) }
+        val epub = pendingEpubFile
+        if (epub != null) openEpubFile(epub) else zimReaderSource?.let { openZimFile(it) }
       }
       return
     }
