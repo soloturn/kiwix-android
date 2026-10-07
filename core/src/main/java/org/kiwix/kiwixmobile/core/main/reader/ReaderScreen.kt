@@ -141,6 +141,7 @@ import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
+import org.kiwix.kiwixmobile.core.epub.EpubNavState
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.BookmarkButtonItem
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
@@ -235,6 +236,10 @@ const val READER_BOTTOM_BAR_PREVIOUS_SCREEN_BUTTON_TESTING_TAG =
   "readerBottomBarPreviousScreenButtonTestingTag"
 const val READER_BOTTOM_BAR_NEXT_SCREEN_BUTTON_TESTING_TAG =
   "readerBottomBarNextScreenButtonTestingTag"
+const val READER_BOTTOM_BAR_PREVIOUS_CHAPTER_BUTTON_TESTING_TAG =
+  "readerBottomBarPreviousChapterButtonTestingTag"
+const val READER_BOTTOM_BAR_NEXT_CHAPTER_BUTTON_TESTING_TAG =
+  "readerBottomBarNextChapterButtonTestingTag"
 const val READER_BOTTOM_BAR_HOME_BUTTON_TESTING_TAG = "readerBottomBarHomeButtonTestingTag"
 const val READER_BOTTOM_BAR_TABLE_CONTENT_BUTTON_TESTING_TAG =
   "readerBottomBarTableContentButtonTestingTag"
@@ -292,7 +297,8 @@ fun ReaderScreen(
               state.isTocButtonEnable,
               state.showBottomBar,
               bottomAppBarScrollBehavior,
-              onReaderAction
+              onReaderAction,
+              state.epubNavState
             )
           }
         },
@@ -335,7 +341,8 @@ fun ReaderScreen(
         TableDrawerSheet(
           title = state.tableOfContentTitle,
           sections = state.documentSections,
-          state.tabsState.currentWebView
+          state.tabsState.currentWebView,
+          onSectionUrlClick = { onReaderAction(ReaderAction.OpenEpubUrl(it)) }
         ) { onReaderAction(CloseTocDrawer) }
       }
     }
@@ -454,6 +461,7 @@ fun TableDrawerSheet(
   title: String,
   sections: List<DocumentSection>,
   selectedWebView: KiwixWebView?,
+  onSectionUrlClick: (String) -> Unit = {},
   closeTocClick: () -> Unit
 ) {
   ModalDrawerSheet(
@@ -495,7 +503,8 @@ fun TableDrawerSheet(
                 selectedWebView,
                 index,
                 sections,
-                closeTocClick
+                closeTocClick,
+                onSectionUrlClick
               )
             }
             .padding(start = paddingStart.dp, top = EIGHT_DP, bottom = EIGHT_DP, end = SIXTEEN_DP)
@@ -518,9 +527,13 @@ private fun onTableOfContentSectionClick(
   selectedWebView: KiwixWebView?,
   position: Int,
   sections: List<DocumentSection>,
-  closeTocClick: () -> Unit
+  closeTocClick: () -> Unit,
+  onSectionUrlClick: (String) -> Unit
 ) {
-  if (hasItemForPositionInDocumentSectionsList(position, sections)) {
+  val sectionUrl = sections.getOrNull(position)?.url
+  if (sectionUrl != null) {
+    onSectionUrlClick(sectionUrl)
+  } else if (hasItemForPositionInDocumentSectionsList(position, sections)) {
     val targetId = sections[position].id.replace("'", "\\'")
     selectedWebView?.evaluateJavascript(
       "document.getElementById('$targetId')?.scrollIntoView();",
@@ -1095,6 +1108,7 @@ private fun BackToTopFab(showBackToTop: Boolean, onReaderAction: (ReaderAction) 
   )
 }
 
+@Suppress("LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BottomAppBarOfReaderScreen(
@@ -1104,7 +1118,8 @@ private fun BottomAppBarOfReaderScreen(
   isTocButtonEnable: Boolean,
   shouldShowBottomAppBar: Boolean,
   bottomAppBarScrollBehavior: BottomAppBarScrollBehavior,
-  onReaderAction: (ReaderAction) -> Unit
+  onReaderAction: (ReaderAction) -> Unit,
+  epubNavState: EpubNavState? = null
 ) {
   if (!shouldShowBottomAppBar) return
   BottomAppBar(
@@ -1130,6 +1145,15 @@ private fun BottomAppBarOfReaderScreen(
           selected = bookmarkButtonItem.isBookmarked
         }
       )
+      if (epubNavState != null) {
+        BottomAppBarButtonIcon(
+          onClick = { onReaderAction(ReaderAction.EpubPreviousChapter) },
+          buttonIcon = Drawable(R.drawable.ic_skip_previous_24dp),
+          shouldEnable = epubNavState.hasPrevious,
+          contentDescription = stringResource(R.string.go_to_previous_chapter),
+          testingTag = READER_BOTTOM_BAR_PREVIOUS_CHAPTER_BUTTON_TESTING_TAG
+        )
+      }
       // Back Icon(for going to previous page)
       BottomAppBarButtonIcon(
         onClick = { onReaderAction(PreviousClicked) },
@@ -1155,6 +1179,15 @@ private fun BottomAppBarOfReaderScreen(
         contentDescription = stringResource(R.string.go_to_next_page),
         testingTag = READER_BOTTOM_BAR_NEXT_SCREEN_BUTTON_TESTING_TAG
       )
+      if (epubNavState != null) {
+        BottomAppBarButtonIcon(
+          onClick = { onReaderAction(ReaderAction.EpubNextChapter) },
+          buttonIcon = Drawable(R.drawable.ic_skip_next_24dp),
+          shouldEnable = epubNavState.hasNext,
+          contentDescription = stringResource(R.string.go_to_next_chapter),
+          testingTag = READER_BOTTOM_BAR_NEXT_CHAPTER_BUTTON_TESTING_TAG
+        )
+      }
       // Toggle Icon(to open the table of content in right side bar)
       BottomAppBarButtonIcon(
         shouldEnable = isTocButtonEnable,
@@ -1438,4 +1471,10 @@ private fun ColumnScope.TabItemCard(
   }
 }
 
-data class DocumentSection(var title: String, var id: String, var level: Int)
+data class DocumentSection(
+  var title: String,
+  var id: String,
+  var level: Int,
+  /** Set for EPUB ToC rows: the kiwix.app URL to open instead of scrolling to [id]. */
+  val url: String? = null
+)

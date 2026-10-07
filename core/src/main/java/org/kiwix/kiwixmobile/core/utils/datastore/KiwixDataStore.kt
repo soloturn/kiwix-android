@@ -25,6 +25,7 @@ import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -38,6 +39,7 @@ import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ThemeConfig
 import org.kiwix.kiwixmobile.core.ThemeConfig.Theme.Companion.from
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.epub.EpubReadingPosition
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.zim_manager.Category
@@ -701,7 +703,20 @@ class KiwixDataStore @Inject constructor(
     }
   }
 
+  suspend fun getEpubPosition(bookId: String): EpubReadingPosition? =
+    EpubReadingPosition.decode(
+      context.kiwixDataStore.data.first()[stringPreferencesKey("$EPUB_POSITION_PREFIX$bookId")]
+    )
+
+  suspend fun setEpubPosition(bookId: String, position: EpubReadingPosition) {
+    context.kiwixDataStore.edit { prefs ->
+      prefs[stringPreferencesKey("$EPUB_POSITION_PREFIX$bookId")] = position.encode()
+    }
+  }
+
   companion object {
+    private const val EPUB_POSITION_PREFIX = "epub_position_"
+
     // Prefs
     const val PREF_LANG = "pref_language_chooser"
     const val PREF_STORAGE = "pref_select_folder"

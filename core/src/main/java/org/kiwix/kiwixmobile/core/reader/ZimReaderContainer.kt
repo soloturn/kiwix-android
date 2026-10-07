@@ -154,6 +154,8 @@ class ZimReaderContainer @Inject constructor(
   suspend fun setEpubFile(file: File?): Boolean = setReaderMutex.withLock {
     withContext(ioDispatcher) {
       val newReader = file?.let { runCatching { EpubFileReader(it) }.getOrNull() }
+      // Parse the lazy ToC here, off Main.
+      runCatching { newReader?.toc }
       lock.write {
         backingReader?.dispose()
         backingReader = newReader
@@ -164,6 +166,9 @@ class ZimReaderContainer @Inject constructor(
 
   /** True when the open book is an EPUB (ZIM-only features are unavailable). */
   val isEpubOpen: Boolean get() = backingReader is EpubFileReader
+
+  /** The open EPUB reader, or null. Lock-free like [isEpubOpen]; its zip reads fail safe once disposed. */
+  val epubReader: EpubFileReader? get() = backingReader as? EpubFileReader
 
   /** Persistable identity of the open book, any format. */
   val sourceId: String? get() = withBookReaderOrNull { it?.sourceId }
