@@ -101,7 +101,10 @@ object EpubParser {
       creators = texts("creator"),
       language = texts("language").firstOrNull(),
       identifier = identifier,
-      coverPath = cover?.path
+      coverPath = cover?.path,
+      publisher = texts("publisher").firstOrNull().orEmpty(),
+      date = texts("date").firstOrNull().orEmpty(),
+      description = texts("description").firstOrNull().orEmpty()
     )
   }
 
