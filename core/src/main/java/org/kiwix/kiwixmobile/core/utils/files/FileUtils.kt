@@ -398,7 +398,7 @@ object FileUtils {
     // For file managers that provide the full path in the URI (common on devices below Android 11).
     // This triggers when the user clicks directly on a ZIM file in the file manager, and the file
     // manager returns the path via its own file provider.
-    "$uri".contains("root") && "$uri".endsWith("zim") -> {
+    "$uri".contains("root") && ("$uri".endsWith("zim") || isEpubFile("$uri")) -> {
       "$uri".substringAfter("/root")
     }
 
@@ -447,7 +447,7 @@ object FileUtils {
     val documentId = extractDocumentId(uri, documentsContractWrapper)
 
     // Attempt to handle cases where the document ID is a direct path to a ZIM file.
-    if (isValidZimFile(documentId)) {
+    if (isValidZimFile(documentId) || isEpubFile(documentId)) {
       return@withContext documentId.substringAfter("raw:")
     }
 
@@ -642,6 +642,10 @@ object FileUtils {
   @JvmStatic
   fun isValidZimFile(filePath: String): Boolean =
     filePath.endsWith(".zim") || filePath.endsWith(".zimaa")
+
+  /** Extension-only EPUB check; use [isValidEpubFile] for a content check. */
+  @JvmStatic
+  fun isEpubPath(filePath: String): Boolean = isEpubFile(filePath)
 
   /**
    * Determines whether the given file path corresponds to a split ZIM file.
