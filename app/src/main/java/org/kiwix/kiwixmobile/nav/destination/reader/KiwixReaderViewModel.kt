@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -93,6 +94,7 @@ class KiwixReaderViewModel @Inject constructor(
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
   @MainDispatcher mainDispatcher: MainCoroutineDispatcher,
+  private val epubLibraryManager: EpubLibraryManager,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CoreReaderViewModel(
     context,
@@ -225,6 +227,8 @@ class KiwixReaderViewModel @Inject constructor(
       return
     }
     if (isEpubFile(filePath)) {
+      // Covers EPUBs opened from outside the library (VIEW intents) as well as from it.
+      runCatching { epubLibraryManager.add(File(filePath), markOpened = true) }
       openEpubFile(File(filePath))
       return
     }

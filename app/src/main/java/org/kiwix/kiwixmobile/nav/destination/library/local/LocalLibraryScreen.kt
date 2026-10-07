@@ -78,6 +78,7 @@ import org.kiwix.kiwixmobile.R.drawable
 import org.kiwix.kiwixmobile.R.string
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
+import org.kiwix.kiwixmobile.core.epub.EpubOnDisk
 import org.kiwix.kiwixmobile.core.main.reader.OnBackPressed
 import org.kiwix.kiwixmobile.core.ui.components.ContentLoadingProgressBar
 import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
@@ -98,6 +99,7 @@ import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListIte
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiState
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.NoFileView
 import org.kiwix.kiwixmobile.ui.BookItem
+import org.kiwix.kiwixmobile.ui.EpubBookItem
 import org.kiwix.kiwixmobile.ui.ZimFilesLanguageHeader
 import org.kiwix.kiwixmobile.zimManager.fileselectView.FileSelectListState
 import kotlin.math.roundToInt
@@ -123,6 +125,7 @@ fun LocalLibraryScreen(
   onClick: ((BookOnDisk) -> Unit)? = null,
   onLongClick: ((BookOnDisk) -> Unit)? = null,
   onMultiSelect: ((BookOnDisk) -> Unit)? = null,
+  epubCallbacks: EpubItemCallbacks = EpubItemCallbacks(),
   bottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
   onUserBackPressed: () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
@@ -165,15 +168,23 @@ fun LocalLibraryScreen(
       onClick,
       onLongClick,
       onMultiSelect,
-      listState
+      listState,
+      epubCallbacks
     )
   }
 }
 
+/** Click handlers for the EPUB rows of the library list. */
+data class EpubItemCallbacks(
+  val onClick: ((EpubOnDisk) -> Unit)? = null,
+  val onLongClick: ((EpubOnDisk) -> Unit)? = null,
+  val onMultiSelect: ((EpubOnDisk) -> Unit)? = null
+)
+
 @Composable
 private fun screenTitle(fileSelectListState: FileSelectListState): String =
-  if (fileSelectListState.selectedBooks.isNotEmpty()) {
-    "${fileSelectListState.selectedBooks.size}"
+  if (fileSelectListState.selectedCount > ZERO) {
+    "${fileSelectListState.selectedCount}"
   } else {
     stringResource(R.string.library)
   }
@@ -190,7 +201,8 @@ private fun LocalLibraryMainContent(
   onClick: ((BookOnDisk) -> Unit)? = null,
   onLongClick: ((BookOnDisk) -> Unit)? = null,
   onMultiSelect: ((BookOnDisk) -> Unit)? = null,
-  listState: LazyListState
+  listState: LazyListState,
+  epubCallbacks: EpubItemCallbacks = EpubItemCallbacks()
 ) {
   SwipeRefreshLayout(
     isRefreshing = state.isSwipeRefreshing,
@@ -207,7 +219,7 @@ private fun LocalLibraryMainContent(
         progress = state.scanning.progress
       )
     }
-    if (state.noFileView.isVisible || state.fileSelectListState.bookOnDiskListItems.isEmpty()) {
+    if (state.noFileView.isVisible || state.fileSelectListState.isEmpty) {
       NoFilesView(state.noFileView, onDownloadButtonClick)
     } else {
       BookItemList(
@@ -215,7 +227,8 @@ private fun LocalLibraryMainContent(
         onClick,
         onLongClick,
         onMultiSelect,
-        listState
+        listState,
+        epubCallbacks
       )
     }
   }
@@ -228,6 +241,7 @@ private fun BookItemList(
   onLongClick: ((BookOnDisk) -> Unit)? = null,
   onMultiSelect: ((BookOnDisk) -> Unit)? = null,
   lazyListState: LazyListState,
+  epubCallbacks: EpubItemCallbacks = EpubItemCallbacks()
 ) {
   LazyColumn(
     modifier = Modifier
@@ -253,6 +267,16 @@ private fun BookItemList(
         }
       }
     }
+    itemsIndexed(state.epubItems, key = { _, epub -> "epub-${epub.id}" }) { index, epub ->
+      EpubBookItem(
+        index = state.bookOnDiskListItems.size + index,
+        epub = epub,
+        selectionMode = state.selectionMode,
+        onClick = epubCallbacks.onClick,
+        onLongClick = epubCallbacks.onLongClick,
+        onMultiSelect = epubCallbacks.onMultiSelect
+      )
+    }
     item {
       Box(
         modifier = Modifier
@@ -274,9 +298,10 @@ private fun BookItemList(
 @Composable
 fun BookItemListForPreview(
   state: FileSelectListState,
-  lazyListState: LazyListState
+  lazyListState: LazyListState,
+  epubCallbacks: EpubItemCallbacks = EpubItemCallbacks()
 ) {
-  BookItemList(state = state, lazyListState = lazyListState)
+  BookItemList(state = state, lazyListState = lazyListState, epubCallbacks = epubCallbacks)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

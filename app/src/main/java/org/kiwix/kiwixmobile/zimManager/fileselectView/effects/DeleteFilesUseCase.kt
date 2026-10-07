@@ -21,6 +21,8 @@ package org.kiwix.kiwixmobile.zimManager.fileselectView.effects
 import kotlinx.coroutines.CoroutineDispatcher
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
+import org.kiwix.kiwixmobile.core.epub.EpubOnDisk
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
@@ -30,8 +32,15 @@ import javax.inject.Inject
 data class DeleteFilesUseCase @Inject constructor(
   private val libkiwixBookOnDisk: LibkiwixBookOnDisk,
   private val zimReaderContainer: ZimReaderContainer,
+  private val epubLibraryManager: EpubLibraryManager,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
+  /** Deletes each EPUB file and its library entry; true only if every file is gone. */
+  suspend fun deleteEpubs(epubs: List<EpubOnDisk>): Boolean =
+    epubs.fold(true) { acc, epub ->
+      epubLibraryManager.deleteFileAndEntry(epub.id, epub.file) && acc
+    }
+
   suspend operator fun invoke(
     books: List<BooksOnDiskListItem.BookOnDisk>
   ): Boolean =

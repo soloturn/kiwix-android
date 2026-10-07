@@ -37,6 +37,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
+import org.kiwix.kiwixmobile.core.epub.EpubOnDisk
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
@@ -50,6 +52,7 @@ class DeleteFilesUseCaseTest {
 
   private val libkiwixBookOnDisk = mockk<LibkiwixBookOnDisk>(relaxed = true)
   private val zimReaderContainer = mockk<ZimReaderContainer>(relaxed = true)
+  private val epubLibraryManager = mockk<EpubLibraryManager>(relaxed = true)
 
   private var file1 = File("/storage/kiwix.zim")
   private val file2 = File("/storage/test.zim")
@@ -79,7 +82,7 @@ class DeleteFilesUseCaseTest {
     book = BookOnDisk(book = libkiwixBook, zimReaderSource = ZimReaderSource(file1))
 
     deleteFilesUseCase =
-      DeleteFilesUseCase(libkiwixBookOnDisk, zimReaderContainer, testDispatcher)
+      DeleteFilesUseCase(libkiwixBookOnDisk, zimReaderContainer, epubLibraryManager, testDispatcher)
   }
 
   @AfterEach
@@ -205,5 +208,29 @@ class DeleteFilesUseCaseTest {
       )
 
     assertFalse(result)
+  }
+
+  private fun epub(id: String) =
+    EpubOnDisk(id, File("/storage/$id.epub"), id, "", "", null, 1L, 0L, 0L)
+
+  @Test
+  fun deleteEpubs_whenAllDeleted_returnsTrueAndNeverUsesZimDeletion() = runTest {
+    coEvery { epubLibraryManager.deleteFileAndEntry(any(), any()) } returns true
+
+    assertTrue(deleteFilesUseCase.deleteEpubs(listOf(epub("a"), epub("b"))))
+
+    coVerify { epubLibraryManager.deleteFileAndEntry("a", File("/storage/a.epub")) }
+    coVerify { epubLibraryManager.deleteFileAndEntry("b", File("/storage/b.epub")) }
+    coVerify(exactly = 0) { FileUtils.deleteZimFile(any(), any()) }
+  }
+
+  @Test
+  fun deleteEpubs_whenOneFails_stillTriesTheRestAndReturnsFalse() = runTest {
+    coEvery { epubLibraryManager.deleteFileAndEntry("a", any()) } returns false
+    coEvery { epubLibraryManager.deleteFileAndEntry("b", any()) } returns true
+
+    assertFalse(deleteFilesUseCase.deleteEpubs(listOf(epub("a"), epub("b"))))
+
+    coVerify { epubLibraryManager.deleteFileAndEntry("b", any()) }
   }
 }
