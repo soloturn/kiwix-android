@@ -39,17 +39,22 @@ class FileSearch @Inject constructor(
   @param:ApplicationContext private val context: Context,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
+  // ZIM-only on purpose: existing callers assume every result is a ZIM. EPUB discovery is
+  // opt-in via scan(includeEpub = true), using the separate list below.
   private val zimFileExtensions = arrayOf("zim", "zimaa")
+  private val epubFileExtensions = arrayOf(EPUB_EXTENSION)
 
   fun scan(
-    scanningProgressListener: ScanningProgressListener
+    scanningProgressListener: ScanningProgressListener,
+    includeEpub: Boolean = false
   ): Flow<List<File>> {
+    val extensions = if (includeEpub) zimFileExtensions + epubFileExtensions else zimFileExtensions
     val fileSystemFlow = flow {
-      emit(scanFileSystem(scanningProgressListener))
+      emit(scanFileSystem(scanningProgressListener, extensions))
     }.flowOn(ioDispatcher)
 
     val mediaStoreFlow = flow {
-      emit(scanMediaStore())
+      emit(scanMediaStore(extensions))
     }.flowOn(ioDispatcher)
 
     return combine(fileSystemFlow, mediaStoreFlow) { filesSystemFiles, mediaStoreFiles ->
@@ -57,9 +62,9 @@ class FileSearch @Inject constructor(
     }
   }
 
-  private fun scanMediaStore() =
+  private fun scanMediaStore(extensions: Array<String>) =
     mutableListOf<File>().apply {
-      queryMediaStore()
+      queryMediaStore(extensions)
         ?.forEachRow { cursor ->
           File(cursor.get<String>(MediaColumns.DATA))
             .takeIf { it.canRead() && isNotInTrashFolder(it) }
@@ -71,17 +76,20 @@ class FileSearch @Inject constructor(
   private fun isNotInTrashFolder(it: File) =
     !Regex("/\\.Trash/").containsMatchIn(it.path)
 
-  private fun queryMediaStore() =
+  private fun queryMediaStore(extensions: Array<String>) =
     context.contentResolver
       .query(
         Files.getContentUri("external"),
         arrayOf(MediaColumns.DATA),
-        MediaColumns.DATA + " like ? or " + MediaColumns.DATA + " like ? ",
-        arrayOf("%." + zimFileExtensions[0], "%." + zimFileExtensions[1]),
+        extensions.joinToString("or ") { MediaColumns.DATA + " like ? " },
+        extensions.map { "%.$it" }.toTypedArray(),
         null
       )
 
-  private suspend fun scanFileSystem(scanningProgressListener: ScanningProgressListener): List<File> {
+  private suspend fun scanFileSystem(
+    scanningProgressListener: ScanningProgressListener,
+    extensions: Array<String>
+  ): List<File> {
     val directoryRoots = directoryRoots()
     val totalDirectories = directoryRoots.size
     var processedDirectories = 0
@@ -89,7 +97,7 @@ class FileSearch @Inject constructor(
     return directoryRoots.fold(mutableListOf<File>()) { acc, root ->
       acc.apply {
         addAll(
-          scanDirectory(root).also {
+          scanDirectory(root, extensions).also {
             // Increment the count of processed directories and notify the progress
             processedDirectories++
             scanningProgressListener.onProgressUpdate(processedDirectories, totalDirectories)
@@ -102,7 +110,10 @@ class FileSearch @Inject constructor(
   private suspend fun directoryRoots() =
     StorageDeviceUtils.getReadableStorage(context, ioDispatcher).map(StorageDevice::name)
 
-  private fun scanDirectory(directory: String): List<File> = File(directory).walk()
+  private fun scanDirectory(
+    directory: String,
+    extensions: Array<String>
+  ): List<File> = File(directory).walk()
     .onEnter { dir ->
       // Excluding the "data," "obb," "hidden folders," and "Trash" folders from scanning is
       // justified for several reasons. The "Trash" folder contains deleted files,
@@ -118,7 +129,7 @@ class FileSearch @Inject constructor(
         !dir.name.equals("obb", ignoreCase = true) &&
         !dir.name.startsWith(".", ignoreCase = true)
     }.filter {
-      it.extension.isAny(*zimFileExtensions)
+      it.extension.isAny(*extensions)
     }.toList()
 }
 
