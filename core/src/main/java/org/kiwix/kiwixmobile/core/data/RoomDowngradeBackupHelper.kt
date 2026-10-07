@@ -38,7 +38,7 @@ object RoomDowngradeBackupHelper {
   )
 
   const val DB_NAME = "KiwixRoom.db"
-  const val CURRENT_ROOM_DB_VERSION = 10
+  const val CURRENT_ROOM_DB_VERSION = 11
   private const val ROOM_DOWNGRADE_HELPER = "RoomDowngradeHelper"
 
   fun isDowngrade(context: Context, targetVersion: Int): Boolean {

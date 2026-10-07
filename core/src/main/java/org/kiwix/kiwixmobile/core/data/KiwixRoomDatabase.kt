@@ -27,6 +27,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
+import org.kiwix.kiwixmobile.core.dao.EpubLibraryDao
 import org.kiwix.kiwixmobile.core.dao.HistoryRoomDao
 import org.kiwix.kiwixmobile.core.dao.HistoryRoomDaoCoverts
 import org.kiwix.kiwixmobile.core.dao.NotesRoomDao
@@ -34,6 +35,7 @@ import org.kiwix.kiwixmobile.core.dao.RecentSearchRoomDao
 import org.kiwix.kiwixmobile.core.dao.WebViewHistoryRoomDao
 import org.kiwix.kiwixmobile.core.dao.entities.BundleRoomConverter
 import org.kiwix.kiwixmobile.core.dao.entities.DownloadRoomEntity
+import org.kiwix.kiwixmobile.core.dao.entities.EpubBookRoomEntity
 import org.kiwix.kiwixmobile.core.dao.entities.ErrorConverter
 import org.kiwix.kiwixmobile.core.dao.entities.HistoryRoomEntity
 import org.kiwix.kiwixmobile.core.dao.entities.NotesRoomEntity
@@ -53,7 +55,8 @@ import org.kiwix.kiwixmobile.core.utils.files.Log
     HistoryRoomEntity::class,
     NotesRoomEntity::class,
     DownloadRoomEntity::class,
-    WebViewHistoryEntity::class
+    WebViewHistoryEntity::class,
+    EpubBookRoomEntity::class
   ],
   version = CURRENT_ROOM_DB_VERSION,
   exportSchema = false
@@ -72,6 +75,7 @@ abstract class KiwixRoomDatabase : RoomDatabase() {
   abstract fun notesRoomDao(): NotesRoomDao
   abstract fun downloadRoomDao(): DownloadRoomDao
   abstract fun webViewHistoryRoomDao(): WebViewHistoryRoomDao
+  abstract fun epubLibraryDao(): EpubLibraryDao
 
   companion object {
     private var db: KiwixRoomDatabase? = null
@@ -97,7 +101,8 @@ abstract class KiwixRoomDatabase : RoomDatabase() {
               MIGRATION_6_7,
               MIGRATION_7_8,
               MIGRATION_8_9,
-              MIGRATION_9_10
+              MIGRATION_9_10,
+              MIGRATION_10_11
             )
             .fallbackToDestructiveMigrationOnDowngrade()
             .addCallback(createRestoreCallback(backup))
@@ -398,6 +403,33 @@ abstract class KiwixRoomDatabase : RoomDatabase() {
         override fun migrate(db: SupportSQLiteDatabase) {
           db.execSQL(
             "ALTER TABLE DownloadRoomEntity ADD COLUMN pauseReason INTEGER NOT NULL DEFAULT 0"
+          )
+        }
+      }
+
+    @Suppress("MagicNumber")
+    val MIGRATION_10_11 =
+      object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+          db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `EpubBookRoomEntity` (
+                `id` TEXT NOT NULL,
+                `path` TEXT NOT NULL,
+                `title` TEXT NOT NULL,
+                `authors` TEXT NOT NULL,
+                `language` TEXT NOT NULL,
+                `coverPath` TEXT,
+                `size` INTEGER NOT NULL,
+                `addedAt` INTEGER NOT NULL,
+                `lastOpenedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent()
+          )
+          db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_EpubBookRoomEntity_path` " +
+              "ON `EpubBookRoomEntity` (`path`)"
           )
         }
       }

@@ -48,6 +48,7 @@ class KiwixRoomDatabaseMigrationTest {
     KiwixRoomDatabase.MIGRATION_7_8,
     KiwixRoomDatabase.MIGRATION_8_9,
     KiwixRoomDatabase.MIGRATION_9_10,
+    KiwixRoomDatabase.MIGRATION_10_11,
   )
 
   @Before
@@ -600,5 +601,31 @@ class KiwixRoomDatabaseMigrationTest {
     assertEquals(0, downloadCursor.getInt(downloadCursor.getColumnIndexOrThrow("error")))
     assertEquals(0, downloadCursor.getInt(downloadCursor.getColumnIndexOrThrow("pauseReason")))
     downloadCursor.close()
+  }
+
+  @Test
+  fun migration10To11_createsEpubTableAndKeepsExistingData() {
+    // V11 adds: EpubBookRoomEntity with a unique index on path
+    migrateRange(fromVersion = 1, toVersion = 10)
+    insertRecentSearch(id = 1, searchTerm = "kotlin")
+
+    migrateRange(fromVersion = 10, toVersion = 11)
+
+    db.execSQL(
+      "INSERT INTO EpubBookRoomEntity VALUES ('id1', '/a.epub', 'T', 'A', 'en', NULL, 1, 2, 0)"
+    )
+    val cursor = db.query("SELECT * FROM EpubBookRoomEntity WHERE id = 'id1'")
+    cursor.moveToFirst()
+    assertEquals("/a.epub", cursor.getString(cursor.getColumnIndexOrThrow("path")))
+    cursor.close()
+    val search = db.query("SELECT searchTerm FROM RecentSearchRoomEntity WHERE id = 1")
+    search.moveToFirst()
+    assertEquals("kotlin", search.getString(0))
+    search.close()
+    org.junit.Assert.assertThrows(android.database.sqlite.SQLiteConstraintException::class.java) {
+      db.execSQL(
+        "INSERT INTO EpubBookRoomEntity VALUES ('id2', '/a.epub', 'T', 'A', 'en', NULL, 1, 2, 0)"
+      )
+    }
   }
 }
