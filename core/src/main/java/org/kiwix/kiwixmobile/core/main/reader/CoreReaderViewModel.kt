@@ -1509,10 +1509,19 @@ abstract class CoreReaderViewModel(
   }
 
   /**
-   * Opens a search item, creating a new tab first if requested, then loads the
-   * resolved destination URL (see [resolveDestinationUrl]) into the current web view.
+   * Opens a search item, switching to its book first when it came from a different one,
+   * then loads the resolved destination URL (see [resolveDestinationUrl]) into the web view.
    */
   private suspend fun openSearchItem(item: SearchItemToOpen) {
+    item.zimReaderSourceDatabaseValue
+      ?.takeIf { it != zimReaderContainer.zimReaderSource?.toDatabase() }
+      ?.let { target ->
+        // One gate for "can't resolve" and "can't open": keep the current book either way.
+        val source = ZimReaderSource.fromDatabaseValue(target)?.takeIf { zimFileManager.canOpen(it) }
+          ?: return
+        closeZimBook()
+        openZimFile(source)
+      }
     if (item.shouldOpenInNewTab) {
       // Skip loading the ZIM's main page into this tab; the resolved destination URL
       // is always loaded right below, so loading the main page first would be wasted work.
