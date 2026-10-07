@@ -17,6 +17,7 @@
  */
 package org.kiwix.kiwixmobile.core.utils.dialog
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -127,6 +128,7 @@ class RateDialogHandler @Inject constructor(
   }
 
   @Suppress("TooGenericExceptionCaught")
+  @SuppressLint("LogNotTimber")
   private fun launchInAppReviewFlow() {
     try {
       val reviewManager = ReviewManagerFactory.create(activity)

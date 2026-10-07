@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core.utils.dialog
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -28,9 +29,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
+import org.kiwix.kiwixmobile.core.utils.files.EPUB_MIME_TYPE
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.utils.files.SaveResult
 import java.io.File
@@ -38,6 +42,7 @@ import javax.inject.Inject
 
 class UnsupportedMimeTypeHandler @Inject constructor(
   private val zimReaderContainer: ZimReaderContainer,
+  private val epubOpenUseCase: EpubOpenUseCase,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
   private var alertDialogShower: AlertDialogShower? = null
@@ -62,6 +67,10 @@ class UnsupportedMimeTypeHandler @Inject constructor(
     documentType: String?,
     lifecycleScope: CoroutineScope
   ) {
+    if (documentType == EPUB_MIME_TYPE) {
+      openOrSaveFile(url, documentType, true, lifecycleScope)
+      return
+    }
     requireAlertDialogShower().show(
       KiwixDialog.SaveOrOpenUnsupportedFiles,
       { openOrSaveFile(url, documentType, true, lifecycleScope) },
@@ -70,6 +79,7 @@ class UnsupportedMimeTypeHandler @Inject constructor(
     )
   }
 
+  @SuppressLint("LogNotTimber")
   private fun openOrSaveFile(
     url: String?,
     documentType: String?,
@@ -108,7 +118,17 @@ class UnsupportedMimeTypeHandler @Inject constructor(
     openFile: Boolean
   ) {
     if (openFile) {
-      openFile(result.file, documentType)
+      if (documentType == EPUB_MIME_TYPE) {
+        openEpub(
+          FileProvider.getUriForFile(
+            requireActivity(),
+            "${requireActivity().packageName}.fileprovider",
+            result.file
+          )
+        )
+      } else {
+        openFile(result.file, documentType)
+      }
     } else {
       requireActivity().toast(
         requireActivity().getString(R.string.save_media_saved, result.file.absolutePath)
@@ -116,18 +136,26 @@ class UnsupportedMimeTypeHandler @Inject constructor(
     }
   }
 
-  private fun handleMediaSaved(
+  private suspend fun handleMediaSaved(
     result: SaveResult.MediaSaved,
     documentType: String?,
     openFile: Boolean
   ) {
     if (openFile) {
-      openUri(result.uri, documentType)
+      if (documentType == EPUB_MIME_TYPE) {
+        openEpub(result.uri)
+      } else {
+        openUri(result.uri, documentType)
+      }
     } else {
       requireActivity().toast(
         requireActivity().getString(R.string.save_media_saved, result.displayName)
       )
     }
+  }
+
+  private suspend fun openEpub(uri: Uri) {
+    epubOpenUseCase.open(requireActivity(), EpubSource.Content(uri))
   }
 
   private suspend fun openFile(savedFile: File, documentType: String?) {

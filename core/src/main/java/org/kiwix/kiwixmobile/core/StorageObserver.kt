@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core
 
+import android.net.Uri
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -67,12 +68,24 @@ class StorageObserver @Inject constructor(
    */
   suspend fun syncLibraryTree(scanningProgressListener: ScanningProgressListener? = null): Int =
     withContext(ioDispatcher) {
-      val treeUri = libraryFolder.activeTreeUri() ?: return@withContext 0
-      val known = libkiwixBookOnDisk.getBooks().map { it.zimReaderSource.toDatabase() }.toSet()
-      // Downloads in progress carry a ".part" suffix, so the walk never returns them.
-      fileSearch.scanTree(treeUri, scanningProgressListener)
-        .filterNot { "$it" in known }
-        .count { libkiwixBookOnDisk.insertUriBook(it) != null }
+      val treeUris = libraryFolder.activeScanTreeUris()
+      if (treeUris.isEmpty()) return@withContext 0
+      val known = libkiwixBookOnDisk.getBooks()
+        .map { it.zimReaderSource.toDatabase() }
+        .toMutableSet()
+      var added = 0
+      treeUris.forEach { treeUri ->
+        // Downloads in progress carry a ".part" suffix, so the walk never returns them.
+        val scan = fileSearch.scanTree(treeUri, scanningProgressListener)
+        importTreeEpubsInBackground(scan.epubFiles)
+        scan.zimFiles.forEach { zimUri ->
+          if ("$zimUri" !in known && libkiwixBookOnDisk.insertUriBook(zimUri) != null) {
+            known.add("$zimUri")
+            added++
+          }
+        }
+      }
+      added
     }
 
   fun getBooksOnFileSystem(
@@ -94,6 +107,18 @@ class StorageObserver @Inject constructor(
     if (epubs.isEmpty()) return
     importScope.launch {
       importMutex.withLock { runCatching { epubLibraryManager.importScanned(epubs) } }
+    }
+  }
+
+  private fun importTreeEpubsInBackground(epubs: List<Uri>) {
+    if (epubs.isEmpty()) return
+    importScope.launch {
+      importMutex.withLock {
+        runCatching {
+          val files = epubs.mapNotNull { fileSearch.importEpubFromTree(it) }
+          epubLibraryManager.importScanned(files)
+        }
+      }
     }
   }
 

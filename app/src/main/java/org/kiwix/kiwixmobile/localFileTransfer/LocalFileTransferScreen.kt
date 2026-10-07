@@ -104,6 +104,7 @@ fun LocalFileTransferScreen(
 ) {
   val targets = remember { mutableStateMapOf<String, ShowcaseProperty>() }
   val context = LocalContext.current
+  val nearbyDevicesMessage = stringResource(string.click_nearby_devices_message)
   Scaffold(
     topBar = {
       KiwixAppBar(
@@ -115,7 +116,7 @@ fun LocalFileTransferScreen(
                 targets[SEARCH_ICON_TESTING_TAG] = ShowcaseProperty(
                   index = ZERO,
                   coordinates = coordinates,
-                  showCaseMessage = context.getString(string.click_nearby_devices_message)
+                  showCaseMessage = nearbyDevicesMessage
                 )
               }
           )

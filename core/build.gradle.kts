@@ -57,6 +57,8 @@ dependencies {
   api(Libs.MEDIA3_SESSION)
   api(Libs.MEDIA3_COMMON)
 
-  implementation(Libs.READIUM_SHARED)
-  implementation(Libs.READIUM_STREAMER)
+  // Readium EPUB toolkit: parsing/metadata (shared, streamer) and the paginated navigator.
+  api(Libs.READIUM_SHARED)
+  api(Libs.READIUM_STREAMER)
+  api(Libs.READIUM_NAVIGATOR)
 }

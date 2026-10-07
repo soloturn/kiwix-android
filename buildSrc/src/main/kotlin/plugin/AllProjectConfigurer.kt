@@ -108,7 +108,7 @@ class AllProjectConfigurer {
         encoding = "UTF-8"
         sourceCompatibility = Config.javaVersion
         targetCompatibility = Config.javaVersion
-        // Readium requires desugaring in core and its consuming applications.
+        // The Readium EPUB toolkit requires core library desugaring in consuming modules.
         isCoreLibraryDesugaringEnabled = true
       }
       target.dependencies.add("coreLibraryDesugaring", Libs.DESUGAR_JDK_LIBS)
