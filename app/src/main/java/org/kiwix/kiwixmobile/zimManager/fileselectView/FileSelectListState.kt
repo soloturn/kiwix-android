@@ -17,17 +17,41 @@
  */
 package org.kiwix.kiwixmobile.zimManager.fileselectView
 
+import org.kiwix.kiwixmobile.core.epub.EpubOnDisk
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.SelectionMode
+import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.SelectionMode.MULTI
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.SelectionMode.NORMAL
 
 data class FileSelectListState(
   val bookOnDiskListItems: List<BooksOnDiskListItem>,
-  val selectionMode: SelectionMode = NORMAL
+  val selectionMode: SelectionMode = NORMAL,
+  val epubItems: List<EpubOnDisk> = emptyList()
 ) {
   val selectedBooks
     get() = bookOnDiskListItems
       .filterIsInstance<BookOnDisk>()
       .filter { it.isSelected }
+
+  val selectedEpubs get() = epubItems.filter { it.isSelected }
+
+  val selectedCount get() = selectedBooks.size + selectedEpubs.size
+
+  val isEmpty get() = bookOnDiskListItems.isEmpty() && epubItems.isEmpty()
+
+  /** MULTI while anything (ZIM or EPUB) is selected, otherwise NORMAL. */
+  fun withSelectionMode() = copy(selectionMode = if (selectedCount == 0) NORMAL else MULTI)
+
+  fun toggleEpub(id: String) = copy(
+    epubItems = epubItems.map { if (it.id == id) it.copy(isSelected = !it.isSelected) else it }
+  ).withSelectionMode()
+
+  fun clearSelections() = copy(
+    bookOnDiskListItems = bookOnDiskListItems.map {
+      if (it is BookOnDisk) it.copy(isSelected = false) else it
+    },
+    epubItems = epubItems.map { it.copy(isSelected = false) },
+    selectionMode = NORMAL
+  )
 }

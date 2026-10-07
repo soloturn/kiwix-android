@@ -37,6 +37,7 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadModel
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Factory
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
@@ -61,6 +62,7 @@ class StorageObserverTest {
   private val zimFileReader: ZimFileReader = mockk()
   private val libkiwixBookmarks: LibkiwixBookmarks = mockk()
   private val scanningProgressListener: ScanningProgressListener = mockk()
+  private val epubLibraryManager: EpubLibraryManager = mockk(relaxed = true)
 
   private val files = MutableStateFlow<List<File>>(emptyList())
   private val downloads = MutableStateFlow<List<DownloadModel>>(emptyList())
@@ -76,7 +78,7 @@ class StorageObserverTest {
   @BeforeEach fun init() {
     clearAllMocks()
     coEvery { kiwixDataStore.selectedStorage } returns flowOf("a")
-    every { fileSearch.scan(scanningProgressListener) } returns files
+    every { fileSearch.scan(scanningProgressListener, includeEpub = true) } returns files
     every { downloadRoomDao.downloads() } returns downloads
     coEvery { libkiwixBookmarks.addBookToLibrary(any()) } returns Unit
     every { zimFileReader.jniKiwixReader } returns mockk()
@@ -88,8 +90,25 @@ class StorageObserverTest {
       readerFactory,
       libkiwixBookmarks,
       libkiwixBookFactory,
+      epubLibraryManager,
       mainDispatcherRule.dispatcher
     )
+  }
+
+  @Test
+  fun `epub files are imported to the epub library and not read as zims`() = runTest {
+    val epub: File = mockk()
+    every { epub.absolutePath } returns "/books/a.epub"
+    every { downloadModel.fileNameFromUrl } returns "test"
+    coEvery { epubLibraryManager.importScanned(any()) } returns 1
+    downloads.value = listOf(downloadModel)
+    files.value = listOf(epub)
+    storageObserver.getBooksOnFileSystem(scanningProgressListener).test {
+      assertThat(awaitItem()).isEmpty()
+      awaitComplete()
+    }
+    coVerify { epubLibraryManager.importScanned(listOf(epub)) }
+    coVerify(exactly = 0) { readerFactory.create(any(), any()) }
   }
 
   @Test

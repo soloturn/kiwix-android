@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -93,6 +94,7 @@ class KiwixReaderViewModel @Inject constructor(
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
   @MainDispatcher mainDispatcher: MainCoroutineDispatcher,
+  private val epubLibraryManager: EpubLibraryManager,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CoreReaderViewModel(
     context,
@@ -230,6 +232,12 @@ class KiwixReaderViewModel @Inject constructor(
     }
     val zimReaderSource = ZimReaderSource(File(filePath))
     openZimFile(zimReaderSource)
+  }
+
+  /** Every EPUB open (library, VIEW intent, content:// import) lands in the library. */
+  override suspend fun openEpubFile(file: File) {
+    runCatching { epubLibraryManager.add(file, markOpened = true) }
+    super.openEpubFile(file)
   }
 
   override suspend fun restoreViewStateOnValidWebViewHistory(

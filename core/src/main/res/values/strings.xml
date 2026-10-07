@@ -379,6 +379,7 @@
   <string name="move_file_error_message">Error in moving the ZIM file: %s.</string>
   <string name="file_copy_move_error_dialog_message">%s \nDo you want to continue with other ZIM files?</string>
   <string name="your_selected_files_added_to_library">Your selected ZIM files are added to library.</string>
+  <string name="epub_badge" translatable="false">EPUB</string>
   <string name="how_to_update_content">How to update content?</string>
   <string name="update_content_description">To update content (a ZIM file) you need to download the full latest version of this very same content. You can do that via the download section.</string>
   <string name="all_files_permission_needed">All Files Permission Needed</string>

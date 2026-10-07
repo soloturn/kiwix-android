@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.SideEffect
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.epub.EpubOnDisk
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog.DeleteZims
@@ -36,7 +37,8 @@ data class DeleteFiles(
   private val dialogShower: DialogShower,
   private val deleteFilesUseCase: DeleteFilesUseCase,
   private val viewModelScope: CoroutineScope,
-  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
+  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  private val epubs: List<EpubOnDisk> = emptyList()
 ) : SideEffect<Unit> {
   override fun invokeWith(activity: AppCompatActivity) {
     dialogShower.show(
@@ -46,9 +48,7 @@ data class DeleteFiles(
   }
 
   private fun dialogTitle() =
-    booksOnDiskListItems.joinToString("\n") {
-      it.book.title
-    }
+    (booksOnDiskListItems.map { it.book.title } + epubs.map { it.title }).joinToString("\n")
 
   private fun deleteBooks(
     activity: AppCompatActivity
@@ -56,7 +56,9 @@ data class DeleteFiles(
     viewModelScope.launch {
       val deleted =
         withContext(ioDispatcher) {
-          deleteFilesUseCase(booksOnDiskListItems)
+          val zimsDeleted = deleteFilesUseCase(booksOnDiskListItems)
+          val epubsDeleted = epubs.isEmpty() || deleteFilesUseCase.deleteEpubs(epubs)
+          zimsDeleted && epubsDeleted
         }
 
       showResult(activity, deleted)

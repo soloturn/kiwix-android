@@ -27,10 +27,12 @@ import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadModel
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.files.FileSearch
 import org.kiwix.kiwixmobile.core.utils.files.ScanningProgressListener
+import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
 import org.kiwix.libkiwix.Book
 import java.io.File
 import javax.inject.Inject
@@ -42,20 +44,24 @@ class StorageObserver @Inject constructor(
   private val zimReaderFactory: ZimFileReader.Factory,
   private val libkiwixBookmarks: LibkiwixBookmarks,
   private val libkiwixBookFactory: LibkiwixBookFactory,
+  private val epubLibraryManager: EpubLibraryManager,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
   fun getBooksOnFileSystem(
     scanningProgressListener: ScanningProgressListener
   ): Flow<List<Book>> = flow {
-    val files = scanFiles(scanningProgressListener).first()
+    val (epubs, zims) = scanFiles(scanningProgressListener).first()
+      .partition { isEpubFile(it.absolutePath) }
+    // EPUBs go to their own library table; only ZIMs are returned as libkiwix books.
+    runCatching { epubLibraryManager.importScanned(epubs) }
     val downloads = downloadRoomDao.downloads().first()
-    val result = toFilesThatAreNotDownloading(files, downloads)
+    val result = toFilesThatAreNotDownloading(zims, downloads)
       .mapNotNull { convertToLibkiwixBook(it) }
     emit(result)
   }.flowOn(ioDispatcher)
 
   private fun scanFiles(scanningProgressListener: ScanningProgressListener): Flow<List<File>> =
-    fileSearch.scan(scanningProgressListener)
+    fileSearch.scan(scanningProgressListener, includeEpub = true)
 
   private fun toFilesThatAreNotDownloading(files: List<File>, downloads: List<DownloadModel>) =
     files.filter { fileHasNoMatchingDownload(downloads, it) }
