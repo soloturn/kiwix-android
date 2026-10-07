@@ -27,6 +27,18 @@ sealed class SearchListItem {
 
   data class ZimSearchResultListItem constructor(
     override val value: String,
-    override val url: String?
+    override val url: String?,
+    /**
+     * Quote of the sentence the term was found in, with matches in `<b>` tags
+     * as the Xapian index returns them. Full-text results only.
+     */
+    val snippet: String? = null,
+    /** Book this result came from; set for cross-book search only. */
+    val bookTitle: String? = null,
+    /**
+     * `ZimReaderSource.toDatabase()` of the book this result came from, so the
+     * reader can switch to it before opening. Cross-book results only.
+     */
+    val zimReaderSourceDatabaseValue: String? = null
   ) : SearchListItem()
 }

@@ -52,6 +52,7 @@ object PreferencesKeys {
   val SELECTED_ONLINE_CONTENT_LANGUAGE =
     stringPreferencesKey(KiwixDataStore.SELECTED_ONLINE_CONTENT_LANGUAGE)
   val PREF_LANG = stringPreferencesKey(KiwixDataStore.PREF_LANG)
+  val PREF_SEARCH_MODE = stringPreferencesKey(KiwixDataStore.PREF_SEARCH_MODE)
   val PREF_SHOW_HISTORY_ALL_BOOKS =
     booleanPreferencesKey(KiwixDataStore.PREF_SHOW_HISTORY_ALL_BOOKS)
   val PREF_SHOW_BOOKMARKS_ALL_BOOKS =
