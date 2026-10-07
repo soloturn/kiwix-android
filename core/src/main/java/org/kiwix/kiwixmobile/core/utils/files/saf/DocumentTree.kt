@@ -68,7 +68,18 @@ class DocumentTree(private val contentResolver: ContentResolver) {
   }
 
   /** Breadth-first walk returning every ZIM (or first split part) below the tree root. */
-  fun findZimFiles(treeUri: Uri, onDirectoryScanned: (Int) -> Unit = {}): List<DocumentEntry> {
+  fun findZimFiles(treeUri: Uri, onDirectoryScanned: (Int) -> Unit = {}): List<DocumentEntry> =
+    findFiles(treeUri, onDirectoryScanned, ::isZimName)
+
+  /** Breadth-first walk returning ZIMs and EPUBs below the granted library tree. */
+  fun findLibraryFiles(treeUri: Uri, onDirectoryScanned: (Int) -> Unit = {}): List<DocumentEntry> =
+    findFiles(treeUri, onDirectoryScanned) { isZimName(it) || isEpubName(it) }
+
+  private fun findFiles(
+    treeUri: Uri,
+    onDirectoryScanned: (Int) -> Unit,
+    matches: (String) -> Boolean
+  ): List<DocumentEntry> {
     val result = mutableListOf<DocumentEntry>()
     val pending = ArrayDeque<String>().apply { add(rootDocumentId(treeUri)) }
     val visited = mutableSetOf<String>()
@@ -78,7 +89,7 @@ class DocumentTree(private val contentResolver: ContentResolver) {
       val children = listChildren(treeUri, directoryId)
       children.filter { it.isDirectory && !isSkippedDirectory(it.name) }
         .forEach { pending.add(it.documentId) }
-      result += children.filter { !it.isDirectory && isZimName(it.name) }
+      result += children.filter { !it.isDirectory && matches(it.name) }
       onDirectoryScanned(visited.size)
     }
     return result
@@ -86,6 +97,33 @@ class DocumentTree(private val contentResolver: ContentResolver) {
 
   fun findChild(treeUri: Uri, parentDocumentId: String, name: String): DocumentEntry? =
     listChildren(treeUri, parentDocumentId).firstOrNull { it.name == name }
+
+  /** Finds a file beside [documentUri] when it is part of a granted SAF tree. */
+  fun findSibling(documentUri: Uri, name: String): DocumentEntry? =
+    if (isDocumentInTree(documentUri)) {
+      val treeUri = treeUriOf(documentUri)
+      val documentId = DocumentsContract.getDocumentId(documentUri)
+      parentDocumentId(treeUri, documentUri, documentId)?.let { parentId ->
+        findChild(treeUri, parentId, name)
+      }
+    } else {
+      null
+    }
+
+  /** Creates a file beside [documentUri] when it is part of a granted SAF tree. */
+  fun createSibling(
+    documentUri: Uri,
+    name: String,
+    mimeType: String = "application/octet-stream"
+  ): Uri? = if (isDocumentInTree(documentUri)) {
+    val treeUri = treeUriOf(documentUri)
+    val documentId = DocumentsContract.getDocumentId(documentUri)
+    parentDocumentId(treeUri, documentUri, documentId)?.let { parentId ->
+      createDocument(treeUri, name, mimeType, parentId)
+    }
+  } else {
+    null
+  }
 
   fun createDocument(
     treeUri: Uri,
@@ -210,6 +248,8 @@ class DocumentTree(private val contentResolver: ContentResolver) {
 
     fun isZimName(name: String): Boolean =
       name.endsWith(".zim", ignoreCase = true) || name.endsWith(".zimaa", ignoreCase = true)
+
+    private fun isEpubName(name: String): Boolean = name.endsWith(".epub", ignoreCase = true)
 
     // Mirrors FileSearch: hidden folders and the trash never hold library books.
     private fun isSkippedDirectory(name: String): Boolean =

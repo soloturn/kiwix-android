@@ -31,6 +31,8 @@ import org.kiwix.kiwixmobile.core.ui.components.ONE
 import org.kiwix.kiwixmobile.core.utils.TAG_KIWIX
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
+import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
+import org.kiwix.kiwixmobile.core.utils.files.isValidEpubFile
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
 import java.io.File
 import javax.inject.Inject
@@ -80,6 +82,8 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
     val (file, errorMessage) = getZimFileFromUri(uri)
     if (file == null) {
       context.toast(errorMessage)
+    } else if (isEpubFile(file)) {
+      selectedZimFileCallback?.onEpubFileSelected(file)
     } else {
       selectedZimFileCallback?.navigateToReaderScreen(file)
     }
@@ -102,7 +106,11 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
         return@processMultipleFiles
       }
 
-      selectedZimFileCallback?.addBookToLibkiwixBookOnDisk(file)
+      if (isEpubFile(file)) {
+        selectedZimFileCallback?.addEpubToLibrary(file)
+      } else {
+        selectedZimFileCallback?.addBookToLibkiwixBookOnDisk(file)
+      }
       // Notify user after all files are processed
       if (index == uris.lastIndex) {
         context.toast(context.getString(string.your_selected_files_added_to_library))
@@ -130,8 +138,9 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
       return null to context.getString(string.error_file_not_found, "$uri")
     }
     val file = File(filePath)
-    return if (!FileUtils.isValidZimFile(file.path)) {
-      Log.e(TAG_KIWIX, "Invalid ZIM file. Path = ${file.path}")
+    val isValid = if (isEpubFile(file)) isValidEpubFile(file) else FileUtils.isValidZimFile(file.path)
+    return if (!isValid) {
+      Log.e(TAG_KIWIX, "Invalid ZIM/EPUB file. Path = ${file.path}")
       null to context.getString(string.error_file_invalid, file.path)
     } else {
       file to ""
@@ -144,6 +153,12 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
 }
 
 interface SelectedZimFileCallback {
+  /** A validated EPUB was selected; implementers open it in the native EPUB reader. */
+  fun onEpubFileSelected(file: File)
+
+  /** A validated EPUB from a multi-selection: add it to the library without opening it. */
+  fun addEpubToLibrary(file: File)
+
   fun navigateToReaderScreen(file: File)
   fun addBookToLibkiwixBookOnDisk(file: File)
   fun showFileCopyMoveErrorDialog(errorMessage: String, callBack: suspend () -> Unit)

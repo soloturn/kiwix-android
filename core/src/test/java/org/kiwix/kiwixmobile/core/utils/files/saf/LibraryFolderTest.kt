@@ -18,7 +18,11 @@
 
 package org.kiwix.kiwixmobile.core.utils.files.saf
 
+import android.content.ContentResolver
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.UriPermission
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -46,8 +50,9 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.R], application = TestApplication::class)
 class LibraryFolderTest {
-  private val context: Context = ApplicationProvider.getApplicationContext()
+  private lateinit var context: Context
   private val kiwixDataStore: KiwixDataStore = mockk(relaxed = true)
+  private val persistedUriPermissions = mutableListOf<UriPermission>()
   private lateinit var libraryFolder: LibraryFolder
 
   private fun tree(documentId: String): Uri =
@@ -55,8 +60,25 @@ class LibraryFolderTest {
 
   @Before
   fun setUp() {
-    every { kiwixDataStore.publicDocumentsDirectory() } returns
-      Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+    val resolver = mockk<ContentResolver>(relaxed = true)
+    every { resolver.persistedUriPermissions } answers { persistedUriPermissions.toList() }
+    every { resolver.takePersistableUriPermission(any(), any()) } answers {
+      val uri = args[0] as Uri
+      val flags = args[1] as Int
+      persistedUriPermissions.removeAll { it.uri == uri }
+      val permission = mockk<UriPermission>()
+      every { permission.uri } returns uri
+      every { permission.isReadPermission } returns
+        (flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+      every { permission.isWritePermission } returns
+        (flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION != 0)
+      persistedUriPermissions += permission
+    }
+    val applicationContext: Context = ApplicationProvider.getApplicationContext()
+    context = object : ContextWrapper(applicationContext) {
+      override fun getContentResolver(): ContentResolver = resolver
+    }
+    every { kiwixDataStore.publicDocumentsDirectory() } returns File(context.cacheDir, "Documents")
     libraryFolder = LibraryFolder(context, kiwixDataStore)
   }
 
@@ -69,6 +91,30 @@ class LibraryFolderTest {
         "primary:Documents/Kiwix"
       ),
       libraryFolder.pickerInitialUri()
+    )
+  }
+
+  @Test
+  fun mediaScanPickerOpensAtAndroidMediaWhenNothingWasPicked() = runTest {
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf(null)
+    assertEquals(
+      DocumentsContract.buildDocumentUri(
+        LibraryFolder.EXTERNAL_STORAGE_AUTHORITY,
+        "primary:Android/media"
+      ),
+      libraryFolder.mediaScanPickerInitialUri()
+    )
+  }
+
+  @Test
+  fun documentsScanPickerOpensAtDocumentsWhenNothingWasPicked() = runTest {
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf(null)
+    assertEquals(
+      DocumentsContract.buildDocumentUri(
+        LibraryFolder.EXTERNAL_STORAGE_AUTHORITY,
+        "primary:Documents"
+      ),
+      libraryFolder.documentsScanPickerInitialUri()
     )
   }
 
@@ -95,6 +141,54 @@ class LibraryFolderTest {
     coEvery { kiwixDataStore.libraryTreeUri } returns flowOf("$picked")
     assertEquals(picked, libraryFolder.activeTreeUri())
     assertFalse(libraryFolder.needsAccessRestore())
+  }
+
+  @Test
+  fun scanTreeNeedsOnlyReadAccess() = runTest {
+    val documentsTree = tree("primary:Documents")
+    coEvery { kiwixDataStore.libraryTreeUri } returns flowOf(null)
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf(null)
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf(null)
+
+    assertTrue(libraryFolder.onDocumentsScanTreePicked(documentsTree))
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf("$documentsTree")
+    assertTrue(libraryFolder.activeScanTreeUris().contains(documentsTree))
+    assertFalse(libraryFolder.hasTreeAccess(documentsTree))
+  }
+
+  @Test
+  fun pickingMediaFolderAddsItWithoutReplacingTheLibraryFolder() = runTest {
+    val libraryTree = tree("primary:Documents/Kiwix")
+    val mediaTree = tree("primary:Android/media")
+    coEvery { kiwixDataStore.libraryTreeUri } returns flowOf("$libraryTree")
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf(null)
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf(null)
+    assertTrue(libraryFolder.onTreePicked(libraryTree))
+    assertTrue(libraryFolder.onMediaScanTreePicked(mediaTree))
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf("$mediaTree")
+    coVerify { kiwixDataStore.setMediaScanTreeUri("$mediaTree") }
+    assertEquals(listOf(libraryTree, mediaTree), libraryFolder.activeScanTreeUris())
+  }
+
+  @Test
+  fun documentsScanTreeIsAddedAlongsideLibraryAndMediaTrees() = runTest {
+    val libraryTree = tree("primary:Documents/Kiwix")
+    val documentsTree = tree("primary:Documents")
+    val mediaTree = tree("primary:Android/media")
+    coEvery { kiwixDataStore.libraryTreeUri } returns flowOf("$libraryTree")
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf(null)
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf("$mediaTree")
+    libraryFolder.onTreePicked(libraryTree)
+    libraryFolder.onMediaScanTreePicked(mediaTree)
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf("$mediaTree")
+
+    assertTrue(libraryFolder.onDocumentsScanTreePicked(documentsTree))
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf("$documentsTree")
+    coVerify { kiwixDataStore.setDocumentsScanTreeUri("$documentsTree") }
+    assertEquals(
+      listOf(libraryTree, documentsTree, mediaTree),
+      libraryFolder.activeScanTreeUris()
+    )
   }
 
   @Test

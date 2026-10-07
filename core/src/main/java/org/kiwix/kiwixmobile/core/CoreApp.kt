@@ -60,6 +60,7 @@ abstract class CoreApp : Application() {
     AndroidThreeTen.init(this)
     themeConfig.init()
     fileLogger.writeLogFile(this)
+    CoroutineScope(Dispatchers.IO).launch { deleteStaleEpubParts(this@CoreApp) }
     configureStrictMode()
     CoroutineScope(Dispatchers.IO).launch { deleteStaleEpubParts(this@CoreApp) }
   }

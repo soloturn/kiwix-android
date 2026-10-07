@@ -101,13 +101,13 @@ class AddNoteViewModel @Inject constructor(
     }
   }
 
-  fun setInitialNoteText() {
+  fun setInitialNoteText(initialNoteText: String = "") {
     viewModelScope.launch {
       val noteFileContent = withContext(ioDispatcher) {
         noteRepository.loadNote(requireNoteMetadata())
       }
-      val textFieldValue =
-        TextFieldValue(noteFileContent.text, TextRange(noteFileContent.text.length))
+      val noteText = noteFileContent.text.ifBlank { initialNoteText }
+      val textFieldValue = TextFieldValue(noteText, TextRange(noteText.length))
       _uiState.update { it.copy(noteTextFieldValue = textFieldValue) }
       updateMenuState(
         shareEnabled = noteFileContent.fileExists,

@@ -102,21 +102,45 @@ abstract class CoreSettingsViewModel(
   /** Library folder rows of the storage category; null hides them (branded apps). */
   data class LibraryFolderState(
     val summary: String,
-    val restoreSummary: String? = null
+    val restoreSummary: String? = null,
+    val documentsScanSummary: String? = null,
+    val mediaScanSummary: String? = null
   )
 
   /** Where the folder picker opens; null leaves it to the system. */
   open suspend fun libraryFolderPickerUri(): Uri? = null
 
+  open suspend fun mediaScanFolderPickerUri(): Uri? = null
+
+  open suspend fun documentsScanFolderPickerUri(): Uri? = null
+
   open fun onLibraryFolderPicked(treeUri: Uri) = Unit
+
+  open fun onMediaScanFolderPicked(treeUri: Uri) = Unit
+
+  open fun onDocumentsScanFolderPicked(treeUri: Uri) = Unit
 
   private val _libraryFolderPickerRequests = MutableSharedFlow<Uri?>()
 
   /** Initial locations for the folder picker; the screen owns the launcher. */
   val libraryFolderPickerRequests: SharedFlow<Uri?> = _libraryFolderPickerRequests
 
+  private val _mediaScanFolderPickerRequests = MutableSharedFlow<Uri?>()
+  val mediaScanFolderPickerRequests: SharedFlow<Uri?> = _mediaScanFolderPickerRequests
+
+  private val _documentsScanFolderPickerRequests = MutableSharedFlow<Uri?>()
+  val documentsScanFolderPickerRequests: SharedFlow<Uri?> = _documentsScanFolderPickerRequests
+
   fun chooseLibraryFolder() {
     viewModelScope.launch { _libraryFolderPickerRequests.emit(libraryFolderPickerUri()) }
+  }
+
+  fun chooseMediaScanFolder() {
+    viewModelScope.launch { _mediaScanFolderPickerRequests.emit(mediaScanFolderPickerUri()) }
+  }
+
+  fun chooseDocumentsScanFolder() {
+    viewModelScope.launch { _documentsScanFolderPickerRequests.emit(documentsScanFolderPickerUri()) }
   }
 
   abstract suspend fun setStorage()

@@ -1,0 +1,330 @@
+/*
+ * Kiwix Android
+ * Copyright (c) 2026 Kiwix <android.kiwix.org>
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+package org.kiwix.kiwixmobile.core.epub.reader
+
+import android.os.Build
+import androidx.lifecycle.SavedStateHandle
+import androidx.test.core.app.ApplicationProvider
+import io.mockk.Runs
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
+import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
+import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.kiwix.sharedFunctions.MainDispatcherRule
+import org.readium.r2.shared.publication.Locator
+import org.readium.r2.shared.util.Url
+import org.readium.r2.shared.util.mediatype.MediaType
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import java.io.File
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [Build.VERSION_CODES.R])
+class EpubReaderViewModelTest {
+  // One dispatcher for Main and the opener: all work runs on virtual time.
+  private val testDispatcher = UnconfinedTestDispatcher()
+
+  @get:Rule
+  val tmp = TemporaryFolder()
+
+  @get:Rule
+  val mainDispatcherRule = MainDispatcherRule(testDispatcher)
+
+  private val library: EpubLibraryManager = mockk()
+  private val annotations: EpubAnnotationRepository = mockk()
+  private val openUseCase: EpubOpenUseCase = mockk()
+  private val store: KiwixDataStore = mockk()
+  private val opener =
+    EpubPublicationOpener(ApplicationProvider.getApplicationContext(), testDispatcher)
+
+  private fun locator(path: String, progression: Double) =
+    Locator(href = Url(path)!!, mediaType = MediaType.XHTML)
+      .copyWithLocations(progression = progression)
+
+  private fun viewModel(
+    path: String?,
+    settings: EpubReaderSettings = EpubReaderSettings(),
+    savedLocator: String? = null
+  ): EpubReaderViewModel {
+    every { store.epubReaderSettingsJson } returns flowOf(settings.toJson())
+    coEvery { library.locator(BOOK_ID) } returns savedLocator
+    coEvery { library.saveLocator(any(), any()) } just Runs
+    coEvery { annotations.load(any(), any()) } returns emptyList()
+    coEvery { annotations.save(any(), any(), any(), any()) } just Runs
+    coEvery { store.setEpubReaderSettingsJson(any()) } just Runs
+    coEvery { openUseCase.prepare(any(), any()) } answers {
+      EpubOpenResult.Ready((firstArg<EpubSource>() as EpubSource.Path).file, BOOK_ID)
+    }
+    return EpubReaderViewModel(
+      SavedStateHandle(path?.let { mapOf(EpubReaderViewModel.EXTRA_PATH to it) } ?: emptyMap()),
+      opener,
+      library,
+      annotations,
+      openUseCase,
+      store
+    )
+  }
+
+  private suspend fun EpubReaderViewModel.ready(): OpenEpub =
+    (state.first { it !is EpubReaderUiState.Loading } as EpubReaderUiState.Ready).book
+
+  private fun book() = EpubFixture.write(tmp.newFile("book.epub"))
+
+  @Test
+  fun `opens the book, adds it to the library and exposes title and toc`() = runTest {
+    val file = book()
+    val vm = viewModel(file.path, EpubReaderSettings(fontScale = 1.4))
+
+    val open = vm.ready()
+
+    assertEquals(BOOK_ID, open.bookId)
+    assertEquals(EpubFixture.TITLE, open.title)
+    assertEquals(listOf("Chapter One", "Chapter Two"), open.toc.map { it.title })
+    assertEquals(null, open.initialLocator)
+    assertFalse(open.rtl)
+    assertEquals(1.4, vm.settings.value.fontScale, 0.0)
+    coVerify { openUseCase.prepare(EpubSource.Path(file), false) }
+  }
+
+  @Test
+  fun `restores the stored locator`() = runTest {
+    val saved = locator("c2.xhtml", 0.5)
+    val vm = viewModel(book().path, savedLocator = EpubLocatorCodec.encode(saved))
+
+    assertEquals(saved, vm.ready().initialLocator)
+    assertEquals(saved, vm.currentLocator.value)
+  }
+
+  @Test
+  fun `saves bookmarks notes and highlights for the open book`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    val selected = locator("c1.xhtml", 0.4).copy(
+      text = Locator.Text("before", "selected passage", "after")
+    )
+    vm.onLocatorChanged(locator("c1.xhtml", 0.3))
+
+    vm.addBookmark()
+    vm.addNote(selected, "My note")
+    vm.addHighlight(selected, EpubHighlightColor.LIGHT_BLUE)
+    vm.updateAnnotationNote(vm.annotations.value.last().id, "Highlight note")
+    runCurrent()
+
+    assertEquals(
+      listOf(
+        EpubAnnotationKind.BOOKMARK,
+        EpubAnnotationKind.NOTE,
+        EpubAnnotationKind.HIGHLIGHT
+      ),
+      vm.annotations.value.map { it.kind }
+    )
+    assertEquals("selected passage", vm.annotations.value[1].text)
+    assertEquals("My note", vm.annotations.value[1].note)
+    assertEquals("Chapter One", vm.annotations.value.last().title)
+    assertEquals(EpubHighlightColor.LIGHT_BLUE, vm.annotations.value.last().color)
+    assertEquals("Highlight note", vm.annotations.value.last().note)
+    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, match { it.size == 3 }, any()) }
+  }
+
+  @Test
+  fun `automatic search suggestions ignore a one-character query`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    vm.openSearch()
+
+    vm.updateSearchQuery("a")
+    advanceTimeBy(1_000)
+    runCurrent()
+
+    assertFalse(vm.search.value.isSearching)
+    assertFalse(vm.search.value.hasSearched)
+  }
+
+  @Test
+  fun `closing search cancels the pending automatic search`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    vm.openSearch()
+
+    vm.updateSearchQuery("bitcoin")
+    vm.closeSearch()
+    advanceTimeBy(1_000)
+    runCurrent()
+
+    assertFalse(vm.search.value.isOpen)
+    assertFalse(vm.search.value.isSearching)
+    assertFalse(vm.search.value.hasSearched)
+  }
+
+  @Test
+  fun `bookmark toggle tracks the current location and removes it when tapped again`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    val page = locator("c1.xhtml", 0.4)
+
+    assertFalse(vm.isBookmarked(page))
+    vm.toggleBookmark(page)
+    assertTrue(vm.isBookmarked(page.copyWithLocations(progression = 0.401)))
+    vm.toggleBookmark(page.copyWithLocations(progression = 0.401))
+    runCurrent()
+
+    assertFalse(vm.isBookmarked(page))
+    assertTrue(vm.annotations.value.isEmpty())
+    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, emptyList(), any()) }
+  }
+
+  @Test
+  fun `a recreated navigator starts at the latest position, not the opening one`() = runTest {
+    val vm = viewModel(book().path, savedLocator = EpubLocatorCodec.encode(locator("c1.xhtml", 0.1)))
+    val open = vm.ready()
+    assertEquals(open.initialLocator, vm.startLocator(open))
+
+    val latest = locator("c2.xhtml", 0.7)
+    vm.onLocatorChanged(latest)
+
+    assertEquals(latest, vm.startLocator(open))
+  }
+
+  @Test
+  fun `previous page history keeps four entries and retains pages when revisiting`() = runTest {
+    val vm = viewModel(null)
+    val pages = (1..5).map { locator("chapter$it.xhtml", it / 10.0) }
+
+    pages.forEach(vm::rememberPreviousPage)
+
+    assertEquals(pages.takeLast(4), vm.previousPages.value)
+    vm.rememberPreviousPage(pages[3])
+
+    assertEquals(listOf(pages[1], pages[2], pages[4], pages[3]), vm.previousPages.value)
+  }
+
+  @Test
+  fun `locator changes remember the four most recently left pages`() = runTest {
+    val vm = viewModel(null)
+    val pages = (1..6).map { locator("chapter$it.xhtml", it / 10.0) }
+
+    pages.forEach(vm::onLocatorChanged)
+
+    assertEquals(pages.dropLast(1).takeLast(4), vm.previousPages.value)
+  }
+
+  @Test
+  fun `a corrupt stored locator opens at the start`() = runTest {
+    val vm = viewModel(book().path, savedLocator = "{garbage")
+    assertEquals(null, vm.ready().initialLocator)
+  }
+
+  @Test
+  fun `missing, absent and invalid files fail instead of crashing`() = runTest {
+    val junk = tmp.newFile("junk.epub").apply { writeText("not a zip") }
+    listOf(null, File(tmp.root, "gone.epub").path, junk.path).forEach { path ->
+      val vm = viewModel(path)
+      assertEquals(EpubReaderUiState.Failed, vm.state.first { it !is EpubReaderUiState.Loading })
+    }
+  }
+
+  @Test
+  fun `page turns are saved after a pause, only the latest one`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+
+    vm.onLocatorChanged(locator("c1.xhtml", 0.1))
+    advanceTimeBy(300)
+    vm.onLocatorChanged(locator("c1.xhtml", 0.2))
+    advanceTimeBy(300)
+    runCurrent()
+    coVerify(exactly = 0) { library.saveLocator(any(), any()) }
+
+    advanceTimeBy(300)
+    runCurrent()
+    coVerify(exactly = 1) {
+      library.saveLocator(BOOK_ID, EpubLocatorCodec.encode(locator("c1.xhtml", 0.2)))
+    }
+  }
+
+  @Test
+  fun `persistPosition writes immediately`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    val latest = locator("c2.xhtml", 0.9)
+
+    vm.onLocatorChanged(latest)
+    vm.persistPosition()
+    runCurrent()
+
+    coVerify(exactly = 1) { library.saveLocator(BOOK_ID, EpubLocatorCodec.encode(latest)) }
+  }
+
+  @Test
+  fun `settings changes are applied and stored, repeats are ignored`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+
+    vm.changeSettings { it.withFontScale(1.1) }
+    vm.changeSettings { it.withFontScale(1.2).withFontScale(1.0) }
+    vm.changeSettings { it }
+    runCurrent()
+
+    assertEquals(1.0, vm.settings.value.fontScale, 0.0)
+    coVerify(exactly = 1) { store.setEpubReaderSettingsJson(EpubReaderSettings(fontScale = 1.1).toJson()) }
+    coVerify(exactly = 1) { store.setEpubReaderSettingsJson(EpubReaderSettings(fontScale = 1.0).toJson()) }
+  }
+
+  @Test
+  fun `the overlay starts hidden and can be shown and hidden`() = runTest {
+    val vm = viewModel(book().path)
+    assertFalse(vm.chromeVisible.value)
+    vm.setChromeVisible(true)
+    assertTrue(vm.chromeVisible.value)
+    vm.setChromeVisible(false)
+    assertFalse(vm.chromeVisible.value)
+  }
+
+  @Test
+  fun `positions are loaded once the book is open`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    assertTrue(vm.positions.first { it.isNotEmpty() }.isNotEmpty())
+  }
+
+  private companion object {
+    const val BOOK_ID = "book-id"
+  }
+}

@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core.dao
 
+import android.content.Context
 import android.os.Build
 import io.mockk.coEvery
 import io.mockk.every
@@ -43,7 +44,6 @@ import org.kiwix.libkiwix.Library
 import org.kiwix.libkiwix.Manager
 import org.kiwix.sharedFunctions.TestApplication
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -61,14 +61,17 @@ class LibkiwixBookmarksTest {
   private val library: Library = mockk(relaxed = true)
   private val manager: Manager = mockk(relaxed = true)
   private val kiwixDataStore: KiwixDataStore = mockk()
+  private val context: Context = mockk()
   private val libkiwixBookOnDisk: LibkiwixBookOnDisk = mockk()
   private val testDispatcher = UnconfinedTestDispatcher()
   private lateinit var libkiwixBookmarks: LibkiwixBookmarks
 
   @Before
   fun setUp() {
-    every { kiwixDataStore.context } returns RuntimeEnvironment.getApplication()
     coEvery { kiwixDataStore.defaultStorage() } returns temporaryFolder.root.path
+    every { context.filesDir } returns temporaryFolder.root
+    every { context.getExternalFilesDir(null) } returns null
+    every { kiwixDataStore.context } returns context
     coEvery { libkiwixBookOnDisk.getBooks() } returns emptyList()
     every { library.booksIds } returns arrayOf(FIRST_BOOK_ID, SECOND_BOOK_ID)
     every { library.getBookById(FIRST_BOOK_ID) } returns book(FIRST_BOOK_ID)

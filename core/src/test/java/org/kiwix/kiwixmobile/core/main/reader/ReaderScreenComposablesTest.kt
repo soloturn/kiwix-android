@@ -24,10 +24,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -42,8 +44,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
+import org.kiwix.kiwixmobile.core.epub.reader.EpubHighlightColor
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.SelectionMenuAction
 import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.TabsManager
 import org.kiwix.kiwixmobile.core.ui.components.CONTENT_LOADING_PROGRESS_BAR_TESTING_TAG
@@ -102,6 +106,9 @@ class ReaderScreenComposablesTest {
     tableOfContentTitle: String = "Contents",
     documentSections: List<DocumentSection> = emptyList(),
     showDonationPopup: Boolean = false,
+    selectionText: String? = null,
+    canReadSelectedText: Boolean = false,
+    selectionHasAnnotation: Boolean = false,
     findInPageUiState: FindInPageManager.FindInPageUiState =
       FindInPageManager.FindInPageUiState()
   ): CoreReaderViewModel.ReaderUiState = CoreReaderViewModel.ReaderUiState(
@@ -126,6 +133,9 @@ class ReaderScreenComposablesTest {
     tableOfContentTitle = tableOfContentTitle,
     documentSections = documentSections,
     showDonationPopup = showDonationPopup,
+    selectionText = selectionText,
+    canReadSelectedText = canReadSelectedText,
+    selectionHasAnnotation = selectionHasAnnotation,
     findInPageUiState = findInPageUiState
   )
 
@@ -143,7 +153,9 @@ class ReaderScreenComposablesTest {
    */
   private fun renderReaderScreen(
     state: CoreReaderViewModel.ReaderUiState,
-    onReaderAction: (ReaderAction) -> Unit = {}
+    onReaderAction: (ReaderAction) -> Unit = {},
+    onSelectionMenuAction: (SelectionMenuAction) -> Unit = {},
+    onHighlightSelection: (EpubHighlightColor) -> Unit = {}
   ) {
     composeTestRule.setContent {
       val navController = rememberNavController()
@@ -156,9 +168,72 @@ class ReaderScreenComposablesTest {
         onUserBackPressed = { BackPressActivityExtensions.Super.ShouldCall },
         navHostController = navController,
         mainActivityBottomAppBarScrollBehaviour = null,
-        navigationIcon = {}
+        navigationIcon = {},
+        onSelectionMenuAction = onSelectionMenuAction,
+        onHighlightSelection = onHighlightSelection
       )
     }
+  }
+
+  @Test
+  fun readerScreen_textSelection_displaysReaderActionGrid() {
+    var selectedAction: SelectionMenuAction? = null
+    renderReaderScreen(
+      createTestState(selectionText = "Selected passage", canReadSelectedText = true),
+      onSelectionMenuAction = { selectedAction = it }
+    )
+
+    composeTestRule.onNodeWithText("Selected passage").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Copy").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Share").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Search web").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Select all").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Highlight").assertIsDisplayed()
+    composeTestRule.onAllNodesWithText("Bookmark").assertCountEquals(0)
+    composeTestRule.onAllNodesWithText("Delete").assertCountEquals(0)
+    composeTestRule.onNodeWithText("Add note").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Read aloud").performClick()
+    assertEquals(SelectionMenuAction.READ_ALOUD, selectedAction)
+  }
+
+  @Test
+  fun readerScreen_unhighlightedSelectionHasNoDeleteAndOffersHighlightColors() {
+    var selectedColor: EpubHighlightColor? = null
+    renderReaderScreen(
+      createTestState(
+        selectionText = "Selected passage",
+        bookmarkButtonItem = CoreReaderViewModel.BookmarkButtonItem(
+          IconItem.Drawable(R.drawable.ic_bookmark_24dp),
+          true
+        )
+      ),
+      onHighlightSelection = { selectedColor = it }
+    )
+
+    composeTestRule.onAllNodesWithText("Bookmark").assertCountEquals(0)
+    composeTestRule.onAllNodesWithText("Delete").assertCountEquals(0)
+    composeTestRule.onNodeWithText("Highlight").performClick()
+    composeTestRule.onNodeWithText("Light green").performTouchInput { click() }
+
+    assertEquals(EpubHighlightColor.LIGHT_GREEN, selectedColor)
+    composeTestRule.onAllNodesWithText("Light green").assertCountEquals(0)
+    composeTestRule.onAllNodesWithText("Selected passage").assertCountEquals(0)
+  }
+
+  @Test
+  fun readerScreen_highlightedSelectionCanDeleteAnnotation() {
+    var selectedAction: SelectionMenuAction? = null
+    renderReaderScreen(
+      createTestState(
+        selectionText = "Selected passage",
+        selectionHasAnnotation = true
+      ),
+      onSelectionMenuAction = { selectedAction = it }
+    )
+
+    composeTestRule.onNodeWithText("Delete").assertIsDisplayed().performClick()
+
+    assertEquals(SelectionMenuAction.DELETE_ANNOTATION, selectedAction)
   }
 
   @Test
@@ -629,6 +704,117 @@ class ReaderScreenComposablesTest {
       )
       .performClick()
     assertEquals(ReaderAction.CloseTab(0), action)
+  }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [Build.VERSION_CODES.R])
+class ReaderScreenTtsComposablesTest {
+  @Rule
+  @JvmField
+  val composeTestRule = createComposeRule()
+
+  private val context get() = RuntimeEnvironment.getApplication()
+
+  /**
+   * Creates a minimal [CoreReaderViewModel.ReaderUiState] with sensible defaults
+   * for testing. Test-specific values can be overridden via named parameters.
+   */
+  private fun createTestState(
+    appName: String = "Kiwix",
+    title: String = "Test Reader",
+    loading: Boolean = false,
+    progress: Int = 0,
+    tabsState: TabsManager.TabsState = createTabsState(),
+    videoView: FrameLayout? = null,
+    shouldShowFullScreen: Boolean = false,
+    showBackToTopButton: Boolean = false,
+    ttsControlsItem: CoreReaderViewModel.TtsControlsItem =
+      CoreReaderViewModel.TtsControlsItem(),
+    showTabSwitcher: Boolean = false,
+    showBottomBar: Boolean = true,
+    bookmarkButtonItem: CoreReaderViewModel.BookmarkButtonItem =
+      CoreReaderViewModel.BookmarkButtonItem(
+        IconItem.Drawable(R.drawable.ic_bookmark_border_24dp),
+        false
+      ),
+    showNoBookOpenInReader: Boolean = false,
+    searchPlaceHolderItemForBrandedApps: Boolean = false,
+    isPreviousPageButtonEnable: Boolean = true,
+    isNextPageButtonEnable: Boolean = true,
+    isTocButtonEnable: Boolean = true,
+    showTableOfContentDrawer: Boolean = false,
+    tableOfContentTitle: String = "Contents",
+    documentSections: List<DocumentSection> = emptyList(),
+    showDonationPopup: Boolean = false,
+    selectionText: String? = null,
+    canReadSelectedText: Boolean = false,
+    selectionHasAnnotation: Boolean = false,
+    findInPageUiState: FindInPageManager.FindInPageUiState =
+      FindInPageManager.FindInPageUiState()
+  ): CoreReaderViewModel.ReaderUiState = CoreReaderViewModel.ReaderUiState(
+    appName = appName,
+    title = title,
+    loading = loading,
+    progress = progress,
+    tabsState = tabsState,
+    videoView = videoView,
+    shouldShowFullScreen = shouldShowFullScreen,
+    showBackToTopButton = showBackToTopButton,
+    ttsControlsItem = ttsControlsItem,
+    showTabSwitcher = showTabSwitcher,
+    showBottomBar = showBottomBar,
+    bookmarkButtonItem = bookmarkButtonItem,
+    showNoBookOpenInReader = showNoBookOpenInReader,
+    searchPlaceHolderItemForBrandedApps = searchPlaceHolderItemForBrandedApps,
+    isPreviousPageButtonEnable = isPreviousPageButtonEnable,
+    isNextPageButtonEnable = isNextPageButtonEnable,
+    isTocButtonEnable = isTocButtonEnable,
+    showTableOfContentDrawer = showTableOfContentDrawer,
+    tableOfContentTitle = tableOfContentTitle,
+    documentSections = documentSections,
+    showDonationPopup = showDonationPopup,
+    selectionText = selectionText,
+    canReadSelectedText = canReadSelectedText,
+    selectionHasAnnotation = selectionHasAnnotation,
+    findInPageUiState = findInPageUiState
+  )
+
+  private fun createTabsState(
+    webViews: List<KiwixWebView> = emptyList(),
+    selectedIndex: Int = 0
+  ) = TabsManager.TabsState(
+    webViews = webViews,
+    selectedIndex = selectedIndex
+  )
+
+  /**
+   * Renders the full [ReaderScreen] with the given state,
+   * providing minimal test doubles for required dependencies.
+   */
+  private fun renderReaderScreen(
+    state: CoreReaderViewModel.ReaderUiState,
+    onReaderAction: (ReaderAction) -> Unit = {},
+    onSelectionMenuAction: (SelectionMenuAction) -> Unit = {},
+    onHighlightSelection: (EpubHighlightColor) -> Unit = {}
+  ) {
+    composeTestRule.setContent {
+      val navController = rememberNavController()
+      val snackBarHostState = remember { SnackbarHostState() }
+      ReaderScreen(
+        state = state,
+        snackBarHost = snackBarHostState,
+        onReaderAction = onReaderAction,
+        actionMenuItems = emptyList(),
+        onUserBackPressed = { BackPressActivityExtensions.Super.ShouldCall },
+        navHostController = navController,
+        mainActivityBottomAppBarScrollBehaviour = null,
+        navigationIcon = {},
+        onSelectionMenuAction = onSelectionMenuAction,
+        onHighlightSelection = onHighlightSelection
+      )
+    }
   }
 
   @Test

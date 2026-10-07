@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -118,7 +119,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -136,12 +136,14 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
+import org.kiwix.kiwixmobile.core.epub.reader.EpubHighlightColor
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.BookmarkButtonItem
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
@@ -172,6 +174,7 @@ import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.S
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.ShowVoiceSelectionDialog
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction.StopTts
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderUiState
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.SelectionMenuAction
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.TtsControlsItem
 import org.kiwix.kiwixmobile.core.main.reader.helper.TabsManager
 import org.kiwix.kiwixmobile.core.ui.components.ContentLoadingProgressBar
@@ -257,7 +260,11 @@ fun ReaderScreen(
   onUserBackPressed: suspend () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
   mainActivityBottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
-  navigationIcon: @Composable () -> Unit
+  onSystemBarsVisibilityChange: (Boolean) -> Unit = {},
+  onSelectionMenuAction: (SelectionMenuAction) -> Unit = {},
+  onHighlightSelection: (EpubHighlightColor) -> Unit = {},
+  onDismissSelectionMenu: () -> Unit = {},
+  navigationIcon: @Composable () -> Unit = {}
 ) {
   val topAppBarScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
   val bottomAppBarScrollBehavior = BottomAppBarDefaults.exitAlwaysScrollBehavior()
@@ -288,6 +295,15 @@ fun ReaderScreen(
     topAppBarScrollBehavior.state.heightOffset = topOffset
     bottomAppBarScrollBehavior.state.heightOffset = bottomOffset
   }
+  val readerOpen = isReaderOpen(state)
+  val searchVisible = state.findInPageUiState.visible
+  HandleReaderSystemBars(
+    topAppBarScrollBehavior,
+    bottomAppBarScrollBehavior,
+    readerOpen,
+    searchVisible,
+    onSystemBarsVisibilityChange
+  )
   LaunchedEffect(bottomAppBarScrollBehavior.state.heightOffset) {
     mainActivityBottomAppBarScrollBehaviour?.state?.heightOffset =
       bottomAppBarScrollBehavior.state.heightOffset
@@ -367,9 +383,246 @@ fun ReaderScreen(
           state.tabsState.currentWebView
         ) { onReaderAction(CloseTocDrawer) }
       }
+      state.selectionText?.takeIf(String::isNotBlank)?.let { selectedText ->
+        ReaderSelectionActionsDialog(
+          selectedText = selectedText,
+          canReadSelectedText = state.canReadSelectedText,
+          hasAnnotation = state.selectionHasAnnotation,
+          onAction = onSelectionMenuAction,
+          onHighlightSelection = onHighlightSelection,
+          onDismiss = onDismissSelectionMenu
+        )
+      }
     }
   }
 }
+
+private data class ReaderSelectionMenuItem(
+  val label: Int,
+  val icon: Int,
+  val action: SelectionMenuAction
+)
+
+private const val SELECTION_DIALOG_WIDTH = 0.92f
+
+@Composable
+private fun ReaderSelectionActionsDialog(
+  selectedText: String,
+  canReadSelectedText: Boolean,
+  hasAnnotation: Boolean,
+  onAction: (SelectionMenuAction) -> Unit,
+  onHighlightSelection: (EpubHighlightColor) -> Unit,
+  onDismiss: () -> Unit
+) {
+  var dialogVisible by remember { mutableStateOf(true) }
+  var choosingHighlightColor by remember { mutableStateOf(false) }
+  if (!dialogVisible) return
+  Dialog(
+    onDismissRequest = {
+      dialogVisible = false
+      onDismiss()
+    }
+  ) {
+    Surface(
+      modifier = Modifier.fillMaxWidth(SELECTION_DIALOG_WIDTH),
+      shape = RoundedCornerShape(24.dp),
+      color = MaterialTheme.colorScheme.surface
+    ) {
+      Column(
+        Modifier.padding(SIXTEEN_DP),
+        verticalArrangement = Arrangement.spacedBy(EIGHT_DP)
+      ) {
+        if (choosingHighlightColor) {
+          HighlightColorOptions { color ->
+            dialogVisible = false
+            choosingHighlightColor = false
+            onHighlightSelection(color)
+            onDismiss()
+          }
+        } else {
+          SelectionMenuOptions(
+            selectedText = selectedText,
+            items = readerSelectionMenuItems(canReadSelectedText, hasAnnotation),
+            onItemSelected = { item ->
+              if (item.action == SelectionMenuAction.HIGHLIGHT) {
+                choosingHighlightColor = true
+              } else {
+                onAction(item.action)
+              }
+            }
+          )
+        }
+      }
+    }
+  }
+}
+
+private fun readerSelectionMenuItems(
+  canReadSelectedText: Boolean,
+  hasAnnotation: Boolean
+) = buildList {
+  add(selectionMenuItem(android.R.string.copy, R.drawable.ic_file_copy, SelectionMenuAction.COPY))
+  add(selectionMenuItem(R.string.share, R.drawable.baseline_share_24, SelectionMenuAction.SHARE))
+  add(
+    selectionMenuItem(R.string.epub_search_web, R.drawable.action_search, SelectionMenuAction.SEARCH_WEB)
+  )
+  add(
+    selectionMenuItem(R.string.epub_select_all, R.drawable.ic_select_all_24, SelectionMenuAction.SELECT_ALL)
+  )
+  add(
+    selectionMenuItem(R.string.epub_highlight, R.drawable.ic_highlight_24, SelectionMenuAction.HIGHLIGHT)
+  )
+  add(
+    selectionMenuItem(R.string.epub_add_note, R.drawable.ic_add_note, SelectionMenuAction.ADD_NOTE)
+  )
+  if (hasAnnotation) {
+    add(
+      selectionMenuItem(
+        R.string.epub_delete_annotation,
+        R.drawable.ic_delete_white_24dp,
+        SelectionMenuAction.DELETE_ANNOTATION
+      )
+    )
+  }
+  if (canReadSelectedText) {
+    add(
+      selectionMenuItem(R.string.menu_read_aloud, R.drawable.action_voice, SelectionMenuAction.READ_ALOUD)
+    )
+  }
+}
+
+private fun selectionMenuItem(
+  label: Int,
+  icon: Int,
+  action: SelectionMenuAction
+) = ReaderSelectionMenuItem(label, icon, action)
+
+@Composable
+private fun HighlightColorOptions(onColorSelected: (EpubHighlightColor) -> Unit) {
+  EpubHighlightColor.entries.chunked(2).forEach { rowColors ->
+    Row(horizontalArrangement = Arrangement.spacedBy(EIGHT_DP)) {
+      rowColors.forEach { color ->
+        HighlightColorCard(color) { onColorSelected(color) }
+      }
+      if (rowColors.size == 1) Spacer(Modifier.weight(1f))
+    }
+  }
+}
+
+@Composable
+private fun RowScope.HighlightColorCard(color: EpubHighlightColor, onClick: () -> Unit) {
+  Surface(
+    modifier = Modifier.weight(1f).height(HIGHLIGHT_COLOR_CARD_HEIGHT).clickable(onClick = onClick),
+    shape = MaterialTheme.shapes.large,
+    color = MaterialTheme.colorScheme.surfaceVariant
+  ) {
+    Row(
+      Modifier.fillMaxSize().padding(horizontal = SIXTEEN_DP),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(EIGHT_DP)
+    ) {
+      Box(Modifier.size(24.dp).background(Color(color.tint), CircleShape))
+      Text(
+        stringResource(color.labelResource()),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        style = MaterialTheme.typography.labelLarge
+      )
+    }
+  }
+}
+
+@Composable
+private fun SelectionMenuOptions(
+  selectedText: String,
+  items: List<ReaderSelectionMenuItem>,
+  onItemSelected: (ReaderSelectionMenuItem) -> Unit
+) {
+  Text(
+    selectedText,
+    maxLines = 2,
+    overflow = TextOverflow.Ellipsis,
+    style = MaterialTheme.typography.bodyMedium
+  )
+  items.chunked(2).forEach { rowItems ->
+    Row(horizontalArrangement = Arrangement.spacedBy(EIGHT_DP)) {
+      rowItems.forEach { item ->
+        SelectionMenuCard(item) { onItemSelected(item) }
+      }
+      if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+    }
+  }
+}
+
+@Composable
+private fun RowScope.SelectionMenuCard(item: ReaderSelectionMenuItem, onClick: () -> Unit) {
+  Surface(
+    modifier = Modifier.weight(1f).height(72.dp).clickable(onClick = onClick),
+    shape = MaterialTheme.shapes.large,
+    color = MaterialTheme.colorScheme.surfaceVariant
+  ) {
+    Row(
+      Modifier.fillMaxSize().padding(horizontal = SIXTEEN_DP),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(EIGHT_DP)
+    ) {
+      Icon(
+        painterResource(item.icon),
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary
+      )
+      Text(
+        stringResource(item.label),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        style = MaterialTheme.typography.labelLarge
+      )
+    }
+  }
+}
+
+private val HIGHLIGHT_COLOR_CARD_HEIGHT = 64.dp
+
+private fun EpubHighlightColor.labelResource() = when (this) {
+  EpubHighlightColor.LIGHT_YELLOW -> R.string.epub_highlight_light_yellow
+  EpubHighlightColor.LIGHT_GREEN -> R.string.epub_highlight_light_green
+  EpubHighlightColor.LIGHT_BLUE -> R.string.epub_highlight_light_blue
+  EpubHighlightColor.LIGHT_PINK -> R.string.epub_highlight_light_pink
+  EpubHighlightColor.LIGHT_PURPLE -> R.string.epub_highlight_light_purple
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HandleReaderSystemBars(
+  topAppBarScrollBehavior: TopAppBarScrollBehavior,
+  bottomAppBarScrollBehavior: BottomAppBarScrollBehavior,
+  readerOpen: Boolean,
+  searchVisible: Boolean,
+  onSystemBarsVisibilityChange: (Boolean) -> Unit
+) {
+  LaunchedEffect(topAppBarScrollBehavior, bottomAppBarScrollBehavior, readerOpen, searchVisible) {
+    snapshotFlow {
+      shouldShowSystemBars(
+        readerOpen = readerOpen,
+        searchVisible = searchVisible,
+        topBarVisible = topAppBarScrollBehavior.state.heightOffset == 0f,
+        bottomBarVisible = bottomAppBarScrollBehavior.state.heightOffset == 0f
+      )
+    }.collect { onSystemBarsVisibilityChange(it) }
+  }
+}
+
+private fun isReaderOpen(state: ReaderUiState): Boolean =
+  state.tabsState.currentWebView != null &&
+    !state.showNoBookOpenInReader &&
+    !state.showTabSwitcher
+
+private fun shouldShowSystemBars(
+  readerOpen: Boolean,
+  searchVisible: Boolean,
+  topBarVisible: Boolean,
+  bottomBarVisible: Boolean
+): Boolean = !readerOpen || searchVisible || topBarVisible || bottomBarVisible
 
 @Composable
 fun OnBackPressed(
@@ -1251,39 +1504,39 @@ fun TabSwitcherView(
   onReaderAction: (ReaderAction) -> Unit
 ) {
   val state = rememberLazyGridState()
-  LazyVerticalGrid(
-    columns = GridCells.Adaptive(minSize = TAB_CARD_MIN_WIDTH),
-    modifier = Modifier.fillMaxSize(),
-    contentPadding = PaddingValues(
-      start = TWELVE_DP,
-      top = TWELVE_DP,
-      end = TWELVE_DP,
-      bottom = TAB_SWITCHER_BOTTOM_PADDING
-    ),
-    horizontalArrangement = Arrangement.spacedBy(TWELVE_DP),
-    verticalArrangement = Arrangement.spacedBy(TWELVE_DP),
-    state = state
-  ) {
-    itemsIndexed(tabsState.webViews, key = { _, item -> item.hashCode() }) { index, webView ->
-      val context = LocalContext.current
-      val title = remember(webView, webView.title) {
-        webView.title?.fromHtml()?.toString()
-          ?: context.getString(R.string.menu_home)
+  Box(modifier = Modifier.fillMaxSize()) {
+    LazyVerticalGrid(
+      columns = GridCells.Adaptive(minSize = TAB_CARD_MIN_WIDTH),
+      modifier = Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(
+        start = TWELVE_DP,
+        top = TWELVE_DP,
+        end = TWELVE_DP,
+        bottom = TAB_SWITCHER_BOTTOM_PADDING
+      ),
+      horizontalArrangement = Arrangement.spacedBy(TWELVE_DP),
+      verticalArrangement = Arrangement.spacedBy(TWELVE_DP),
+      state = state
+    ) {
+      itemsIndexed(tabsState.webViews, key = { _, item -> item.hashCode() }) { index, webView ->
+        val homeTitle = stringResource(R.string.menu_home)
+        val title = remember(webView, webView.title) {
+          webView.title?.fromHtml()?.toString() ?: homeTitle
+        }
+        TabItemView(
+          index = index,
+          title = title,
+          isSelected = index == tabsState.selectedIndex,
+          webView = webView,
+          showTabSwitcher = showTabSwitcher,
+          onReaderAction = onReaderAction,
+        )
       }
-
-      TabItemView(
-        index = index,
-        title = title,
-        isSelected = index == tabsState.selectedIndex,
-        webView = webView,
-        showTabSwitcher = showTabSwitcher,
-        onReaderAction = onReaderAction,
-      )
     }
-  }
-  LaunchedEffect(tabsState.selectedIndex) {
-    if (tabsState.selectedIndex in tabsState.webViews.indices) {
-      state.animateScrollToItem(tabsState.selectedIndex)
+    LaunchedEffect(tabsState.selectedIndex) {
+      if (tabsState.selectedIndex in tabsState.webViews.indices) {
+        state.animateScrollToItem(tabsState.selectedIndex)
+      }
     }
   }
 }
