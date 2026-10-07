@@ -66,6 +66,7 @@ import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.UnsupportedMimeTypeHandler
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.utils.files.Log
+import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
 import org.kiwix.kiwixmobile.ui.KiwixDestination
 import java.io.File
 import javax.inject.Inject
@@ -221,6 +222,10 @@ class KiwixReaderViewModel @Inject constructor(
       // which is inside the non-existing ZIM file. This leads to unexpected behavior.
       exitBook()
       emitEffect(ReaderEffect.ShowToast(context.getString(string.error_file_not_found, zimFileUri)))
+      return
+    }
+    if (isEpubFile(filePath)) {
+      openEpubFile(File(filePath))
       return
     }
     val zimReaderSource = ZimReaderSource(File(filePath))

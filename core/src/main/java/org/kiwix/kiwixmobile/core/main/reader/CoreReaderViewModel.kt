@@ -103,6 +103,7 @@ import org.kiwix.kiwixmobile.core.main.reader.helper.documentparser.DocumentPars
 import org.kiwix.kiwixmobile.core.main.reader.helper.documentparser.DocumentParser.SectionsListener
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.None
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenBookmarks
+import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenEpub
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenSearch
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenZim
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.ReaderIntentManager
@@ -1329,6 +1330,35 @@ abstract class CoreReaderViewModel(
   }
 
   /**
+   * Opens [file] in the native EPUB reader and renders its first spine page.
+   * TODO(epub-reader): library entry/persistence, bookmarks, ToC UI, in-book search, and hiding
+   *  ZIM-only menu items (random page, search) while an EPUB is open.
+   */
+  open suspend fun openEpubFile(file: File) {
+    if (uiState.value.ttsControlsItem.isTtsPlaying) {
+      stopReadAloud()
+    }
+    if (!isBrandedApp() && !kiwixPermissionChecker.hasReadExternalStoragePermission()) {
+      emitEffect(ReaderEffect.RequestReadStoragePermission)
+      return
+    }
+    // Same as openZimFile: WebViews must not outlive the reader they were serving.
+    readerWebViewManager.destroyAllTabs()
+    if (!zimReaderContainer.setEpubFile(file)) {
+      exitBook()
+      emitEffect(
+        ReaderEffect.ShowToast(context.getString(string.error_file_invalid, file.path))
+      )
+      return
+    }
+    hideNoBookOpenViews()
+    openMainPage()
+    readerMenuState?.onFileOpened(urlIsValid())
+    updateState { copy(showTabSwitcher = false) }
+    updateTitle()
+  }
+
+  /**
    * Sets the title for toolbar, controlling the title of toolbar.
    * Subclasses like BrandedViewModel override this method to provide custom
    * behavior, such as hiding the title when configured not to show it.
@@ -1487,6 +1517,9 @@ abstract class CoreReaderViewModel(
         isOpenedFromTabView = result.isOpenedFromTabView,
         result.isVoice
       ).also { clearActivityIntentAction() }
+
+      is OpenEpub ->
+        launchInViewModelScope { openEpubFile(File(result.epubFilePath)) }
 
       is OpenZim ->
         launchInViewModelScope {

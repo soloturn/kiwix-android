@@ -72,6 +72,20 @@ class PendingIntentParserTest {
   }
 
   @Test
+  fun `file epub VIEW intent returns OpenEpub, content epub stays None`() {
+    val file = Intent(Intent.ACTION_VIEW, Uri.parse("file:///sdcard/book.epub"))
+    val content = Intent(Intent.ACTION_VIEW, Uri.parse("content://x/1")).apply {
+      type = "application/epub+zip"
+    }
+
+    assertEquals(
+      PendingIntentParser.ReaderIntentAction.OpenEpub("/sdcard/book.epub"),
+      parser.parse(file)
+    )
+    assertEquals(PendingIntentParser.ReaderIntentAction.None, parser.parse(content))
+  }
+
+  @Test
   fun `TEXT_CLICKED returns empty OpenSearch`() {
     val intent = Intent(CoreSearchWidget.TEXT_CLICKED)
 
@@ -146,6 +160,7 @@ class PendingIntentParserTest {
     every { intent.hasExtra(ZIM_FILE_URI_KEY) } returns false
     every { intent.scheme } returns "file"
     every { intent.type } returns "text/plain"
+    every { intent.data } returns null
 
     assertEquals(
       PendingIntentParser.ReaderIntentAction.None,

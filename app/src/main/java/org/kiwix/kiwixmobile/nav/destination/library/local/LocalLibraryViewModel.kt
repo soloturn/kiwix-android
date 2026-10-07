@@ -91,6 +91,7 @@ import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestDrawerToggle
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestMultiSelection
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestNavigateTo
+import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestOpenEpub
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestReadWritePermission
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestSelect
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestShareMultiSelection
@@ -107,6 +108,7 @@ import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.DeleteFilesUseCas
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.NavigateToDownloads
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.NavigationDrawerToggle
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.None
+import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.OpenEpubWithNavigation
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.OpenFileWithNavigation
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.ShareFiles
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.ValidateZIMFiles
@@ -148,6 +150,7 @@ class LocalLibraryViewModel @Inject constructor(
    */
   sealed class LocalLibraryUiActions {
     data class RequestNavigateTo(val zimReaderSource: ZimReaderSource) : LocalLibraryUiActions()
+    data class RequestOpenEpub(val file: File) : LocalLibraryUiActions()
     data class RequestSelect(val bookOnDisk: BookOnDisk) : LocalLibraryUiActions()
     data class RequestMultiSelection(val bookOnDisk: BookOnDisk) : LocalLibraryUiActions()
     data object RequestValidateZimFiles : LocalLibraryUiActions()
@@ -378,6 +381,8 @@ class LocalLibraryViewModel @Inject constructor(
           coroutineScope = viewModelScope,
           ioDispatcher = ioDispatcher
         )
+
+      is RequestOpenEpub -> OpenEpubWithNavigation(action.file)
 
       RequestDrawerToggle -> NavigationDrawerToggle
     }
@@ -808,6 +813,17 @@ class LocalLibraryViewModel @Inject constructor(
         addBookToLibkiwixBookOnDisk(file)
         // Open the ZIM file in reader screen.
         sendAction(RequestNavigateTo(ZimReaderSource(file)))
+      }
+    }
+  }
+
+  // TODO(epub-reader): add the EPUB to the local library (persistence) once that step lands.
+  override fun onEpubFileSelected(file: File) {
+    viewModelScope.launch {
+      if (!file.canReadFile(ioDispatcher)) {
+        context.toast(string.unable_to_read_zim_file)
+      } else {
+        sendAction(RequestOpenEpub(file))
       }
     }
   }
