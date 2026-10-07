@@ -25,6 +25,7 @@ import org.kiwix.kiwixmobile.core.main.ZIM_HOST_DEEP_LINK_SCHEME
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.None
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenBookmarks
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenEpub
+import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenEpubContent
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenSearch
 import org.kiwix.kiwixmobile.core.utils.files.EPUB_MIME_TYPE
 import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
@@ -40,6 +41,9 @@ class PendingIntentParser @Inject constructor() {
 
     data class OpenZim(val zimFileUri: String, val pageUrl: String) : ReaderIntentAction
     data class OpenEpub(val epubFilePath: String) : ReaderIntentAction
+
+    /** A `content://` EPUB; must be copied to app-private storage before opening. */
+    data class OpenEpubContent(val uri: String) : ReaderIntentAction
     data object OpenBookmarks : ReaderIntentAction
     data object None : ReaderIntentAction
   }
@@ -71,10 +75,13 @@ class PendingIntentParser @Inject constructor() {
   @Suppress("ReturnCount")
   private fun parseActionViewIntent(intent: Intent): ReaderIntentAction {
     if (intent.hasExtra(ZIM_FILE_URI_KEY)) return None
-    // TODO(epub-reader): content:// EPUB URIs need copying to a local file first; only file://
-    //  paths open directly for now.
-    if (intent.scheme == "file" && isEpubViewIntent(intent)) {
-      intent.data?.path?.let { return OpenEpub(it) }
+    val scheme = intent.scheme
+    if ((scheme == "file" || scheme == "content") && isEpubViewIntent(intent)) {
+      if (scheme == "file") {
+        intent.data?.path?.let { return OpenEpub(it) }
+      } else {
+        intent.data?.let { return OpenEpubContent(it.toString()) }
+      }
     }
     val hasValidScheme =
       intent.scheme in listOf("file", "content", "zim", ZIM_HOST_DEEP_LINK_SCHEME)
