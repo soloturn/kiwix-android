@@ -245,5 +245,9 @@ class EpubLibraryManagerTest {
     override fun delete(id: String) {
       rows.removeAll { it.id == id }
     }
+
+    override fun deleteByPath(path: String) {
+      rows.removeAll { it.path == path }
+    }
   }
 }
