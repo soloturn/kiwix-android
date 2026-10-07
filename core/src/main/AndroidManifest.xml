@@ -45,7 +45,7 @@
     <!-- To open EPUB files in external application -->
     <intent>
       <action android:name="android.intent.action.VIEW" />
-      <data android:mimeType="application/pdf" />
+      <data android:mimeType="application/epub+zip" />
     </intent>
   </queries>
 
