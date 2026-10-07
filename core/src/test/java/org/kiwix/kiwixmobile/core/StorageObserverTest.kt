@@ -49,6 +49,7 @@ import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.files.FileSearch
 import org.kiwix.kiwixmobile.core.utils.files.ScanningProgressListener
+import org.kiwix.kiwixmobile.core.utils.files.TreeScanResult
 import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.libkiwix.Book
@@ -193,7 +194,7 @@ class StorageObserverTest {
 
   @Test
   fun `tree sync does nothing without an active library folder`() = runTest {
-    coEvery { libraryFolder.activeTreeUri() } returns null
+    coEvery { libraryFolder.activeScanTreeUris() } returns emptyList()
     assertThat(storageObserver.syncLibraryTree()).isZero()
     coVerify(exactly = 0) { fileSearch.scanTree(any(), any()) }
   }
@@ -206,15 +207,66 @@ class StorageObserverTest {
     val knownSource: ZimReaderSource = mockk {
       every { toDatabase() } returns "content://tree/known.zim"
     }
-    coEvery { libraryFolder.activeTreeUri() } returns treeUri
+    coEvery { libraryFolder.activeScanTreeUris() } returns listOf(treeUri)
     coEvery { libkiwixBookOnDisk.getBooks() } returns listOf(
       BookOnDisk(book = libkiwixBook("known"), zimReaderSource = knownSource)
     )
-    coEvery { fileSearch.scanTree(treeUri, null) } returns listOf(known, fresh)
+    coEvery { fileSearch.scanTree(treeUri, null) } returns TreeScanResult(
+      zimFiles = listOf(known, fresh),
+      epubFiles = emptyList()
+    )
     coEvery { libkiwixBookOnDisk.insertUriBook(fresh) } returns libkiwixBook("new")
 
     assertThat(storageObserver.syncLibraryTree()).isEqualTo(1)
     coVerify(exactly = 0) { libkiwixBookOnDisk.insertUriBook(known) }
+  }
+
+  @Test
+  fun `tree sync imports EPUBs from the selected library folder`() = runTest {
+    val treeUri: Uri = mockk()
+    val epubUri: Uri = mockk()
+    val importedEpub = File("/private/epub/book.epub")
+    coEvery { libraryFolder.activeScanTreeUris() } returns listOf(treeUri)
+    coEvery { libkiwixBookOnDisk.getBooks() } returns emptyList()
+    coEvery { fileSearch.scanTree(treeUri, null) } returns TreeScanResult(
+      zimFiles = emptyList(),
+      epubFiles = listOf(epubUri)
+    )
+    coEvery { fileSearch.importEpubFromTree(epubUri) } returns importedEpub
+    coEvery { epubLibraryManager.importScanned(listOf(importedEpub)) } returns 1
+
+    assertThat(storageObserver.syncLibraryTree()).isZero()
+    advanceUntilIdle()
+    coVerify { epubLibraryManager.importScanned(listOf(importedEpub)) }
+  }
+
+  @Test
+  fun `tree sync scans both the library and additional media folders`() = runTest {
+    val documentsTree: Uri = mockk()
+    val mediaTree: Uri = mockk()
+    val documentsEpub: Uri = mockk()
+    val mediaEpub: Uri = mockk()
+    val importedDocumentsEpub = File("/private/epub/documents.epub")
+    val importedMediaEpub = File("/private/epub/media.epub")
+    coEvery { libraryFolder.activeScanTreeUris() } returns listOf(documentsTree, mediaTree)
+    coEvery { libkiwixBookOnDisk.getBooks() } returns emptyList()
+    coEvery { fileSearch.scanTree(documentsTree, null) } returns TreeScanResult(
+      zimFiles = emptyList(),
+      epubFiles = listOf(documentsEpub)
+    )
+    coEvery { fileSearch.scanTree(mediaTree, null) } returns TreeScanResult(
+      zimFiles = emptyList(),
+      epubFiles = listOf(mediaEpub)
+    )
+    coEvery { fileSearch.importEpubFromTree(documentsEpub) } returns importedDocumentsEpub
+    coEvery { fileSearch.importEpubFromTree(mediaEpub) } returns importedMediaEpub
+
+    assertThat(storageObserver.syncLibraryTree()).isZero()
+    advanceUntilIdle()
+    coVerify { fileSearch.scanTree(documentsTree, null) }
+    coVerify { fileSearch.scanTree(mediaTree, null) }
+    coVerify { epubLibraryManager.importScanned(listOf(importedDocumentsEpub)) }
+    coVerify { epubLibraryManager.importScanned(listOf(importedMediaEpub)) }
   }
 
   private fun booksOnFileSystem() =

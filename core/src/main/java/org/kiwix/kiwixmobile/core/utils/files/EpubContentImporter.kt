@@ -55,8 +55,8 @@ sealed interface EpubImportResult {
 object EpubContentImporter {
   /**
    * Stores the stream as `<name>-<bytes>-<content hash>.epub`, so different books never share a
-   * file and the same book from any provider (whatever its name) is stored once. Known-size
-   * imports of an already stored book skip the copy.
+   * file and the same book from any provider (whatever its name) is stored once. Incoming content
+   * is always read and hashed before it can reuse an existing copy.
    */
   @Suppress("ReturnCount", "LongParameterList")
   fun import(
@@ -71,11 +71,6 @@ object EpubContentImporter {
     if (!destDir.isDirectory && !destDir.mkdirs()) return EpubImportResult.Invalid
     deleteStaleParts(destDir, STALE_PART_AGE_MS)
     val base = sanitizedBase(displayName)
-    if (size != UNKNOWN_SIZE) {
-      findStored(destDir, base, size)?.let {
-        return EpubImportResult.Imported(it)
-      }
-    }
     val required = maxOf(size, 0L) + FREE_SPACE_MARGIN
     val available = freeSpace(destDir)
     if (available < required) return EpubImportResult.NotEnoughSpace(required, available)
@@ -131,11 +126,6 @@ object EpubContentImporter {
       digest.update(buffer, 0, read)
       out.write(buffer, 0, read)
     }
-  }
-
-  private fun findStored(destDir: File, base: String, size: Long): File? {
-    val pattern = Regex("${Regex.escape(base)}-$size-[0-9a-f]{$HASH_LENGTH}\\.$EPUB_EXTENSION")
-    return destDir.listFiles { _, name -> pattern.matches(name) }?.firstOrNull(::isValidEpubFile)
   }
 
   /** Removes `.part` files left by an interrupted copy; younger ones may be in progress. */

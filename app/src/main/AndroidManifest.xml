@@ -121,6 +121,45 @@
         <data android:pathPattern="/.*\\..*\\..*\\.zimaa" />
         <data android:pathPattern="/.*\\..*\\..*\\..*\\.zimaa" />
       </intent-filter>
+      <!-- EPUB files (native EPUB reader). -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+
+        <data android:scheme="content" />
+        <data android:scheme="file" />
+        <data android:mimeType="application/epub+zip" />
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+
+        <data android:scheme="file" />
+        <data android:mimeType="*/*" />
+        <data android:pathPattern="/.*\\.epub" />
+        <data android:pathPattern="/.*\\..*\\.epub" />
+        <data android:pathPattern="/.*\\..*\\..*\\.epub" />
+        <data android:pathPattern="/.*\\..*\\..*\\..*\\.epub" />
+        <data android:host="*" />
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+
+        <data android:scheme="content" />
+        <data android:host="*" />
+        <data android:mimeType="*/*" />
+        <data android:pathPattern="/.*\\.epub" />
+        <data android:pathPattern="/.*\\..*\\.epub" />
+        <data android:pathPattern="/.*\\..*\\..*\\.epub" />
+        <data android:pathPattern="/.*\\..*\\..*\\..*\\.epub" />
+      </intent-filter>
       <intent-filter>
         <action android:name="android.intent.action.VIEW" />
 

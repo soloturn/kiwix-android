@@ -25,6 +25,8 @@ import org.kiwix.kiwixmobile.core.main.ZIM_HOST_DEEP_LINK_SCHEME
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.None
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenBookmarks
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenSearch
+import org.kiwix.kiwixmobile.core.utils.files.EPUB_MIME_TYPE
+import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
 import javax.inject.Inject
 
 class PendingIntentParser @Inject constructor() {
@@ -59,9 +61,18 @@ class PendingIntentParser @Inject constructor() {
     else -> None
   }
 
+  /**
+   * True for an ACTION_VIEW of an EPUB, by MIME type or a `.epub` path. The main activity opens
+   * these itself, so [parse] gives the ZIM reader nothing to do for them.
+   */
+  fun isEpubViewIntent(intent: Intent): Boolean =
+    intent.action == Intent.ACTION_VIEW &&
+      (intent.type == EPUB_MIME_TYPE || intent.data?.path?.let(::isEpubFile) == true)
+
   @Suppress("ReturnCount")
   private fun parseActionViewIntent(intent: Intent): ReaderIntentAction {
     if (intent.hasExtra(ZIM_FILE_URI_KEY)) return None
+    if (isEpubViewIntent(intent)) return None
     val hasValidScheme =
       intent.scheme in listOf("file", "content", "zim", ZIM_HOST_DEEP_LINK_SCHEME)
     // Added condition to handle ZIM files. When opening from storage, the intent may

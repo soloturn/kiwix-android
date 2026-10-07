@@ -182,6 +182,21 @@ class AddNoteViewModelTest {
   }
 
   @Test
+  fun `setInitialNoteText uses selected text when no note exists`() = runTest {
+    initializeViewModel()
+    every { noteMetadata.isZimFileExist } returns true
+    coEvery {
+      noteRepository.loadNote(noteMetadata)
+    } returns NoteFileContent(fileExists = false, text = "")
+
+    viewModel.setInitialNoteText("Selected passage")
+    advanceUntilIdle()
+
+    assertEquals("Selected passage", viewModel.uiState.value.noteTextFieldValue.text)
+    assertTrue(viewModel.uiState.value.isSaveMenuButtonEnable)
+  }
+
+  @Test
   fun `deleteNote success clears note and disables menu items`() = runTest {
     initializeViewModel()
 

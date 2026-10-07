@@ -39,6 +39,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
+import org.kiwix.kiwixmobile.core.epub.EpubOnDisk
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
@@ -165,5 +166,52 @@ class DeleteFilesTest {
     verify {
       activity.toast(R.string.delete_zim_failed)
     }
+  }
+
+  @Test
+  fun invokeWith_withEpubs_listsTheirTitlesAndDeletesThem() = runTest {
+    val epub = EpubOnDisk("e1", File("/storage/e1.epub"), "Epub 1", "", "", null, 1L, 0L, 0L)
+    val withEpub = DeleteFiles(
+      listOf(book1),
+      dialogShower,
+      deleteFilesUseCase,
+      viewModelScope,
+      mainDispatcherRule.dispatcher,
+      listOf(epub)
+    )
+    val clickSlot = slot<() -> Unit>()
+    every { dialogShower.show(any(), capture(clickSlot)) } just Runs
+    coEvery { deleteFilesUseCase(any()) } returns true
+    coEvery { deleteFilesUseCase.deleteEpubs(any()) } returns true
+
+    withEpub.invokeWith(activity)
+    verify { dialogShower.show(KiwixDialog.DeleteZims("Book 1\nEpub 1"), any()) }
+
+    clickSlot.captured.invoke()
+    advanceUntilIdle()
+    coVerify(exactly = 1) { deleteFilesUseCase.deleteEpubs(listOf(epub)) }
+    verify { activity.toast(R.string.delete_zims_toast) }
+  }
+
+  @Test
+  fun invokeWith_whenEpubDeletionFails_showsFailureToast() = runTest {
+    val epub = EpubOnDisk("e1", File("/storage/e1.epub"), "Epub 1", "", "", null, 1L, 0L, 0L)
+    val withEpub = DeleteFiles(
+      emptyList(),
+      dialogShower,
+      deleteFilesUseCase,
+      viewModelScope,
+      mainDispatcherRule.dispatcher,
+      listOf(epub)
+    )
+    val clickSlot = slot<() -> Unit>()
+    every { dialogShower.show(any(), capture(clickSlot)) } just Runs
+    coEvery { deleteFilesUseCase(any()) } returns true
+    coEvery { deleteFilesUseCase.deleteEpubs(any()) } returns false
+
+    withEpub.invokeWith(activity)
+    clickSlot.captured.invoke()
+    advanceUntilIdle()
+    verify { activity.toast(R.string.delete_zim_failed) }
   }
 }

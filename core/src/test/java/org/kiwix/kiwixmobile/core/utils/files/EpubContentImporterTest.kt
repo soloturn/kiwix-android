@@ -73,19 +73,22 @@ class EpubContentImporterTest {
   }
 
   @Test
-  fun `second import of the same book reuses the copy without reading the stream`() {
+  fun `second import of the same book hashes the stream and reuses the copy`() {
     val bytes = epub()
     val first = imported(import(bytes))
     var opened = false
     val second = imported(import(bytes) { opened = true })
     assertEquals(first, second)
-    assertFalse(opened)
+    assertTrue(opened)
   }
 
   @Test
-  fun `same name and size but different content gets a distinct file`() {
-    val a = imported(import(epub("aaaa"), size = -1))
-    val b = imported(import(epub("bbbb"), size = -1))
+  fun `same name and declared size but different content gets a distinct file`() {
+    val aBytes = epub("aaaa")
+    val bBytes = epub("bbbb")
+    assertEquals(aBytes.size, bBytes.size)
+    val a = imported(import(aBytes, name = "same.epub"))
+    val b = imported(import(bBytes, name = "same.epub"))
     assertTrue(a != b)
     assertEquals(2, dir.list()!!.size)
   }
@@ -162,10 +165,10 @@ class EpubContentImporterTest {
   }
 
   @Test
-  fun `an already stored book needs no free space`() {
+  fun `an already stored book still requires space to verify incoming content`() {
     val bytes = epub()
     imported(import(bytes))
-    assertTrue(import(bytes, freeSpace = { 0L }) is EpubImportResult.Imported)
+    assertTrue(import(bytes, freeSpace = { 0L }) is EpubImportResult.NotEnoughSpace)
   }
 
   @Test

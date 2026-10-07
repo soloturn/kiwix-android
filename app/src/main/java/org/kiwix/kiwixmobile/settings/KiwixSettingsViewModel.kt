@@ -107,14 +107,65 @@ class KiwixSettingsViewModel @Inject constructor(
     val restoreSummary = libraryFolder.savedTreeUri()
       ?.takeIf { libraryFolder.needsAccessRestore() }
       ?.let { context.getString(R.string.restore_library_summary, libraryFolder.describe(it)) }
-    return LibraryFolderState(summary, restoreSummary)
+    val mediaScanSummary = libraryFolder.savedMediaScanTreeUri()
+      ?.let { treeUri ->
+        if (libraryFolder.mediaScanTreeNeedsAccessRestore()) {
+          context.getString(R.string.additional_scan_folder_restore)
+        } else {
+          context.getString(
+            R.string.additional_scan_folder_summary,
+            libraryFolder.describe(treeUri)
+          )
+        }
+      } ?: context.getString(R.string.additional_scan_folder_not_granted)
+    val documentsScanSummary = libraryFolder.savedDocumentsScanTreeUri()
+      ?.let { treeUri ->
+        if (libraryFolder.documentsScanTreeNeedsAccessRestore()) {
+          context.getString(R.string.documents_scan_folder_restore)
+        } else {
+          context.getString(
+            R.string.documents_scan_folder_summary,
+            libraryFolder.describe(treeUri)
+          )
+        }
+      } ?: context.getString(R.string.documents_scan_folder_not_granted)
+    return LibraryFolderState(summary, restoreSummary, documentsScanSummary, mediaScanSummary)
   }
 
   override suspend fun libraryFolderPickerUri(): Uri = libraryFolder.pickerInitialUri()
 
+  override suspend fun mediaScanFolderPickerUri(): Uri = libraryFolder.mediaScanPickerInitialUri()
+
+  override suspend fun documentsScanFolderPickerUri(): Uri =
+    libraryFolder.documentsScanPickerInitialUri()
+
   override fun onLibraryFolderPicked(treeUri: Uri) {
     viewModelScope.launch {
       if (!libraryFolder.onTreePicked(treeUri)) {
+        sendAction(ShowToast(context.getString(R.string.library_folder_access_denied)))
+        return@launch
+      }
+      setUpStoragePreference()
+      val added = storageObserver.syncLibraryTree()
+      sendAction(ShowToast(context.getString(R.string.library_folder_books_added, added)))
+    }
+  }
+
+  override fun onMediaScanFolderPicked(treeUri: Uri) {
+    viewModelScope.launch {
+      if (!libraryFolder.onMediaScanTreePicked(treeUri)) {
+        sendAction(ShowToast(context.getString(R.string.library_folder_access_denied)))
+        return@launch
+      }
+      setUpStoragePreference()
+      val added = storageObserver.syncLibraryTree()
+      sendAction(ShowToast(context.getString(R.string.library_folder_books_added, added)))
+    }
+  }
+
+  override fun onDocumentsScanFolderPicked(treeUri: Uri) {
+    viewModelScope.launch {
+      if (!libraryFolder.onDocumentsScanTreePicked(treeUri)) {
         sendAction(ShowToast(context.getString(R.string.library_folder_access_denied)))
         return@launch
       }

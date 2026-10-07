@@ -24,6 +24,7 @@ gen/
 
 # Gradle files
 .gradle/
+**/.cxx/
 build/
 gradle/gradle-daemon-jvm.properties
 

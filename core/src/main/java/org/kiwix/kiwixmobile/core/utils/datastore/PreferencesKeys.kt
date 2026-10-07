@@ -79,6 +79,8 @@ object PreferencesKeys {
     booleanPreferencesKey(KiwixDataStore.PREF_SHOW_COPY_MOVE_STORAGE_SELECTION_DIALOG)
   val PREF_STORAGE = stringPreferencesKey(KiwixDataStore.PREF_STORAGE)
   val PREF_LIBRARY_TREE_URI = stringPreferencesKey(KiwixDataStore.PREF_LIBRARY_TREE_URI)
+  val PREF_MEDIA_SCAN_TREE_URI = stringPreferencesKey(KiwixDataStore.PREF_MEDIA_SCAN_TREE_URI)
+  val PREF_DOCUMENTS_SCAN_TREE_URI = stringPreferencesKey(KiwixDataStore.PREF_DOCUMENTS_SCAN_TREE_URI)
   val PREF_LEGACY_BOOKS_MOVE_DECLINED =
     booleanPreferencesKey(KiwixDataStore.PREF_LEGACY_BOOKS_MOVE_DECLINED)
   val STORAGE_POSITION = intPreferencesKey(KiwixDataStore.STORAGE_POSITION)

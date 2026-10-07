@@ -71,8 +71,76 @@ class LibraryFolder @Inject constructor(
   suspend fun savedTreeUri(): Uri? =
     kiwixDataStore.libraryTreeUri.first()?.takeIf(String::isNotEmpty)?.toUri()
 
-  /** The picked tree, but only while we still hold a persisted read/write grant for it. */
+  /** The picked library tree, but only while we still hold its persisted read/write grant. */
   suspend fun activeTreeUri(): Uri? = savedTreeUri()?.takeIf(::hasTreeAccess)
+
+  /** Additional shared tree scanned with the library, independent of its download location. */
+  suspend fun activeScanTreeUris(): List<Uri> {
+    val documentsTree = savedDocumentsScanTreeUri()
+    val mediaTree = savedMediaScanTreeUri()
+    if (documentsTree != null) restrictScanTreeToRead(documentsTree)
+    if (mediaTree != null) restrictScanTreeToRead(mediaTree)
+    return listOfNotNull(
+      activeTreeUri(),
+      documentsTree?.takeIf(::hasReadTreeAccess),
+      mediaTree?.takeIf(::hasReadTreeAccess)
+    ).distinct()
+  }
+
+  suspend fun savedDocumentsScanTreeUri(): Uri? =
+    kiwixDataStore.documentsScanTreeUri.first()?.takeIf(String::isNotEmpty)?.toUri()
+
+  suspend fun documentsScanTreeNeedsAccessRestore(): Boolean =
+    savedDocumentsScanTreeUri()?.let { !hasReadTreeAccess(it) } ?: false
+
+  suspend fun onDocumentsScanTreePicked(treeUri: Uri): Boolean {
+    val taken = runCatching {
+      context.contentResolver.takePersistableUriPermission(treeUri, READ)
+    }.onFailure { Log.e(TAG, "No persistable Documents-tree grant for $treeUri: $it") }.isSuccess
+    if (!taken) return false
+    restrictScanTreeToRead(treeUri)
+    val previous = savedDocumentsScanTreeUri()
+    if (previous != null && previous != treeUri) {
+      releaseScanTreeGrant(previous, savedMediaScanTreeUri() == previous)
+    }
+    kiwixDataStore.setDocumentsScanTreeUri("$treeUri")
+    return true
+  }
+
+  suspend fun documentsScanPickerInitialUri(): Uri =
+    savedDocumentsScanTreeUri()?.let(::treeRootDocumentUri)
+      ?: DocumentsContract.buildDocumentUri(
+        EXTERNAL_STORAGE_AUTHORITY,
+        "$PRIMARY_VOLUME:${Environment.DIRECTORY_DOCUMENTS}"
+      )
+
+  suspend fun savedMediaScanTreeUri(): Uri? =
+    kiwixDataStore.mediaScanTreeUri.first()?.takeIf(String::isNotEmpty)?.toUri()
+
+  suspend fun mediaScanTreeNeedsAccessRestore(): Boolean =
+    savedMediaScanTreeUri()?.let { !hasReadTreeAccess(it) } ?: false
+
+  /** Android's picker grant for the shared media directory is stored separately from the library. */
+  suspend fun onMediaScanTreePicked(treeUri: Uri): Boolean {
+    val taken = runCatching {
+      context.contentResolver.takePersistableUriPermission(treeUri, READ)
+    }.onFailure { Log.e(TAG, "No persistable media-tree grant for $treeUri: $it") }.isSuccess
+    if (!taken) return false
+    restrictScanTreeToRead(treeUri)
+    val previous = savedMediaScanTreeUri()
+    if (previous != null && previous != treeUri) {
+      releaseScanTreeGrant(previous, savedDocumentsScanTreeUri() == previous)
+    }
+    kiwixDataStore.setMediaScanTreeUri("$treeUri")
+    return true
+  }
+
+  suspend fun mediaScanPickerInitialUri(): Uri =
+    savedMediaScanTreeUri()?.let(::treeRootDocumentUri)
+      ?: DocumentsContract.buildDocumentUri(
+        EXTERNAL_STORAGE_AUTHORITY,
+        "$PRIMARY_VOLUME:Android/media"
+      )
 
   /** A folder was picked before, but the grant is gone, typically after a reinstall. */
   suspend fun needsAccessRestore(): Boolean = savedTreeUri() != null && activeTreeUri() == null
@@ -81,6 +149,35 @@ class LibraryFolder @Inject constructor(
     context.contentResolver.persistedUriPermissions.any {
       it.uri == treeUri && it.isReadPermission && it.isWritePermission
     }
+
+  private fun hasReadTreeAccess(treeUri: Uri): Boolean =
+    context.contentResolver.persistedUriPermissions.any {
+      it.uri == treeUri && it.isReadPermission
+    }
+
+  private suspend fun restrictScanTreeToRead(treeUri: Uri) {
+    val hasWriteGrant = context.contentResolver.persistedUriPermissions.any {
+      it.uri == treeUri && it.isWritePermission
+    }
+    if (savedTreeUri() != treeUri && hasWriteGrant) {
+      runCatching {
+        context.contentResolver.releasePersistableUriPermission(
+          treeUri,
+          Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        )
+      }
+    }
+  }
+
+  /** Drop an old scan grant's write bit, unless this tree is also the writable library. */
+  private suspend fun releaseScanTreeGrant(treeUri: Uri, usedByOtherScan: Boolean) {
+    if (savedTreeUri() != treeUri) {
+      runCatching {
+        val flags = if (usedByOtherScan) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else READ_WRITE
+        context.contentResolver.releasePersistableUriPermission(treeUri, flags)
+      }
+    }
+  }
 
   /** Persists the grant for a freshly picked tree and makes it the library folder. */
   suspend fun onTreePicked(treeUri: Uri): Boolean {
@@ -195,5 +292,6 @@ class LibraryFolder @Inject constructor(
     const val PRIMARY_VOLUME = "primary"
     const val READ_WRITE =
       Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+    const val READ = Intent.FLAG_GRANT_READ_URI_PERMISSION
   }
 }

@@ -74,9 +74,11 @@ fun KiwixAppBar(
   actionMenuItems: List<ActionMenuItem> = emptyList(),
   topAppBarScrollBehavior: TopAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
   // Optional search bar, used in screens that require it
-  searchBar: (@Composable () -> Unit)? = null
+  searchBar: (@Composable () -> Unit)? = null,
+  // False keeps the caller's MaterialTheme, e.g. a recoloured one.
+  useAppTheme: Boolean = true
 ) {
-  KiwixTheme {
+  val content = @Composable {
     TopAppBar(
       title = { AppBarTitleSection(title, searchBar) },
       navigationIcon = navigationIcon,
@@ -93,6 +95,7 @@ fun KiwixAppBar(
       modifier = modifier.shadow(KIWIX_TOOLBAR_SHADOW_ELEVATION)
     )
   }
+  if (useAppTheme) KiwixTheme { content() } else content()
 }
 
 @Suppress("ComposableLambdaParameterNaming")
