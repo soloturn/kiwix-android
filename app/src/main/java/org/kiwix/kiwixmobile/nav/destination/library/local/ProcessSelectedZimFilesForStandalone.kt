@@ -154,9 +154,8 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
 
 interface SelectedZimFileCallback {
   /**
-   * A validated EPUB was selected.
-   * TODO(epub-reader): open it in the native EPUB reader / add it to the library once the
-   *  backend lands. Default no-op so existing implementers are unaffected.
+   * A validated EPUB was selected; implementers open it in the native EPUB reader.
+   * Default just logs so existing implementers are unaffected.
    */
   fun onEpubFileSelected(file: File) {
     Log.w(TAG_KIWIX, "EPUB selected but reader not wired yet: ${file.path}")
