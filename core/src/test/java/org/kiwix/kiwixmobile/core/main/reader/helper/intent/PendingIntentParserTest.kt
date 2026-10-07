@@ -61,6 +61,17 @@ class PendingIntentParserTest {
   }
 
   @Test
+  fun `epub VIEW intent is recognised and not turned into a search`() {
+    val byType = Intent(Intent.ACTION_VIEW).apply { type = "application/epub+zip" }
+    val byPath = Intent(Intent.ACTION_VIEW, Uri.parse("https://x/a/book.epub"))
+
+    assertEquals(true, parser.isEpubViewIntent(byType))
+    assertEquals(true, parser.isEpubViewIntent(byPath))
+    assertEquals(PendingIntentParser.ReaderIntentAction.None, parser.parse(byType))
+    assertEquals(false, parser.isEpubViewIntent(Intent(Intent.ACTION_VIEW, Uri.parse("https://x/a.zim"))))
+  }
+
+  @Test
   fun `TEXT_CLICKED returns empty OpenSearch`() {
     val intent = Intent(CoreSearchWidget.TEXT_CLICKED)
 
