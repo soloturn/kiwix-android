@@ -101,6 +101,7 @@ open class CoreWebViewClient(
     if (invalidUrl) {
       return
     }
+    if (url.startsWith(ZimFileReader.CONTENT_PREFIX)) (view as? KiwixWebView)?.injectReflowIfEnabled()
     jumpToAnchor(view, url)
     callback.webViewUrlFinishedLoading()
   }

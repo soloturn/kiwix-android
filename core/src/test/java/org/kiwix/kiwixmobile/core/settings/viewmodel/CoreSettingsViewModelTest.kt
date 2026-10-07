@@ -183,6 +183,7 @@ internal class CoreSettingsViewModelTest {
     every { kiwixDataStore.textZoom } returns flowOf(DEFAULT_ZOOM)
     every { kiwixDataStore.openNewTabInBackground } returns flowOf(false)
     every { kiwixDataStore.wifiOnly } returns flowOf(true)
+    every { kiwixDataStore.reflowEnabled } returns flowOf(true)
 
     // Stub PackageManager so versionCode / versionName are computed at construction time
     val packageInfo = PackageInfo().apply {
@@ -356,6 +357,14 @@ internal class CoreSettingsViewModelTest {
 
       // avoid overflow assertion crash
       coVerify { kiwixDataStore.setTextZoom(any()) }
+    }
+
+    @Test
+    fun `setReflowEnabled delegates to kiwixDataStore`() = runTest {
+      coEvery { kiwixDataStore.setReflowEnabled(any()) } just Runs
+      viewModel.setReflowEnabled(false)
+      advanceUntilIdle()
+      coVerify { kiwixDataStore.setReflowEnabled(false) }
     }
 
     @Test

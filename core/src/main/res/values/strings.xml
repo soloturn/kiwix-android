@@ -353,6 +353,8 @@
   <string name="diagnostic_report_message">To help us diagnose the problem, reproduce the issue first, then send the diagnostic report.</string>
   <string name="percentage">%d%%</string>
   <string name="pref_text_zoom_title">Text Zoom</string>
+  <string name="pref_reflow_title">Fit text to screen width</string>
+  <string name="pref_reflow_summary">Wrap wide content so pages need no sideways scrolling.</string>
   <string name="search_open_in_new_tab">Open in new tab</string>
   <string name="reader">Reader</string>
   <string name="no_open_book">No open book</string>

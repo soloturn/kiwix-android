@@ -547,7 +547,14 @@ private fun DisplayCategory(coreSettingsViewModel: CoreSettingsViewModel) {
   val backToTopEnabled by coreSettingsViewModel.backToTopEnabled.collectAsStateWithLifecycle()
   val textZoom by coreSettingsViewModel.textZoom.collectAsStateWithLifecycle()
   val textZoomPosition = (textZoom / ZOOM_SCALE) - ZOOM_OFFSET
+  val reflowEnabled by coreSettingsViewModel.reflowEnabled.collectAsStateWithLifecycle()
   SettingsCategory(stringResource(R.string.pref_display_title)) {
+    SwitchPreference(
+      title = stringResource(R.string.pref_reflow_title),
+      summary = stringResource(R.string.pref_reflow_summary),
+      checked = reflowEnabled,
+      onCheckedChange = { coreSettingsViewModel.setReflowEnabled(it) }
+    )
     AppThemePreference(themeLabel = themeLabel, coreSettingsViewModel = coreSettingsViewModel)
     SwitchPreference(
       title = stringResource(R.string.pref_back_to_top),

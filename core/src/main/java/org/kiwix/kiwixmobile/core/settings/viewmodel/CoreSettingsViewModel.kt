@@ -153,6 +153,13 @@ abstract class CoreSettingsViewModel(
       initialValue = DEFAULT_ZOOM
     )
 
+  val reflowEnabled: StateFlow<Boolean> = kiwixDataStore.reflowEnabled
+    .stateIn(
+      scope = viewModelScope,
+      started = SharingStarted.Eagerly,
+      initialValue = true
+    )
+
   val newTabInBackground = kiwixDataStore.openNewTabInBackground
     .stateIn(
       scope = viewModelScope,
@@ -193,6 +200,12 @@ abstract class CoreSettingsViewModel(
   fun setTextZoom(position: Int) {
     viewModelScope.launch {
       kiwixDataStore.setTextZoom((position + ZOOM_OFFSET) * ZOOM_SCALE)
+    }
+  }
+
+  fun setReflowEnabled(enabled: Boolean) {
+    viewModelScope.launch {
+      kiwixDataStore.setReflowEnabled(enabled)
     }
   }
 

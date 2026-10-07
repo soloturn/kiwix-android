@@ -198,6 +198,17 @@ class KiwixDataStoreTest {
   }
 
   @Test
+  fun `reflowEnabled returns true by default`() = runTest {
+    assertThat(kiwixDataStore.reflowEnabled.first()).isTrue()
+  }
+
+  @Test
+  fun `setReflowEnabled toggles reflowEnabled`() = runTest {
+    kiwixDataStore.setReflowEnabled(false)
+    assertThat(kiwixDataStore.reflowEnabled.first()).isFalse()
+  }
+
+  @Test
   fun `externalLinkPopup returns true by default`() = runTest {
     assertThat(kiwixDataStore.externalLinkPopup.first()).isTrue()
   }

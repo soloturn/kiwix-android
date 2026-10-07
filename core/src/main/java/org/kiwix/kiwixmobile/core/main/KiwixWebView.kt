@@ -31,6 +31,9 @@ import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.content.ContextCompat
+import androidx.webkit.ScriptHandler
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -56,6 +59,8 @@ import org.kiwix.kiwixmobile.core.utils.files.SaveResult
 import org.kiwix.videowebview.VideoEnabledWebChromeClient.ToggledFullscreenCallback
 import org.kiwix.videowebview.VideoEnabledWebView
 
+private const val REFLOW_ORIGIN = "https://kiwix.app"
+
 @SuppressLint("ViewConstructor", "SetJavaScriptEnabled")
 @Suppress("LongParameterList")
 open class KiwixWebView constructor(
@@ -71,6 +76,9 @@ open class KiwixWebView constructor(
 ) : VideoEnabledWebView(context, attrs) {
   private var kiwixWebChromeClient: KiwixWebChromeClient? = null
   private var textZoomJob: Job? = null
+  private var reflowJob: Job? = null
+  private var reflowEnabled = false
+  private var reflowScriptHandler: ScriptHandler? = null
   private var cachedZimFavicon: Bitmap? = null
 
   val zimFavicon: Bitmap?
@@ -94,6 +102,7 @@ open class KiwixWebView constructor(
       domStorageEnabled = true
       javaScriptEnabled = true
       loadWithOverviewMode = true
+      // Kept on: it is per-WebView, so off would also squash pages with their own viewport meta.
       useWideViewPort = true
       builtInZoomControls = true
       displayZoomControls = false
@@ -152,12 +161,36 @@ open class KiwixWebView constructor(
     textZoomJob = kiwixDataStore.textZoom
       .onEach { settings.textZoom = it }
       .launchIn(CoroutineScope(SupervisorJob() + mainDispatcher))
+    reflowJob?.cancel()
+    reflowJob = kiwixDataStore.reflowEnabled
+      .onEach { setReflow(it) }
+      .launchIn(CoroutineScope(SupervisorJob() + mainDispatcher))
   }
 
   override fun onDetachedFromWindow() {
     super.onDetachedFromWindow()
     textZoomJob?.cancel()
     textZoomJob = null
+    reflowJob?.cancel()
+    reflowJob = null
+  }
+
+  private fun setReflow(enabled: Boolean) {
+    reflowEnabled = enabled
+    reflowScriptHandler?.remove()
+    reflowScriptHandler = null
+    if (enabled && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+      reflowScriptHandler = WebViewCompat.addDocumentStartJavaScript(
+        this,
+        ReflowScript.build(),
+        setOf(REFLOW_ORIGIN)
+      )
+    }
+  }
+
+  /** Fallback/safety net after a page loads; a no-op if the document-start script already ran. */
+  fun injectReflowIfEnabled() {
+    if (reflowEnabled) evaluateJavascript(ReflowScript.build(), null)
   }
 
   override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
