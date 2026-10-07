@@ -317,6 +317,17 @@ class KiwixDataStore @Inject constructor(
     }
   }
 
+  val searchMode: Flow<String> =
+    context.kiwixDataStore.data.map { prefs ->
+      prefs[PreferencesKeys.PREF_SEARCH_MODE] ?: DEFAULT_SEARCH_MODE
+    }
+
+  suspend fun setSearchMode(searchMode: String) {
+    context.kiwixDataStore.edit { prefs ->
+      prefs[PreferencesKeys.PREF_SEARCH_MODE] = searchMode
+    }
+  }
+
   val showHistoryOfAllBooks: Flow<Boolean> =
     context.kiwixDataStore.data.map { prefs ->
       prefs[PreferencesKeys.PREF_SHOW_HISTORY_ALL_BOOKS] ?: true
@@ -740,6 +751,8 @@ class KiwixDataStore @Inject constructor(
   companion object {
     // Prefs
     const val PREF_LANG = "pref_language_chooser"
+    const val PREF_SEARCH_MODE = "pref_search_mode"
+    const val DEFAULT_SEARCH_MODE = "TITLE"
     const val PREF_STORAGE = "pref_select_folder"
     const val PREF_LIBRARY_TREE_URI = "pref_library_tree_uri"
     const val PREF_LEGACY_BOOKS_MOVE_DECLINED = "pref_legacy_books_move_declined"

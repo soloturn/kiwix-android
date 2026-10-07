@@ -19,17 +19,21 @@
 package org.kiwix.kiwixmobile.core.search
 
 import android.os.Build
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.font.FontWeight
 import io.mockk.mockk
 import io.mockk.verify
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -38,6 +42,7 @@ import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.search.SearchListItem.RecentSearchListItem
 import org.kiwix.kiwixmobile.core.search.SearchListItem.ZimSearchResultListItem
+import org.kiwix.kiwixmobile.core.search.viewmodel.SearchMode
 import org.kiwix.kiwixmobile.core.search.viewmodel.SearchScreenUiState
 import org.kiwix.kiwixmobile.core.search.viewmodel.SearchViewModel
 import org.kiwix.kiwixmobile.core.ui.models.ActionMenuItem
@@ -284,8 +289,8 @@ class SearchScreenUITest {
         isLoadingMore = false
       )
     )
-    composeTestRule.onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG, true)[8]
-      .performScrollTo()
+    composeTestRule.onNodeWithTag(SEARCH_LIST_TESTING_TAG)
+      .performScrollToIndex(8)
 
     composeTestRule.waitForIdle()
 
@@ -306,8 +311,8 @@ class SearchScreenUITest {
         isLoadingMore = true
       )
     )
-    composeTestRule.onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG, true)[8]
-      .performScrollTo()
+    composeTestRule.onNodeWithTag(SEARCH_LIST_TESTING_TAG)
+      .performScrollToIndex(8)
 
     composeTestRule.waitForIdle()
 
@@ -327,8 +332,8 @@ class SearchScreenUITest {
     )
 
     repeat(3) {
-      composeTestRule.onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG, true)[8]
-        .performScrollTo()
+      composeTestRule.onNodeWithTag(SEARCH_LIST_TESTING_TAG)
+        .performScrollToIndex(8)
     }
 
     composeTestRule.waitForIdle()
@@ -336,5 +341,93 @@ class SearchScreenUITest {
     verify(atMost = 1) {
       mockViewModel.loadMoreSearchResults()
     }
+  }
+
+  private fun itemTexts(): List<String> = composeTestRule
+    .onNodeWithTag(SEARCH_ITEM_TESTING_TAG)
+    .fetchSemanticsNode()
+    .config[SemanticsProperties.Text]
+    .map { it.text }
+
+  @Test
+  fun searchScreen_whenPageContentChipClicked_onSearchModeChangedToPageContent() {
+    mockSearchScreenContent(state = SearchScreenUiState(searchMode = SearchMode.TITLE))
+    composeTestRule
+      .onNodeWithTag(SEARCH_IN_PAGE_CONTENT_CHIP_TESTING_TAG)
+      .performClick()
+    verify { mockViewModel.onSearchModeChanged(SearchMode.PAGE_CONTENT) }
+  }
+
+  @Test
+  fun searchScreen_whenAllBooksChipClicked_onSearchAllBooksChangedToggled() {
+    mockSearchScreenContent(state = SearchScreenUiState(searchAllBooks = false))
+    composeTestRule
+      .onNodeWithTag(SEARCH_IN_ALL_BOOKS_CHIP_TESTING_TAG)
+      .performClick()
+    verify { mockViewModel.onSearchAllBooksChanged(true) }
+  }
+
+  @Test
+  fun searchScreen_whenPageContentModeSelected_chipReflectsState() {
+    mockSearchScreenContent(state = SearchScreenUiState(searchMode = SearchMode.PAGE_CONTENT))
+    composeTestRule
+      .onNodeWithTag(SEARCH_IN_PAGE_CONTENT_CHIP_TESTING_TAG)
+      .assertIsSelected()
+    composeTestRule
+      .onNodeWithTag(SEARCH_IN_TITLE_CHIP_TESTING_TAG)
+      .assertIsNotSelected()
+  }
+
+  @Test
+  fun searchScreen_whenSnippetHasBoldMarkup_matchesAreBold() {
+    mockSearchScreenContent(
+      state = SearchScreenUiState(
+        searchList = listOf(
+          ZimSearchResultListItem(
+            value = "Wikipedia",
+            url = "https://kiwix.org/wikipedia",
+            snippet = "the <b>term</b> appears here"
+          )
+        )
+      )
+    )
+    val snippet = composeTestRule
+      .onNodeWithTag(SEARCH_ITEM_TESTING_TAG)
+      .fetchSemanticsNode()
+      .config[SemanticsProperties.Text]
+      .first { it.text == "the term appears here" }
+    val bolded = snippet.spanStyles
+      .filter { it.item.fontWeight == FontWeight.Bold }
+      .map { snippet.substring(it.start, it.end) }
+    assertThat(bolded).containsExactly("term")
+  }
+
+  @Test
+  fun searchScreen_whenSnippetIsNull_snippetIsNotDisplayed() {
+    mockSearchScreenContent(
+      state = SearchScreenUiState(
+        searchList = listOf(
+          ZimSearchResultListItem(value = "Wikipedia", url = "https://kiwix.org/wikipedia")
+        )
+      )
+    )
+    assertThat(itemTexts()).containsExactly("Wikipedia")
+  }
+
+  @Test
+  fun searchScreen_whenBookTitlePresent_bookLabelIsDisplayed() {
+    mockSearchScreenContent(
+      state = SearchScreenUiState(
+        searchList = listOf(
+          ZimSearchResultListItem(
+            value = "Wikipedia",
+            url = "https://kiwix.org/wikipedia",
+            bookTitle = "Wikipedia EN"
+          )
+        )
+      )
+    )
+    composeTestRule.onNodeWithText("Wikipedia EN").assertIsDisplayed()
+    assertThat(itemTexts()).containsExactly("Wikipedia", "Wikipedia EN")
   }
 }
