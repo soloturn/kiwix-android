@@ -8,16 +8,19 @@ import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.result.ActivityResult
 import androidx.compose.material3.SnackbarHostState
 import app.cash.turbine.test
+import io.mockk.Runs
 import io.mockk.clearAllMocks
 import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -29,10 +32,14 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.junit.jupiter.api.io.TempDir
 import org.kiwix.kiwixmobile.core.StorageObserver
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
+import org.kiwix.kiwixmobile.core.dao.entities.EpubBookRoomEntity
 import org.kiwix.kiwixmobile.core.data.DataSource
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
+import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
@@ -76,6 +83,8 @@ class LocalLibraryViewModelTest {
   private val alertDialogShower: AlertDialogShower = mockk(relaxed = true)
   private val validateZimViewModel: ValidateZimViewModel = mockk(relaxed = true)
   private val deleteFilesUseCase = mockk<DeleteFilesUseCase>(relaxed = true)
+  private val epubLibraryManager: EpubLibraryManager = mockk(relaxed = true)
+  private val epubEntities = MutableStateFlow<List<EpubBookRoomEntity>>(emptyList())
   private val snackBarHostState: SnackbarHostState = mockk(relaxed = true)
 
   @RegisterExtension
@@ -83,6 +92,8 @@ class LocalLibraryViewModelTest {
   val mainDispatcherRule = MainDispatcherRule()
 
   private val testDispatcher get() = mainDispatcherRule.dispatcher
+
+  @TempDir lateinit var tempDir: File
 
   private lateinit var viewModel: LocalLibraryViewModel
 
@@ -100,6 +111,7 @@ class LocalLibraryViewModelTest {
     every { application.contentResolver } returns contentResolverMock
 
     every { dataSource.booksOnDiskAsListItems() } returns flowOf(emptyList())
+    every { epubLibraryManager.epubs() } returns epubEntities
     every { libkiwixBookOnDisk.books() } returns flowOf(emptyList())
     coEvery { storageObserver.getBooksOnFileSystem(any()) } returns flowOf(emptyList())
     every { kiwixDataStore.prefIsTest } returns flowOf(true)
@@ -138,6 +150,7 @@ class LocalLibraryViewModelTest {
       kiwixDataStore,
       zimReaderFactory,
       deleteFilesUseCase,
+      epubLibraryManager,
       mainDispatcherRule.dispatcher
     )
     vm.initialize(
@@ -249,6 +262,7 @@ class LocalLibraryViewModelTest {
     every { kiwixDataStore.isScanFileSystemDialogShown } returns flowOf(false)
     every { libkiwixBookOnDisk.books() } returns flowOf(emptyList())
     every { dataSource.booksOnDiskAsListItems() } returns flowOf(emptyList())
+    every { epubLibraryManager.epubs() } returns epubEntities
 
     viewModel.sideEffects.test {
       viewModel.onResume()
@@ -1059,5 +1073,132 @@ class LocalLibraryViewModelTest {
 
       cancelAndIgnoreRemainingEvents()
     }
+  }
+
+  // ======== EPUB library ========
+
+  private fun epubEntity(id: String, path: String = "/books/$id.epub") =
+    EpubBookRoomEntity(id, path, "Title $id", "Author", "en", null, 10L, 1L, 0L)
+
+  private fun showEpubs(vararg ids: String) {
+    epubEntities.value = ids.map(::epubEntity)
+    testDispatcher.scheduler.advanceUntilIdle()
+  }
+
+  @Test
+  fun `epubs from the library show in the list state and hide the empty view`() = runTest {
+    showEpubs("a", "b")
+    val state = viewModel.uiState.value
+    assertEquals(listOf("a", "b"), state.fileSelectListState.epubItems.map { it.id })
+    assertFalse(state.noFileView.isVisible)
+  }
+
+  @Test
+  fun `selecting an epub enters multi mode and finishing clears it`() = runTest {
+    showEpubs("a", "b")
+    viewModel.onEpubItemLongClick(viewModel.uiState.value.fileSelectListState.epubItems[0])
+    var list = viewModel.uiState.value.fileSelectListState
+    assertEquals(SelectionMode.MULTI, list.selectionMode)
+    assertEquals(listOf("a"), list.selectedEpubs.map { it.id })
+
+    viewModel.onEpubMultiSelect(list.epubItems[0])
+    assertEquals(SelectionMode.NORMAL, viewModel.uiState.value.fileSelectListState.selectionMode)
+
+    viewModel.onEpubMultiSelect(list.epubItems[1])
+    viewModel.finishMultiModeFinished()
+    testDispatcher.scheduler.advanceUntilIdle()
+    list = viewModel.uiState.value.fileSelectListState
+    assertEquals(SelectionMode.NORMAL, list.selectionMode)
+    assertTrue(list.selectedEpubs.isEmpty())
+  }
+
+  @Test
+  fun `epub selection survives library updates`() = runTest {
+    showEpubs("a")
+    viewModel.onEpubItemLongClick(viewModel.uiState.value.fileSelectListState.epubItems[0])
+    showEpubs("a", "b")
+    val list = viewModel.uiState.value.fileSelectListState
+    assertEquals(listOf("a"), list.selectedEpubs.map { it.id })
+    assertEquals(SelectionMode.MULTI, list.selectionMode)
+  }
+
+  @Test
+  fun `clicking an epub opens it and stamps lastOpenedAt`() = runTest {
+    val file = File(tempDir, "open.epub").apply { writeText("x") }
+    coEvery { kiwixPermissionChecker.isManageExternalStoragePermissionGranted() } returns true
+    epubEntities.value = listOf(epubEntity("open", file.path))
+    testDispatcher.scheduler.advanceUntilIdle()
+    val item = viewModel.uiState.value.fileSelectListState.epubItems.single()
+
+    viewModel.localLibraryUiActions.test {
+      viewModel.onEpubItemClick(item)
+      testDispatcher.scheduler.advanceUntilIdle()
+      assertEquals(
+        LocalLibraryViewModel.LocalLibraryUiActions.RequestOpenEpub(file),
+        awaitItem()
+      )
+      cancelAndIgnoreRemainingEvents()
+    }
+    coVerify { epubLibraryManager.add(file, true) }
+  }
+
+  @Test
+  fun `clicking an epub whose file is gone removes the stale entry`() = runTest {
+    mockkStatic("org.kiwix.kiwixmobile.core.extensions.ContextExtensionsKt")
+    every { application.toast(any<String>(), any()) } just Runs
+    coEvery { kiwixPermissionChecker.isManageExternalStoragePermissionGranted() } returns true
+    epubEntities.value = listOf(epubEntity("gone", File(tempDir, "gone.epub").path))
+    testDispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.onEpubItemClick(viewModel.uiState.value.fileSelectListState.epubItems.single())
+    testDispatcher.scheduler.advanceUntilIdle()
+
+    coVerify { epubLibraryManager.remove("gone") }
+    coVerify(exactly = 0) { epubLibraryManager.add(any(), any()) }
+    unmockkStatic("org.kiwix.kiwixmobile.core.extensions.ContextExtensionsKt")
+  }
+
+  @Test
+  fun `epub click without all files access asks for the permission instead of opening`() = runTest {
+    coEvery { kiwixPermissionChecker.isManageExternalStoragePermissionGranted() } returns false
+    epubEntities.value = listOf(epubEntity("a"))
+    testDispatcher.scheduler.advanceUntilIdle()
+
+    viewModel.localLibraryUiActions.test {
+      viewModel.onEpubItemClick(viewModel.uiState.value.fileSelectListState.epubItems.single())
+      testDispatcher.scheduler.advanceUntilIdle()
+      assertEquals(
+        LocalLibraryViewModel.LocalLibraryUiActions.ManageFilesPermissionDialog,
+        awaitItem()
+      )
+      cancelAndIgnoreRemainingEvents()
+    }
+  }
+
+  @Test
+  fun `onEpubFileSelected adds the epub to the library then opens it`() = runTest {
+    val file = File(tempDir, "picked.epub").apply { writeText("x") }
+    viewModel.localLibraryUiActions.test {
+      viewModel.onEpubFileSelected(file)
+      testDispatcher.scheduler.advanceUntilIdle()
+      assertEquals(
+        LocalLibraryViewModel.LocalLibraryUiActions.RequestOpenEpub(file),
+        awaitItem()
+      )
+      cancelAndIgnoreRemainingEvents()
+    }
+    coVerify { epubLibraryManager.add(file, true) }
+  }
+
+  @Test
+  fun `addEpubToLibrary adds without opening`() = runTest {
+    val file = File(tempDir, "multi.epub").apply { writeText("x") }
+    viewModel.localLibraryUiActions.test {
+      viewModel.addEpubToLibrary(file)
+      testDispatcher.scheduler.advanceUntilIdle()
+      expectNoEvents()
+      cancelAndIgnoreRemainingEvents()
+    }
+    coVerify { epubLibraryManager.add(file) }
   }
 }

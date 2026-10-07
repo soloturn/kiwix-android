@@ -107,7 +107,7 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
       }
 
       if (isEpubFile(file)) {
-        selectedZimFileCallback?.onEpubFileSelected(file)
+        selectedZimFileCallback?.addEpubToLibrary(file)
       } else {
         selectedZimFileCallback?.addBookToLibkiwixBookOnDisk(file)
       }
@@ -159,6 +159,11 @@ interface SelectedZimFileCallback {
    */
   fun onEpubFileSelected(file: File) {
     Log.w(TAG_KIWIX, "EPUB selected but reader not wired yet: ${file.path}")
+  }
+
+  /** A validated EPUB from a multi-selection: add it to the library without opening it. */
+  fun addEpubToLibrary(file: File) {
+    Log.w(TAG_KIWIX, "EPUB selected but library not wired yet: ${file.path}")
   }
 
   fun navigateToReaderScreen(file: File)
