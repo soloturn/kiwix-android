@@ -1503,6 +1503,8 @@ abstract class CoreReaderViewModel(
   /**
    * Opens a search item based on its properties.
    *
+   * Switches to the result's book first when it came from a different one.
+   *
    * If the item should open in a new tab, a new tab is created.
    *
    * The method attempts to load the page URL directly. If the page URL is not available,
@@ -1510,6 +1512,15 @@ abstract class CoreReaderViewModel(
    * resulting URL is then loaded in the current web view.
    */
   private suspend fun openSearchItem(item: SearchItemToOpen) {
+    item.zimReaderSourceDatabaseValue
+      ?.takeIf { it != zimReaderContainer.zimReaderSource?.toDatabase() }
+      ?.let { target ->
+        // One gate for "can't resolve" and "can't open": keep the current book either way.
+        val source = ZimReaderSource.fromDatabaseValue(target)?.takeIf { zimFileManager.canOpen(it) }
+          ?: return
+        closeZimBook()
+        openZimFile(source)
+      }
     if (item.shouldOpenInNewTab) {
       newMainPageTab()
     }

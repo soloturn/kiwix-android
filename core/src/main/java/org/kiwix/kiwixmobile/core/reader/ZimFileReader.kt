@@ -23,6 +23,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Base64
 import androidx.core.net.toUri
 import eu.mhutti1.utils.storage.KB
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -42,6 +43,9 @@ import org.kiwix.libkiwix.SpellingsDB
 import org.kiwix.libzim.Archive
 import org.kiwix.libzim.DirectAccessInfo
 import org.kiwix.libzim.Item
+import org.kiwix.libzim.Query
+import org.kiwix.libzim.Search
+import org.kiwix.libzim.Searcher
 import org.kiwix.libzim.SuggestionSearch
 import org.kiwix.libzim.SuggestionSearcher
 import java.io.ByteArrayInputStream
@@ -107,6 +111,9 @@ class ZimFileReader(
               "For ZIM file = ${zimReaderSource.toDatabase()}"
           )
           null
+        } catch (cancellation: CancellationException) {
+          // Must not be logged away as a corrupt file — it is the cancel signal.
+          throw cancellation
         } catch (ignore: Exception) {
           // for handing the error, if any zim file is corrupted
           Log.e(
@@ -120,6 +127,9 @@ class ZimFileReader(
   }
 
   private var spellingsDB: SpellingsDB? = null
+
+  // Lazily created: not every ZIM file has a full-text index.
+  private var fullTextSearcher: Searcher? = null
 
   /**
    * Note that the value returned is NOT unique for each zim file. Versions of the same wiki
@@ -189,6 +199,34 @@ class ZimFileReader(
     } catch (exception: Exception) {
       // to handled the exception if there is no FT Xapian index found in the current zim file
       Log.e(TAG, "Unable to search in this file as it does not have FT Xapian index. $exception")
+      null
+    }
+
+  /**
+   * Full-text search over page content via the ZIM's Xapian index, or null when
+   * the book has no full-text index.
+   */
+  fun searchFullText(query: String): Search? {
+    val searcher = getOrCreateFullTextSearcher() ?: return null
+    val jniQuery = Query(query)
+    return try {
+      searcher.search(jniQuery)
+    } catch (exception: CancellationException) {
+      throw exception
+    } catch (exception: Exception) {
+      Log.e(TAG, "Unable to run the full text search for query = $query. $exception")
+      null
+    } finally {
+      jniQuery.dispose()
+    }
+  }
+
+  @Synchronized
+  private fun getOrCreateFullTextSearcher(): Searcher? =
+    fullTextSearcher ?: try {
+      Searcher(jniKiwixReader).also { fullTextSearcher = it }
+    } catch (exception: Exception) {
+      Log.e(TAG, "Could not create the full text searcher. $exception")
       null
     }
 
@@ -446,6 +484,7 @@ class ZimFileReader(
   fun dispose() {
     jniKiwixReader.dispose()
     searcher.dispose()
+    fullTextSearcher?.dispose()
     spellingsDB?.dispose()
   }
 

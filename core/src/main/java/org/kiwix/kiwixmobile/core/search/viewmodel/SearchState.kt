@@ -18,14 +18,13 @@
 
 package org.kiwix.kiwixmobile.core.search.viewmodel
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.kiwix.kiwixmobile.core.search.SearchListItem
 import org.kiwix.kiwixmobile.core.utils.files.Log
-import org.kiwix.libzim.SuggestionSearch
 
 data class SearchState(
   val searchTerm: String,
@@ -33,17 +32,19 @@ data class SearchState(
   val recentResults: List<SearchListItem.RecentSearchListItem>,
   val searchOrigin: SearchOrigin
 ) {
+  @Suppress("ReturnCount")
   suspend fun getVisibleResults(
     startIndex: Int,
-    job: Job? = null,
     ioDispatcher: CoroutineDispatcher
   ): List<SearchListItem>? {
     if (searchTerm.isEmpty()) return recentResults
+    // Cross-book results are computed up front and are not paginated.
+    searchResultsWithTerm.globalResults?.let { return if (startIndex == 0) it else null }
     return searchResultsWithTerm.searchMutex?.withLock {
-      searchResultsWithTerm.suggestionSearch?.let {
+      searchResultsWithTerm.zimSearchResultSet?.let {
         yield()
         withContext(ioDispatcher) {
-          fetchSearchResults(it, startIndex, job)
+          fetchSearchResults(it, startIndex)
         }
       } ?: kotlin.run {
         recentResults
@@ -51,34 +52,61 @@ data class SearchState(
     }
   }
 
-  @Suppress("MagicNumber")
+  @Suppress("MagicNumber", "NestedBlockDepth", "TooGenericExceptionCaught")
   private suspend fun fetchSearchResults(
-    suggestionSearch: SuggestionSearch,
-    startIndex: Int,
-    job: Job?
+    zimSearchResultSet: ZimSearchResultSet,
+    startIndex: Int
   ): List<SearchListItem.ZimSearchResultListItem>? {
     val results = mutableListOf<SearchListItem.ZimSearchResultListItem>()
+    val cancelToken = searchResultsWithTerm.cancelToken
 
-    // if the previous job is cancel then do not execute the code
-    if (job?.isActive == false) return results
+    if (cancelToken.isCancelled) return results
 
-    runCatching {
+    try {
       val safeEndIndex = startIndex + 20
       yield()
-      val searchIterator = suggestionSearch.getResults(startIndex, safeEndIndex)
-      while (searchIterator.hasNext()) {
-        // check if the previous job is cancel while retrieving the data for
-        // previous searched item then break the execution of code.
-        if (job?.isActive == false) break
-        yield()
-        val entry = searchIterator.next()
-        results.add(SearchListItem.ZimSearchResultListItem(entry.title, entry.path))
+      when (zimSearchResultSet) {
+        is ZimSearchResultSet.Title -> {
+          val searchIterator =
+            zimSearchResultSet.suggestionSearch.getResults(startIndex, safeEndIndex)
+          try {
+            while (searchIterator.hasNext()) {
+              if (cancelToken.isCancelled) break
+              yield()
+              val entry = searchIterator.next()
+              results.add(SearchListItem.ZimSearchResultListItem(entry.title, entry.path))
+            }
+          } finally {
+            runCatching { searchIterator.dispose() }
+          }
+        }
+
+        is ZimSearchResultSet.PageContent -> {
+          val searchIterator = zimSearchResultSet.search.getResults(startIndex, safeEndIndex)
+          try {
+            while (searchIterator.hasNext()) {
+              if (cancelToken.isCancelled) break
+              yield()
+              // Snippet is read before next(): afterwards it describes the next hit.
+              val snippet = searchIterator.snippetOrNull()
+              val entry = searchIterator.next()
+              results.add(SearchListItem.ZimSearchResultListItem(entry.title, entry.path, snippet))
+            }
+          } finally {
+            runCatching { searchIterator.dispose() }
+          }
+        }
       }
-    }.onFailure {
+    } catch (exception: CancellationException) {
+      // The match path's cancel signal must never be logged away as a failure.
+      throw exception
+    } catch (exception: Exception) {
+      // The match path's cancel can arrive as a plain Exception; never log that away.
+      if (cancelToken.isCancelled) throw CancellationException("Search cancelled")
       Log.e(
         "SearchState",
         "Could not get the searched result for searchTerm $searchTerm\n" +
-          "Original exception = $it"
+          "Original exception = $exception"
       )
     }
 

@@ -21,12 +21,17 @@ package org.kiwix.kiwixmobile.core.search.viewmodel
 import android.os.Bundle
 import androidx.lifecycle.viewModelScope
 import app.cash.turbine.test
+import io.mockk.Runs
 import io.mockk.clearAllMocks
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
@@ -65,9 +70,9 @@ import org.kiwix.kiwixmobile.core.search.viewmodel.effects.SearchArgumentProcess
 import org.kiwix.kiwixmobile.core.search.viewmodel.effects.ShowDeleteSearchDialog
 import org.kiwix.kiwixmobile.core.search.viewmodel.effects.ShowToast
 import org.kiwix.kiwixmobile.core.search.viewmodel.effects.StartSpeechInput
+import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.effects.CloseKeyboard
-import org.kiwix.libzim.SuggestionSearch
 import org.kiwix.sharedFunctions.MainDispatcherRule
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -79,9 +84,11 @@ internal class SearchViewModelTest {
   private val recentSearchRoomDao: RecentSearchRoomDao = mockk()
   private val zimReaderContainer: ZimReaderContainer = mockk()
   private val searchResultGenerator: SearchResultGenerator = mockk()
+  private val globalSearchResultGenerator: GlobalSearchResultGenerator = mockk()
+  private val kiwixDataStore: KiwixDataStore = mockk()
   private val zimFileReader: ZimFileReader = mockk()
   private val dialogShower = mockk<AlertDialogShower>(relaxed = true)
-  private val searchMutex: Mutex = mockk()
+  private val searchMutex: Mutex = Mutex()
 
   lateinit var viewModel: SearchViewModel
 
@@ -98,8 +105,13 @@ internal class SearchViewModelTest {
       zimFileReader.getSuggestedSpelledWords(any(), any())
     } returns emptyList()
     coEvery {
-      searchResultGenerator.generateSearchResults(any(), zimReaderContainer)
+      searchResultGenerator.generateSearchResults(any(), any(), zimReaderContainer)
     } returns null
+    coEvery {
+      globalSearchResultGenerator.generateSearchResults(any(), any(), any())
+    } returns emptyList()
+    every { kiwixDataStore.searchMode } returns flowOf(SearchMode.TITLE.name)
+    coEvery { kiwixDataStore.setSearchMode(any()) } just Runs
     every { zimReaderContainer.id } returns "id"
     every { recentSearchRoomDao.recentSearches("id") } returns recentsFromDb
     viewModel =
@@ -107,6 +119,8 @@ internal class SearchViewModelTest {
         recentSearchRoomDao,
         zimReaderContainer,
         searchResultGenerator,
+        globalSearchResultGenerator,
+        kiwixDataStore,
         searchMutex,
         mainDispatcherRule.dispatcher
       ).apply {
@@ -121,7 +135,7 @@ internal class SearchViewModelTest {
       val searchTerm1 = "query1"
       val searchTerm2 = "query2"
       val searchTerm3 = "query3"
-      val suggestionSearch: SuggestionSearch = mockk()
+      val suggestionSearch: SuggestionSearchWrapper = mockk()
 
       viewModel.uiState.test {
         skipItems(1)
@@ -142,7 +156,7 @@ internal class SearchViewModelTest {
       val searchTerm1 = "query1"
       val searchTerm2 = "query2"
       val searchTerm3 = "query3"
-      val suggestionSearch: SuggestionSearch = mockk()
+      val suggestionSearch: SuggestionSearchWrapper = mockk()
 
       viewModel.uiState.test {
         skipItems(1)
@@ -160,13 +174,13 @@ internal class SearchViewModelTest {
 
     private fun searchResult(
       searchTerm: String,
-      suggestionSearch: SuggestionSearch,
+      suggestionSearch: SuggestionSearchWrapper,
       testScheduler: TestCoroutineScheduler,
       timeout: Long
     ) {
       coEvery {
-        searchResultGenerator.generateSearchResults(searchTerm, zimReaderContainer)
-      } returns suggestionSearch
+        searchResultGenerator.generateSearchResults(searchTerm, SearchMode.TITLE, zimReaderContainer)
+      } returns ZimSearchResultSet.Title(suggestionSearch)
       viewModel.onSearchValueChanged(searchTerm)
       recentsFromDb.tryEmit(emptyList())
       viewModel.actions.tryEmit(ScreenWasStartedFrom(FromWebView))
@@ -198,7 +212,7 @@ internal class SearchViewModelTest {
       runTest {
         val searchTerm = "searchTerm"
         val searchOrigin = FromWebView
-        val suggestionSearch: SuggestionSearch = mockk()
+        val suggestionSearch: SuggestionSearchWrapper = mockk()
         viewModel.uiState.test {
           skipItems(1)
 
@@ -258,13 +272,13 @@ internal class SearchViewModelTest {
 
     private fun emissionOf(
       searchTerm: String,
-      suggestionSearch: SuggestionSearch,
+      suggestionSearch: SuggestionSearchWrapper,
       databaseResults: List<RecentSearchListItem>,
       searchOrigin: SearchOrigin
     ) {
       coEvery {
-        searchResultGenerator.generateSearchResults(searchTerm, zimReaderContainer)
-      } returns suggestionSearch
+        searchResultGenerator.generateSearchResults(searchTerm, SearchMode.TITLE, zimReaderContainer)
+      } returns ZimSearchResultSet.Title(suggestionSearch)
       viewModel.actions.tryEmit(Filter(searchTerm))
       recentsFromDb.tryEmit(databaseResults)
       viewModel.actions.tryEmit(ScreenWasStartedFrom(searchOrigin))
@@ -535,6 +549,66 @@ internal class SearchViewModelTest {
         }
         expectNoEvents()
       }
+    }
+  }
+
+  @Nested
+  inner class SearchModeAndCancellation {
+    // Drive the term through the debounce path so filter keeps it; a bare Filter
+    // gets reset by the idle debounce emission of the empty query.
+    private fun TestScope.startSearch(term: String) {
+      recentsFromDb.tryEmit(emptyList())
+      viewModel.actions.tryEmit(ScreenWasStartedFrom(FromWebView))
+      viewModel.onSearchValueChanged(term)
+      testScheduler.advanceTimeBy(DEBOUNCE_DELAY)
+      testScheduler.runCurrent()
+    }
+
+    @Test
+    fun onSearchModeChanged_whenCalled_updatesSearchModeAndRegeneratesResults() = runTest {
+      coEvery {
+        searchResultGenerator.generateSearchResults("term", SearchMode.PAGE_CONTENT, zimReaderContainer)
+      } returns null
+      startSearch("term")
+      advanceUntilIdle()
+
+      viewModel.onSearchModeChanged(SearchMode.PAGE_CONTENT)
+      advanceUntilIdle()
+
+      coVerify { kiwixDataStore.setSearchMode(SearchMode.PAGE_CONTENT.name) }
+      assertThat(viewModel.uiState.value.searchMode).isEqualTo(SearchMode.PAGE_CONTENT)
+      coVerify {
+        searchResultGenerator.generateSearchResults("term", SearchMode.PAGE_CONTENT, zimReaderContainer)
+      }
+    }
+
+    @Test
+    fun `superseding search cancels the previous token`() = runTest {
+      startSearch("term1")
+      advanceUntilIdle()
+      val firstToken = viewModel.uiState.value.searchState.searchResultsWithTerm.cancelToken
+
+      startSearch("term2")
+      advanceUntilIdle()
+      val secondToken = viewModel.uiState.value.searchState.searchResultsWithTerm.cancelToken
+
+      assertThat(firstToken.isCancelled).isTrue()
+      assertThat(secondToken.isCancelled).isFalse()
+    }
+
+    @Test
+    fun `superseded result set is disposed`() = runTest {
+      val suggestionSearch: SuggestionSearchWrapper = mockk(relaxed = true)
+      coEvery {
+        searchResultGenerator.generateSearchResults("term1", SearchMode.TITLE, zimReaderContainer)
+      } returns ZimSearchResultSet.Title(suggestionSearch)
+
+      startSearch("term1")
+      advanceUntilIdle()
+      startSearch("term2")
+      advanceUntilIdle()
+
+      verify { suggestionSearch.dispose() }
     }
   }
 }

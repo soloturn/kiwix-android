@@ -29,6 +29,7 @@ import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationRes
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.search.SearchListItem.RecentSearchListItem
+import org.kiwix.kiwixmobile.core.search.SearchListItem.ZimSearchResultListItem
 import org.kiwix.kiwixmobile.core.utils.TAG_FILE_SEARCHED
 import org.kiwix.kiwixmobile.core.utils.TAG_FILE_SEARCHED_NEW_TAB
 
@@ -68,6 +69,35 @@ internal class OpenSearchItemTest {
       activity.navigate(activity.readerScreenRoute, any<NavOptions>())
       activity.setNavigationResultOnCurrent(
         SearchItemToOpen(searchListItem.value, true, ZimFileReader.CONTENT_PREFIX),
+        TAG_FILE_SEARCHED
+      )
+    }
+  }
+
+  @Test
+  fun `invoke with propagates zim reader source database value`() {
+    val searchListItem = ZimSearchResultListItem(
+      value = "",
+      url = ZimFileReader.CONTENT_PREFIX,
+      zimReaderSourceDatabaseValue = "/books/other.zim"
+    )
+    val activity: CoreMainActivity = mockk(relaxed = true)
+    mockkConstructor(Intent::class)
+    val intent = mockk<Intent>()
+    every {
+      anyConstructed<Intent>().putExtra(TAG_FILE_SEARCHED, searchListItem.value)
+        .putExtra(TAG_FILE_SEARCHED_NEW_TAB, false)
+    } returns intent
+    OpenSearchItem(searchListItem, false).invokeWith(activity)
+    verify {
+      activity.navigate(activity.readerScreenRoute, any<NavOptions>())
+      activity.setNavigationResultOnCurrent(
+        SearchItemToOpen(
+          searchListItem.value,
+          false,
+          ZimFileReader.CONTENT_PREFIX,
+          "/books/other.zim"
+        ),
         TAG_FILE_SEARCHED
       )
     }

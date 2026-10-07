@@ -25,4 +25,7 @@ class SuggestionSearchWrapper : SuggestionSearch() {
 
   override fun getResults(start: Int, maxResults: Int): SuggestionIteratorWrapper =
     super.getResults(start, maxResults) as SuggestionIteratorWrapper
+
+  // Native methods have no bytecode for mockk to intercept — override so tests can stub them.
+  override fun dispose() = super.dispose()
 }

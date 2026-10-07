@@ -1,6 +1,6 @@
 /*
  * Kiwix Android
- * Copyright (c) 2023 Kiwix <android.kiwix.org>
+ * Copyright (c) 2026 Kiwix <android.kiwix.org>
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -18,16 +18,9 @@
 
 package org.kiwix.kiwixmobile.core.search.viewmodel
 
-import org.kiwix.libzim.SuggestionIterator
+import org.kiwix.libzim.Entry
 
-class SuggestionIteratorWrapper : SuggestionIterator() {
-  override fun remove() {
-    // Do nothing just to ignore the EmptyFunctionBlock detekt error.
-  }
-
-  override fun hasNext(): Boolean = super.hasNext()
-  override fun next(): SuggestionItemWrapper = super.next() as SuggestionItemWrapper
-
-  // Native methods have no bytecode for mockk to intercept — override so tests can stub them.
-  override fun dispose() = super.dispose()
+class EntryWrapper : Entry() {
+  override fun getTitle(): String = super.getTitle()
+  override fun getPath(): String = super.getPath()
 }

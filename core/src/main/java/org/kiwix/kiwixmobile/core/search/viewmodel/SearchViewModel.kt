@@ -24,6 +24,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -31,8 +32,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -67,20 +71,23 @@ import org.kiwix.kiwixmobile.core.search.viewmodel.effects.ShowDeleteSearchDialo
 import org.kiwix.kiwixmobile.core.search.viewmodel.effects.ShowToast
 import org.kiwix.kiwixmobile.core.search.viewmodel.effects.StartSpeechInput
 import org.kiwix.kiwixmobile.core.utils.ZERO
+import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.effects.CloseKeyboard
-import org.kiwix.libzim.SuggestionSearch
 import javax.inject.Inject
 
 const val DEBOUNCE_DELAY = 150L
 const val MAX_SUGGEST_WORD_COUNT = 1
 
+@Suppress("LongParameterList")
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SearchViewModel @Inject constructor(
   private val recentSearchRoomDao: RecentSearchRoomDao,
   private val zimReaderContainer: ZimReaderContainer,
   private val searchResultGenerator: SearchResultGenerator,
+  private val globalSearchResultGenerator: GlobalSearchResultGenerator,
+  private val kiwixDataStore: KiwixDataStore,
   private val searchMutex: Mutex = Mutex(),
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
@@ -96,10 +103,43 @@ class SearchViewModel @Inject constructor(
   private lateinit var alertDialogShower: AlertDialogShower
   private val debouncedSearchQuery = MutableStateFlow("")
 
+  private val searchMode = MutableStateFlow(SearchMode.TITLE)
+  private val searchAllBooks = MutableStateFlow(false)
+
+  // Latest native handle plus its cancel flag, so the next search can free the previous one.
+  @Volatile
+  private var activeSearch: Pair<SearchCancelToken, ZimSearchResultSet?>? = null
+
   init {
+    viewModelScope.launch { restoreSearchMode() }
     viewModelScope.launch { reducer() }
     viewModelScope.launch { actionMapper() }
     viewModelScope.launch { debouncedSearchQuery() }
+  }
+
+  private suspend fun restoreSearchMode() {
+    val stored = kiwixDataStore.searchMode.first()
+    searchMode.value = SearchMode.entries.firstOrNull { it.name == stored } ?: SearchMode.TITLE
+    updateUiState {
+      it.copy(searchMode = searchMode.value, searchAllBooks = searchAllBooks.value)
+    }
+  }
+
+  fun onSearchModeChanged(searchMode: SearchMode) {
+    this.searchMode.value = searchMode
+    viewModelScope.launch { kiwixDataStore.setSearchMode(searchMode.name) }
+    updateUiState { it.copy(searchMode = searchMode) }
+  }
+
+  fun onSearchAllBooksChanged(searchAllBooks: Boolean) {
+    this.searchAllBooks.value = searchAllBooks
+    updateUiState { it.copy(searchAllBooks = searchAllBooks) }
+  }
+
+  override fun onCleared() {
+    activeSearch?.first?.cancel()
+    activeSearch?.second?.dispose()
+    super.onCleared()
   }
 
   private suspend fun getSuggestedSpelledWords(word: String, maxCount: Int): List<String> =
@@ -139,7 +179,7 @@ class SearchViewModel @Inject constructor(
 
   private suspend fun reducer() {
     combine(
-      searchResults(),
+      searchResults().filterNotNull(),
       recentSearchRoomDao.recentSearches(zimReaderContainer.id),
       searchOrigin.asStateFlow()
     ) { searchResultsWithTerm, recentResults, searchOrigin ->
@@ -165,7 +205,9 @@ class SearchViewModel @Inject constructor(
           searchState = searchState,
           searchList = firstPage,
           spellingCorrectionSuggestions = suggestions,
-          isLoading = false
+          isLoading = false,
+          searchMode = searchMode.value,
+          searchAllBooks = searchAllBooks.value
         )
       }
     }.collect {
@@ -194,28 +236,76 @@ class SearchViewModel @Inject constructor(
   }
 
   private fun searchResults() =
-    filter.asStateFlow()
-      .mapLatest {
-        // The ZIM file's single shared SuggestionSearcher can otherwise be entered from two
-        // ViewModel instances at once (e.g. searching again reuses it before the previous
-        // screen's coroutine is done). Same searchMutex as getVisibleResults below.
-        //
-        // generateSearchResults() blocks on native JNI code with no suspension point, so a
-        // fast-typing burst can queue several already-stale calls behind each other, each
-        // paying full cost only to be discarded. Skip if a newer term has already landed.
-        val suggestionSearch = if (filter.value != it) {
-          null
-        } else {
-          searchMutex.withLock {
-            if (filter.value != it) {
-              null
-            } else {
-              searchResultGenerator.generateSearchResults(it, zimReaderContainer)
-            }
+    combine(filter.asStateFlow(), searchMode, searchAllBooks) { term, mode, allBooks ->
+      Triple(term, mode, allBooks)
+    }.mapLatest { (term, mode, allBooks) ->
+      val cancelToken = SearchCancelToken()
+      // Flip the token if mapLatest is cancelled mid-generation (JNI never throws CancellationException).
+      // cause is null on normal completion — only an abandoned search should flip it.
+      currentCoroutineContext().job.invokeOnCompletion { cause ->
+        if (cause != null) cancelToken.cancel()
+      }
+      // Cancel paging and free the previous native handle before this search starts.
+      val previous = activeSearch
+      previous?.first?.cancel()
+      previous?.second?.let { resultSet ->
+        // Same lock as getVisibleResults, so we never dispose while it pages.
+        searchMutex.withLock { resultSet.dispose() }
+      }
+      activeSearch = Pair(cancelToken, null)
+
+      // A mode/all-books toggle re-enters mapLatest with the same term, so staleness is any
+      // of the three inputs changing — not just the term.
+      val stale = {
+        filter.value != term ||
+          searchMode.value != mode ||
+          searchAllBooks.value != allBooks
+      }
+      if (stale()) {
+        SearchResultsWithTerm(term, null, searchMutex, cancelToken = cancelToken)
+      } else if (allBooks) {
+        SearchResultsWithTerm(
+          term,
+          null,
+          searchMutex,
+          cancelToken = cancelToken,
+          globalResults = globalSearchResultGenerator.generateSearchResults(
+            term,
+            mode,
+            cancelToken
+          )
+        )
+      } else {
+        val zimSearchResultSet = searchMutex.withLock {
+          if (stale()) {
+            null
+          } else {
+            searchResultGenerator.generateSearchResults(term, mode, zimReaderContainer)
           }
         }
-        SearchResultsWithTerm(it, suggestionSearch, searchMutex)
+        // No suspension past here: mapLatest cancellation cannot leak the generated handle.
+        when {
+          zimSearchResultSet == null ->
+            SearchResultsWithTerm(term, null, searchMutex, cancelToken = cancelToken)
+
+          stale() || activeSearch?.first !== cancelToken -> {
+            // Stale or superseded mid-search — free now, never hand out a dead handle.
+            zimSearchResultSet.dispose()
+            null
+          }
+
+          else -> {
+            activeSearch = Pair(cancelToken, zimSearchResultSet)
+            SearchResultsWithTerm(
+              term,
+              zimSearchResultSet,
+              searchMutex,
+              cancelToken = cancelToken
+            )
+          }
+        }
       }
+    }
 
   @Suppress("CyclomaticComplexMethod")
   private suspend fun actionMapper() {
@@ -370,8 +460,10 @@ class SearchViewModel @Inject constructor(
 
 data class SearchResultsWithTerm(
   val searchTerm: String,
-  val suggestionSearch: SuggestionSearch?,
-  val searchMutex: Mutex?
+  val zimSearchResultSet: ZimSearchResultSet?,
+  val searchMutex: Mutex?,
+  val cancelToken: SearchCancelToken = SearchCancelToken(),
+  val globalResults: List<SearchListItem>? = null
 )
 
 data class SearchScreenUiState(
@@ -386,5 +478,7 @@ data class SearchScreenUiState(
     SearchResultsWithTerm("", null, null),
     emptyList(),
     FromWebView
-  )
+  ),
+  val searchMode: SearchMode = SearchMode.TITLE,
+  val searchAllBooks: Boolean = false
 )

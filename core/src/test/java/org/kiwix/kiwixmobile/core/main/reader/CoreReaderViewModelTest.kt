@@ -37,6 +37,7 @@ import io.mockk.Runs
 import io.mockk.clearAllMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.invoke
 import io.mockk.just
@@ -2805,6 +2806,214 @@ internal class CoreReaderViewModelTest {
         advanceUntilIdle()
 
         coVerify(exactly = 0) { viewModel.loadUrlWithCurrentWebview(any()) }
+      }
+
+      @Test
+      fun `search result from another book switches to that book first`() = runTest {
+        val viewModel = spyk(viewModel)
+
+        val historyItems = listOf(mockk<WebViewHistoryItem>())
+        val validSession = RestoreSessionResult.Valid(
+          webViewHistoryList = historyItems,
+          currentTab = 2,
+          currentZimFile = "kiwix.zim"
+        )
+
+        coEvery { readerSessionManager.restoreReaderSession() } returns validSession
+
+        val onCompleteSlot = slot<suspend () -> Unit>()
+        coEvery {
+          viewModel.restoreViewStateOnValidWebViewHistory(
+            any(),
+            any(),
+            any(),
+            any(),
+            capture(onCompleteSlot)
+          )
+        } just Runs
+
+        val otherDatabaseValue = "/books/other.zim"
+        val item = SearchItemToOpen(
+          shouldOpenInNewTab = false,
+          pageUrl = "${ZimFileReader.CONTENT_PREFIX}page.html",
+          pageTitle = "title",
+          zimReaderSourceDatabaseValue = otherDatabaseValue
+        )
+        every { pendingSearchItemManager.consume() } returns item
+        coEvery { zimFileManager.canOpen(any()) } returns true
+        coEvery { viewModel.closeZimBook() } just Runs
+        coEvery { viewModel.openZimFile(any()) } just Runs
+        coEvery { viewModel.loadUrlWithCurrentWebview(any()) } just Runs
+
+        every { zimReaderContainer.id } returns null
+        every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.None
+        coEvery { readerSessionManager.saveReaderSession() } just Runs
+
+        viewModel.manageExternalLaunchAndRestoringViewState()
+        advanceUntilIdle()
+
+        onCompleteSlot.captured.invoke()
+        advanceUntilIdle()
+
+        coVerifyOrder {
+          viewModel.closeZimBook()
+          viewModel.openZimFile(match { it.file?.path == otherDatabaseValue })
+          viewModel.loadUrlWithCurrentWebview("${ZimFileReader.CONTENT_PREFIX}page.html")
+        }
+      }
+
+      @Test
+      fun `search result in the current book does not reopen the book`() = runTest {
+        val viewModel = spyk(viewModel)
+
+        val historyItems = listOf(mockk<WebViewHistoryItem>())
+        val validSession = RestoreSessionResult.Valid(
+          webViewHistoryList = historyItems,
+          currentTab = 2,
+          currentZimFile = "kiwix.zim"
+        )
+
+        coEvery { readerSessionManager.restoreReaderSession() } returns validSession
+
+        val onCompleteSlot = slot<suspend () -> Unit>()
+        coEvery {
+          viewModel.restoreViewStateOnValidWebViewHistory(
+            any(),
+            any(),
+            any(),
+            any(),
+            capture(onCompleteSlot)
+          )
+        } just Runs
+
+        val currentBook = ZimReaderSource(File("/books/current.zim"))
+        every { zimReaderContainer.zimReaderSource } returns currentBook
+
+        val item = SearchItemToOpen(
+          shouldOpenInNewTab = false,
+          pageUrl = "${ZimFileReader.CONTENT_PREFIX}page.html",
+          pageTitle = "title",
+          zimReaderSourceDatabaseValue = currentBook.toDatabase()
+        )
+        every { pendingSearchItemManager.consume() } returns item
+        coEvery { viewModel.closeZimBook() } just Runs
+        coEvery { viewModel.openZimFile(any()) } just Runs
+        coEvery { viewModel.loadUrlWithCurrentWebview(any()) } just Runs
+
+        every { zimReaderContainer.id } returns null
+        every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.None
+        coEvery { readerSessionManager.saveReaderSession() } just Runs
+
+        viewModel.manageExternalLaunchAndRestoringViewState()
+        advanceUntilIdle()
+
+        onCompleteSlot.captured.invoke()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { viewModel.closeZimBook() }
+        coVerify(exactly = 0) { viewModel.openZimFile(any()) }
+        coVerify { viewModel.loadUrlWithCurrentWebview("${ZimFileReader.CONTENT_PREFIX}page.html") }
+      }
+
+      @Test
+      fun `search result for a missing book keeps the current book open`() = runTest {
+        val viewModel = spyk(viewModel)
+
+        val historyItems = listOf(mockk<WebViewHistoryItem>())
+        val validSession = RestoreSessionResult.Valid(
+          webViewHistoryList = historyItems,
+          currentTab = 2,
+          currentZimFile = "kiwix.zim"
+        )
+
+        coEvery { readerSessionManager.restoreReaderSession() } returns validSession
+
+        val onCompleteSlot = slot<suspend () -> Unit>()
+        coEvery {
+          viewModel.restoreViewStateOnValidWebViewHistory(
+            any(),
+            any(),
+            any(),
+            any(),
+            capture(onCompleteSlot)
+          )
+        } just Runs
+
+        val item = SearchItemToOpen(
+          shouldOpenInNewTab = false,
+          pageUrl = "${ZimFileReader.CONTENT_PREFIX}page.html",
+          pageTitle = "title",
+          zimReaderSourceDatabaseValue = "/books/missing.zim"
+        )
+        every { pendingSearchItemManager.consume() } returns item
+        coEvery { zimFileManager.canOpen(any()) } returns false
+        coEvery { viewModel.closeZimBook() } just Runs
+        coEvery { viewModel.openZimFile(any()) } just Runs
+        coEvery { viewModel.loadUrlWithCurrentWebview(any()) } just Runs
+
+        every { zimReaderContainer.id } returns null
+        every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.None
+        coEvery { readerSessionManager.saveReaderSession() } just Runs
+
+        viewModel.manageExternalLaunchAndRestoringViewState()
+        advanceUntilIdle()
+
+        onCompleteSlot.captured.invoke()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { viewModel.closeZimBook() }
+        coVerify(exactly = 0) { viewModel.openZimFile(any()) }
+        coVerify(exactly = 0) { viewModel.loadUrlWithCurrentWebview(any()) }
+      }
+
+      @Test
+      fun `search result without a book source keeps the previous behaviour`() = runTest {
+        val viewModel = spyk(viewModel)
+
+        val historyItems = listOf(mockk<WebViewHistoryItem>())
+        val validSession = RestoreSessionResult.Valid(
+          webViewHistoryList = historyItems,
+          currentTab = 2,
+          currentZimFile = "kiwix.zim"
+        )
+
+        coEvery { readerSessionManager.restoreReaderSession() } returns validSession
+
+        val onCompleteSlot = slot<suspend () -> Unit>()
+        coEvery {
+          viewModel.restoreViewStateOnValidWebViewHistory(
+            any(),
+            any(),
+            any(),
+            any(),
+            capture(onCompleteSlot)
+          )
+        } just Runs
+
+        val item = SearchItemToOpen(
+          shouldOpenInNewTab = false,
+          pageUrl = "${ZimFileReader.CONTENT_PREFIX}page.html",
+          pageTitle = "title",
+          zimReaderSourceDatabaseValue = null
+        )
+        every { pendingSearchItemManager.consume() } returns item
+        coEvery { viewModel.closeZimBook() } just Runs
+        coEvery { viewModel.openZimFile(any()) } just Runs
+        coEvery { viewModel.loadUrlWithCurrentWebview(any()) } just Runs
+
+        every { zimReaderContainer.id } returns null
+        every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.None
+        coEvery { readerSessionManager.saveReaderSession() } just Runs
+
+        viewModel.manageExternalLaunchAndRestoringViewState()
+        advanceUntilIdle()
+
+        onCompleteSlot.captured.invoke()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { viewModel.closeZimBook() }
+        coVerify(exactly = 0) { viewModel.openZimFile(any()) }
+        coVerify { viewModel.loadUrlWithCurrentWebview("${ZimFileReader.CONTENT_PREFIX}page.html") }
       }
     }
   }
