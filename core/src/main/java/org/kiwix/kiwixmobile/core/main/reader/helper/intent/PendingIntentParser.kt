@@ -25,6 +25,8 @@ import org.kiwix.kiwixmobile.core.main.ZIM_HOST_DEEP_LINK_SCHEME
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.None
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenBookmarks
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenSearch
+import org.kiwix.kiwixmobile.core.utils.files.EPUB_MIME_TYPE
+import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
 import javax.inject.Inject
 
 class PendingIntentParser @Inject constructor() {
@@ -59,6 +61,11 @@ class PendingIntentParser @Inject constructor() {
     else -> None
   }
 
+  /** True for an ACTION_VIEW of an EPUB, by MIME type or a `.epub` path. */
+  fun isEpubViewIntent(intent: Intent): Boolean =
+    intent.action == Intent.ACTION_VIEW &&
+      (intent.type == EPUB_MIME_TYPE || intent.data?.path?.let(::isEpubFile) == true)
+
   @Suppress("ReturnCount")
   private fun parseActionViewIntent(intent: Intent): ReaderIntentAction {
     if (intent.hasExtra(ZIM_FILE_URI_KEY)) return None
@@ -70,6 +77,11 @@ class PendingIntentParser @Inject constructor() {
     val isOctetStream = intent.type == null || intent.type == "application/octet-stream"
 
     if (isOctetStream || hasValidScheme) return None
+
+    // TODO(epub-reader): add a ReaderIntentAction.OpenEpub and route file/content EPUB
+    //  intents (currently None above) once the backend lands; callers can use
+    //  isEpubViewIntent. An EPUB type must never fall through to search.
+    if (intent.type == EPUB_MIME_TYPE) return None
 
     val searchString = if (intent.data == null) "" else intent.data?.lastPathSegment
     return OpenSearch(searchString.orEmpty(), false, isOpenedFromTabView = false)
