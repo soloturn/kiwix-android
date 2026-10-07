@@ -30,6 +30,8 @@ class ZimFileManager @Inject constructor(
   private val zimReaderContainer: ZimReaderContainer,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
+  suspend fun canOpen(source: ZimReaderSource): Boolean = source.canOpenInLibkiwix(ioDispatcher)
+
   suspend fun openZimFileInReader(
     source: ZimReaderSource,
     showSearchSuggestionsSpellChecked: Boolean
