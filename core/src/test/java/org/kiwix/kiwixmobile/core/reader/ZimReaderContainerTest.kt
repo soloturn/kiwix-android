@@ -31,10 +31,14 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import org.junit.jupiter.api.io.TempDir
 import org.kiwix.sharedFunctions.MainDispatcherRule
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Guards against the JNI use-after-free race described in
@@ -138,5 +142,58 @@ class ZimReaderContainerTest {
 
       assertEquals(secondReader, container.withReaderBlocking { it })
       verify { firstReader.dispose() }
+    }
+
+  private fun epubFile(dir: File): File {
+    val opf = """<?xml version="1.0"?>
+      <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="b">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:identifier id="b">urn:x</dc:identifier><dc:title>T</dc:title>
+        </metadata>
+        <manifest><item id="c" href="c.xhtml" media-type="application/xhtml+xml"/></manifest>
+        <spine><itemref idref="c"/></spine>
+      </package>"""
+    val container = """<?xml version="1.0"?>
+      <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+      <rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+      </container>"""
+    return File(dir, "b.epub").also { f ->
+      ZipOutputStream(f.outputStream()).use { z ->
+        listOf("META-INF/container.xml" to container, "content.opf" to opf, "c.xhtml" to "<p/>")
+          .forEach { (n, c) ->
+            z.putNextEntry(ZipEntry(n))
+            z.write(c.toByteArray())
+            z.closeEntry()
+          }
+      }
+    }
+  }
+
+  @Test
+  fun `epub reader is held, exposes book data, degrades ZIM-only calls, and closes on null zim`(
+    @TempDir dir: File
+  ) = runTest(mainDispatcherRule.dispatcher) {
+    assertEquals(true, container.setEpubFile(epubFile(dir)))
+
+    assertEquals(true, container.hasReader)
+    assertEquals(true, container.isEpubOpen)
+    assertEquals("urn:x", container.id)
+    assertEquals("c.xhtml", container.mainPage)
+    assertEquals(null, container.zimReaderSource)
+    assertEquals(null, container.getPageUrlFromTitle("x"))
+    assertEquals(null, container.getRandomPageUrl())
+    assertEquals(0L, container.fileSize)
+    assertEquals(null, container.withReader { it })
+
+    container.setZimReaderSource(null)
+    assertEquals(false, container.hasReader)
+  }
+
+  @Test
+  fun `invalid epub file leaves no reader`(@TempDir dir: File) =
+    runTest(mainDispatcherRule.dispatcher) {
+      val bad = File(dir, "bad.epub").apply { writeText("nope") }
+      assertEquals(false, container.setEpubFile(bad))
+      assertEquals(false, container.hasReader)
     }
 }

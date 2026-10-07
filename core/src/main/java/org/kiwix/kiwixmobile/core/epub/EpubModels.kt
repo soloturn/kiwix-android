@@ -26,7 +26,10 @@ data class EpubMetadata(
   val language: String?,
   val identifier: String?,
   /** Zip entry path of the cover image, or null if none is declared. */
-  val coverPath: String?
+  val coverPath: String?,
+  val publisher: String = "",
+  val date: String = "",
+  val description: String = ""
 )
 
 /** [path] is the normalized zip entry path (already resolved against the OPF location). */
