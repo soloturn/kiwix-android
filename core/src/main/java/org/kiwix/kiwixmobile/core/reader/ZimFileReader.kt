@@ -60,7 +60,7 @@ class ZimFileReader(
   val jniKiwixReader: Archive,
   private val searcher: SuggestionSearcher,
   private val ioDispatcher: CoroutineDispatcher
-) {
+) : BookReader {
   interface Factory {
     suspend fun create(
       zimReaderSource: ZimReaderSource,
@@ -125,9 +125,10 @@ class ZimFileReader(
    * Note that the value returned is NOT unique for each zim file. Versions of the same wiki
    * (complete, nopic, novid, etc) may return the same title.
    */
-  val title: String
+  override val sourceId: String get() = zimReaderSource.toDatabase()
+  override val title: String
     get() = getSafeMetaData("Title", "No Title Found")
-  val mainPage: String?
+  override val mainPage: String?
     get() =
       try {
         jniKiwixReader.mainEntry.getItem(true).path
@@ -135,19 +136,19 @@ class ZimFileReader(
         Log.e(TAG, "Unable to find the main page, original exception $exception")
         null
       }
-  val id: String get() = jniKiwixReader.uuid
+  override val id: String get() = jniKiwixReader.uuid
 
   /*
      libzim returns file size in kib so we need to convert it into bytes.
      More information here https://github.com/kiwix/java-libkiwix/issues/41
    */
   val fileSize: Long get() = jniKiwixReader.filesize / 1024
-  val creator: String get() = getSafeMetaData("Creator", "")
-  val publisher: String get() = getSafeMetaData("Publisher", "")
-  val name: String get() = getSafeMetaData("Name", id)
-  val date: String get() = getSafeMetaData("Date", "")
-  val description: String get() = getSafeMetaData("Description", "")
-  val favicon: String?
+  override val creator: String get() = getSafeMetaData("Creator", "")
+  override val publisher: String get() = getSafeMetaData("Publisher", "")
+  override val name: String get() = getSafeMetaData("Name", id)
+  override val date: String get() = getSafeMetaData("Date", "")
+  override val description: String get() = getSafeMetaData("Description", "")
+  override val favicon: String?
     get() = runCatching {
       Base64.encodeToString(
         jniKiwixReader.getIllustrationItem(ILLUSTRATION_SIZE).data.data,
@@ -156,7 +157,7 @@ class ZimFileReader(
     }.onFailure {
       Log.e(TAG, "Could not get the favicon for $title. Original exception: $it")
     }.getOrNull()
-  val language: String get() = getSafeMetaData("Language", "")
+  override val language: String get() = getSafeMetaData("Language", "")
 
   val tags: String
     get() = getSafeMetaData("Tags", "")
@@ -255,7 +256,7 @@ class ZimFileReader(
     }
 
   @Suppress("UnreachableCode")
-  suspend fun load(
+  override suspend fun load(
     uri: String
   ): InputStream? =
     withContext(ioDispatcher) {
@@ -292,15 +293,15 @@ class ZimFileReader(
     return generateZimContentBytes(item, uri)
   }
 
-  fun getMimeTypeFromUrl(uri: String): String? =
+  override fun getMimeTypeFromUrl(uri: String): String? =
     getItem(uri)?.mimetype
       ?.truncateMimeType.also {
         Log.d(TAG, "getting mimetype for $uri = $it")
       }
 
-  fun getRedirect(url: String) = "${toRedirect(url)}"
+  override fun getRedirect(url: String) = "${toRedirect(url)}"
 
-  fun isRedirect(url: String) =
+  override fun isRedirect(url: String) =
     when {
       getRedirect(url).isEmpty() -> false
       else -> url.startsWith(CONTENT_PREFIX) && url != getRedirect(url)
@@ -439,7 +440,7 @@ class ZimFileReader(
       tags = this@ZimFileReader.tags
     }
 
-  fun dispose() {
+  override fun dispose() {
     jniKiwixReader.dispose()
     searcher.dispose()
     spellingsDB?.dispose()
