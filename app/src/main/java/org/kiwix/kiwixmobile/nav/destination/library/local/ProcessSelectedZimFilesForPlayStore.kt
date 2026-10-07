@@ -47,6 +47,10 @@ import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils.isSplittedZimFile
 import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
+import org.kiwix.kiwixmobile.core.utils.files.EpubImportResult
+import org.kiwix.kiwixmobile.core.utils.files.importEpubContentUriResult
+import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
+import org.kiwix.kiwixmobile.core.utils.files.isValidEpubFile
 import org.kiwix.kiwixmobile.nav.destination.library.CopyMoveFileHandler
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
 import java.io.File
@@ -155,11 +159,14 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
     }
 
     val fileName = documentFile?.name
-    if (!isValidZimFile(fileName)) {
-      handleInvalidFile(uri, fileName, isFromMultipleFiles)
-      return
+    when {
+      fileName != null && isEpubFile(fileName) -> openEpub(uri, fileName, isFromMultipleFiles)
+      !isValidZimFile(fileName) -> handleInvalidFile(uri, fileName, isFromMultipleFiles)
+      else -> openOrMoveZim(uri, documentFile, fileName)
     }
+  }
 
+  private suspend fun openOrMoveZim(uri: Uri, documentFile: DocumentFile?, fileName: String?) {
     // Files inside the granted library folder are read in place; copying them would only
     // duplicate them.
     val libraryDocument = LibraryFolder.documentInGrantedTree(context.contentResolver, uri)
@@ -179,6 +186,28 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
         multipleFilesProcessAction,
         isSingleFileSelected
       )
+    }
+  }
+
+  /**
+   * EPUBs are read from app-private storage, so unlike ZIMs there is no copy/move-to-public
+   * prompt: a `content://` URI is imported there, a `file://` one is validated in place.
+   */
+  private suspend fun openEpub(uri: Uri, fileName: String, isFromMultipleFiles: Boolean) {
+    val file = withContext(ioDispatcher) {
+      if (uri.scheme == "file") {
+        uri.path?.let(::File)?.takeIf(::isValidEpubFile)
+      } else {
+        (importEpubContentUriResult(context, uri) as? EpubImportResult.Imported)?.file
+      }
+    }
+    if (file == null) {
+      handleInvalidFile(uri, fileName, isFromMultipleFiles)
+      return
+    }
+    selectedZimFileCallback?.onEpubFileSelected(file)
+    if (isFromMultipleFiles) {
+      processSelectedFiles(selectedZimFileUriList.drop(ONE), isAfterRetry = true)
     }
   }
 
