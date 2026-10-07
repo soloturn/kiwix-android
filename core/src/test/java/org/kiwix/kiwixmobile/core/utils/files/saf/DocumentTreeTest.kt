@@ -50,6 +50,7 @@ class DocumentTreeTest {
   private val folders = mapOf(
     rootId to listOf(
       Triple("wiki.zim", "application/octet-stream", 10L),
+      Triple("book.epub", "application/epub+zip", 8L),
       Triple("notes.txt", "text/plain", 1L),
       Triple("split.zimaa", "application/octet-stream", 4L),
       Triple("split.zimab", "application/octet-stream", 4L),
@@ -58,7 +59,10 @@ class DocumentTreeTest {
       Triple("sub", Document.MIME_TYPE_DIR, 0L),
       Triple(".Trash", Document.MIME_TYPE_DIR, 0L)
     ),
-    "$rootId/sub" to listOf(Triple("nested.zim", "application/octet-stream", 5L)),
+    "$rootId/sub" to listOf(
+      Triple("nested.zim", "application/octet-stream", 5L),
+      Triple("nested.EPUB", "application/epub+zip", 6L)
+    ),
     "$rootId/.Trash" to listOf(Triple("deleted.zim", "application/octet-stream", 5L))
   )
 
@@ -86,7 +90,7 @@ class DocumentTreeTest {
   @Test
   fun listsADirectoryWithASingleQuery() {
     val children = DocumentTree(resolver).listChildren(treeUri)
-    assertEquals(8, children.size)
+    assertEquals(9, children.size)
     assertEquals(1, queries.size)
     assertEquals(
       DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootId),
@@ -102,6 +106,16 @@ class DocumentTreeTest {
     val names = DocumentTree(resolver).findZimFiles(treeUri).map { it.name }.toSet()
     assertEquals(setOf("wiki.zim", "split.zimaa", "nested.zim"), names)
     // root + sub; .Trash is never listed
+    assertEquals(2, queries.size)
+  }
+
+  @Test
+  fun findsEpubsAlongsideZimsRecursivelyAndIgnoresExtensionCase() {
+    val names = DocumentTree(resolver).findLibraryFiles(treeUri).map { it.name }.toSet()
+    assertEquals(
+      setOf("wiki.zim", "split.zimaa", "nested.zim", "book.epub", "nested.EPUB"),
+      names
+    )
     assertEquals(2, queries.size)
   }
 

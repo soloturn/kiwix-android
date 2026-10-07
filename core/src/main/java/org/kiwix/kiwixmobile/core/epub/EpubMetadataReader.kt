@@ -20,6 +20,7 @@ package org.kiwix.kiwixmobile.core.epub
 
 import android.graphics.Bitmap
 import android.util.Size
+import org.kiwix.kiwixmobile.core.epub.reader.EpubPublicationOpener
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.coverFitting
 import java.io.ByteArrayOutputStream

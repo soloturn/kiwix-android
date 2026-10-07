@@ -820,7 +820,6 @@ class SettingsScreenTest {
     val viewModel = createMockViewModel(themeLabel = "Dark")
     composeTestRule.setContent {
       AppThemePreference(
-        context = context,
         themeLabel = "Dark",
         coreSettingsViewModel = viewModel
       )
@@ -835,7 +834,6 @@ class SettingsScreenTest {
     val viewModel = createMockViewModel()
     composeTestRule.setContent {
       AppThemePreference(
-        context = context,
         themeLabel = "System default",
         coreSettingsViewModel = viewModel
       )

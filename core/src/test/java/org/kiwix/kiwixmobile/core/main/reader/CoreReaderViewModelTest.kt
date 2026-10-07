@@ -65,6 +65,7 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
+import org.kiwix.kiwixmobile.core.epub.reader.EpubHighlightColor
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -74,6 +75,8 @@ import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderEffect
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.SelectionMenuAction
+import org.kiwix.kiwixmobile.core.main.reader.ZimHighlightRepository
 import org.kiwix.kiwixmobile.core.main.reader.helper.BookmarkManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.PendingSearchItemManager
@@ -133,6 +136,7 @@ internal class CoreReaderViewModelTest {
   private val readAloudManager = mockk<ReadAloudManager>()
   private val donationDialogHandler = mockk<DonationDialogHandler>()
   private val findInPageManager = mockk<FindInPageManager>(relaxed = true)
+  private val zimHighlightRepository = mockk<ZimHighlightRepository>(relaxed = true)
 
   companion object {
     private const val TEST_TTS_SPEED = 1.25f
@@ -194,7 +198,8 @@ internal class CoreReaderViewModelTest {
       readAloudManager,
       donationDialogHandler,
       findInPageManager,
-      mainDispatcherRule.mainDispatcher
+      mainDispatcherRule.mainDispatcher,
+      zimHighlightRepository
     )
   }
 
@@ -324,7 +329,8 @@ internal class CoreReaderViewModelTest {
         viewModel.initialize(coreMainActivity, alertDialogShower)
         advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.bookmarkButtonItem.icon).isEqualTo(IconItem.Drawable(R.drawable.ic_bookmark_24dp))
+        assertThat(viewModel.uiState.value.bookmarkButtonItem.icon)
+          .isEqualTo(IconItem.Drawable(R.drawable.ic_bookmark_24dp))
         assertThat(viewModel.uiState.value.bookmarkButtonItem.isBookmarked).isTrue()
       }
 
@@ -335,7 +341,8 @@ internal class CoreReaderViewModelTest {
         viewModel.initialize(coreMainActivity, alertDialogShower)
         advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.bookmarkButtonItem.icon).isEqualTo(IconItem.Drawable(R.drawable.ic_bookmark_border_24dp))
+        assertThat(viewModel.uiState.value.bookmarkButtonItem.icon)
+          .isEqualTo(IconItem.Drawable(R.drawable.ic_bookmark_border_24dp))
         assertThat(viewModel.uiState.value.bookmarkButtonItem.isBookmarked).isFalse()
       }
     }
@@ -1341,7 +1348,8 @@ internal class CoreReaderViewModelTest {
 
     @Test
     fun onRandomPageMenuClicked_whenFailedAfterRetries_emitsShowToastEffect() = runTest {
-      every { context.getString(string.could_not_find_random_page) } returns "Unable to find a random page. Please try again later."
+      every { context.getString(string.could_not_find_random_page) } returns
+        "Unable to find a random page. Please try again later."
 
       coEvery { readerPageManager.getRandomPage() } returns ReaderPageManager.GetRandomPageResult.FailedAfterRetries
 
@@ -1483,6 +1491,88 @@ internal class CoreReaderViewModelTest {
 
     // calls configureWebViewSelectionHandler()
     verify { mockMenu.findItem(R.id.menu_speak_text) }
+  }
+
+  @Test
+  fun onSelectionActionModeStarted_waitsForReleaseBeforeReadingSelection() {
+    val actionMode = mockk<ActionMode>(relaxed = true)
+    val menu = mockk<Menu>(relaxed = true)
+    val inflater = mockk<MenuInflater>()
+    every { actionMode.menu } returns menu
+    every { coreMainActivity.menuInflater } returns inflater
+    every { inflater.inflate(R.menu.menu_webview_action, menu) } just Runs
+
+    viewModel.onSelectionActionModeStarted(actionMode, coreMainActivity)
+
+    verify(exactly = 0) {
+      mockWebView.evaluateJavascript(match { it.contains("encodeURIComponent(selection.toString())") }, any())
+    }
+    viewModel.onSelectionTouchReleased()
+    verify(exactly = 1) {
+      mockWebView.evaluateJavascript(
+        match {
+          it.contains("encodeURIComponent(selection.toString())") &&
+            it.contains("window.__kiwixSelectionSnapshot") &&
+            it.contains("range.cloneRange()")
+        },
+        any()
+      )
+    }
+  }
+
+  @Test
+  fun dismissSelectionMenu_keepsWebViewSelection() {
+    viewModel.updateUiStateForTest { copy(selectionText = "Selected passage") }
+
+    viewModel.dismissSelectionMenu()
+
+    assertThat(viewModel.uiState.value.selectionText).isNull()
+    verify(exactly = 0) { mockWebView.evaluateJavascript(any(), any()) }
+  }
+
+  @Test
+  fun onHighlightSelection_appliesSelectedColorToWebViewSelection() {
+    viewModel.updateUiStateForTest { copy(selectionText = "Selected passage") }
+    every { zimReaderContainer.id } returns null
+    every { zimReaderContainer.zimReaderSource } returns null
+    every { mockWebView.url } returns "zim://book/article"
+
+    viewModel.onHighlightSelection(EpubHighlightColor.LIGHT_GREEN)
+
+    verify {
+      mockWebView.evaluateJavascript(
+        match {
+          it.contains("data-kiwix-highlight") &&
+            it.contains("highlight.style.backgroundColor = \"#A5D6A7\";") &&
+            it.contains("snapshot.text") &&
+            it.contains("candidates.length === 1")
+        },
+        any()
+      )
+    }
+    assertThat(viewModel.uiState.value.selectionText).isNull()
+  }
+
+  @Test
+  fun onSelectionMenuAction_deleteAnnotationUnwrapsSelectedHighlight() {
+    viewModel.updateUiStateForTest {
+      copy(selectionText = "Selected passage", selectionHasAnnotation = true)
+    }
+
+    viewModel.onSelectionMenuAction(SelectionMenuAction.DELETE_ANNOTATION)
+
+    verify {
+      mockWebView.evaluateJavascript(
+        match {
+          it.contains("[data-kiwix-highlight]") &&
+            it.contains("parent.insertBefore(highlight.firstChild, highlight)") &&
+            it.contains("parent.removeChild(highlight)")
+        },
+        any()
+      )
+    }
+    assertThat(viewModel.uiState.value.selectionText).isNull()
+    assertThat(viewModel.uiState.value.selectionHasAnnotation).isFalse()
   }
 
   @Test
@@ -2616,7 +2706,8 @@ internal class CoreReaderViewModelTest {
 
         coEvery { readerSessionManager.restoreReaderSession() } returns RestoreSessionResult.Invalid
 
-        every { readerIntentManager.consumePendingAction() } returns PendingIntentParser.ReaderIntentAction.OpenBookmarks
+        every { readerIntentManager.consumePendingAction() } returns
+          PendingIntentParser.ReaderIntentAction.OpenBookmarks
         every { viewModel.openBookmarkScreen() } just Runs
 
         viewModel.effects.test {
@@ -3225,7 +3316,7 @@ internal class CoreReaderViewModelTest {
     @Nested
     inner class ShowTabSwitcher {
       @Test
-      fun when_navigationDrawerIsOpenFalseAndShowTabSwitcherTrue_selectsCurrentWebViewIndexWhenIndexSmallerThanWebViewListSize() =
+      fun whenNavigationDrawerIsOpenAndTabSwitcherShown_selectsCurrentWebViewIndexWhenInRange() =
         runTest {
           val viewModel = spyk(viewModel)
 
@@ -3244,7 +3335,7 @@ internal class CoreReaderViewModelTest {
         }
 
       @Test
-      fun when_navigationDrawerIsOpenFalseAndShowTabSwitcherTrue_selectsWebViewListSizeIndexWhenCurrentIndexGreaterThanWebViewListSize() =
+      fun whenNavigationDrawerIsOpenAndTabSwitcherShown_selectsLastIndexWhenCurrentIndexIsTooLarge() =
         runTest {
           val viewModel = spyk(viewModel)
 
@@ -3264,7 +3355,7 @@ internal class CoreReaderViewModelTest {
     }
 
     @Test
-    fun whenNavigationDrawerIsOpenFalseAndFindInPageUiStateIsVisible_closesFindInPageAndCallsBackPressActivityExtensionsSuperShouldCall() =
+    fun whenFindInPageIsVisible_closesFindInPageAndDoesNotCallSuper() =
       runTest {
         viewModel.updateUiStateForTest {
           copy(findInPageUiState = FindInPageManager.FindInPageUiState(visible = true))
@@ -3279,7 +3370,7 @@ internal class CoreReaderViewModelTest {
       }
 
     @Test
-    fun whenNavigationDrawerIsOpenFalseAndShowTableOfContentDrawer_closesTocDrawerAndBackPressActivityExtensionsSuperShouldNotCall() =
+    fun whenTocDrawerIsOpen_closesTocDrawerAndDoesNotCallSuper() =
       runTest {
         val viewModel = spyk(viewModel)
         viewModel.updateUiStateForTest { copy(showTableOfContentDrawer = true) }
@@ -3292,7 +3383,7 @@ internal class CoreReaderViewModelTest {
       }
 
     @Test
-    fun whenNavigationDrawerIsOpenFalseAndWebViewCanGoBack_invokesWebViewGoBackAndBackPressActivityExtensionsSuperShouldNotCall() =
+    fun whenWebViewCanGoBack_invokesWebViewGoBackAndDoesNotCallSuper() =
       runTest {
         every { coreMainActivity.navigationDrawerIsOpen() } returns false
         every { mockWebView.canGoBack() } returns true
@@ -3421,6 +3512,7 @@ internal class CoreReaderViewModelTest {
     // Also sets documentParser, zimReaderSource, hideBackToTopJob to null
   }
 
+  @Suppress("LongParameterList") // Mirrors the production ViewModel constructor for tests.
   private class TestCoreReaderViewModel(
     context: Application,
     kiwixDataStore: KiwixDataStore,
@@ -3440,7 +3532,8 @@ internal class CoreReaderViewModelTest {
     readAloudManager: ReadAloudManager,
     donationDialogHandler: DonationDialogHandler,
     findInPageManager: FindInPageManager,
-    mainDispatcher: MainCoroutineDispatcher
+    mainDispatcher: MainCoroutineDispatcher,
+    zimHighlightRepository: ZimHighlightRepository
   ) : CoreReaderViewModel(
       context,
       kiwixDataStore,
@@ -3460,17 +3553,17 @@ internal class CoreReaderViewModelTest {
       readAloudManager,
       donationDialogHandler,
       findInPageManager,
-      mainDispatcher
+      mainDispatcher,
+      zimHighlightRepository
     ) {
     var tocSidebarEnabled = true
 
-    override fun openLocalLibrary() {}
+    override fun openLocalLibrary() = Unit
     override fun openSearch(
       searchString: String,
       isOpenedFromTabView: Boolean,
       isVoice: Boolean
-    ) {
-    }
+    ) = Unit
 
     fun updateUiStateForTest(transform: ReaderUiState.() -> ReaderUiState) {
       updateState(transform)
@@ -3480,15 +3573,13 @@ internal class CoreReaderViewModelTest {
       this.zimReaderSource = zimReaderSource
     }
 
-    override fun invalidZimFileFound(onInvalidZimFileFound: () -> Unit) {
-    }
+    override fun invalidZimFileFound(onInvalidZimFileFound: () -> Unit) = Unit
 
     override fun shouldShowSpellCheckedSuggestions(): Boolean = false
     override fun isTocSidebarEnabled(): Boolean = tocSidebarEnabled
     override fun isBrandedApp(): Boolean = false
 
-    override fun openBookmarkScreen() {
-    }
+    override fun openBookmarkScreen() = Unit
 
     public override fun openHomeScreen() {
       super.openHomeScreen()
@@ -3538,8 +3629,7 @@ internal class CoreReaderViewModelTest {
       currentZimFile: String?,
       restoreOrigin: RestoreOrigin,
       onComplete: suspend () -> Unit
-    ) {
-    }
+    ) = Unit
 
     public override suspend fun manageExternalLaunchAndRestoringViewState(restoreOrigin: RestoreOrigin) {
       super.manageExternalLaunchAndRestoringViewState(restoreOrigin)
@@ -3565,14 +3655,12 @@ internal class CoreReaderViewModelTest {
       super.onCleared()
     }
 
-    override suspend fun restoreViewStateOnInvalidWebViewHistory() {
-    }
+    override suspend fun restoreViewStateOnInvalidWebViewHistory() = Unit
 
     override suspend fun openZimFileWithArguments(
       zimFileUri: String,
       pageUrl: String,
       searchItemTitle: String
-    ) {
-    }
+    ) = Unit
   }
 }

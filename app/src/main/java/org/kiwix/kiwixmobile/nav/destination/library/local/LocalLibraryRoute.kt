@@ -129,6 +129,11 @@ fun LocalLibraryRoute(
       onClick = localLibraryViewModel::onBookItemClick,
       onLongClick = localLibraryViewModel::onBookItemLongClick,
       onMultiSelect = localLibraryViewModel::onMultiSelect,
+      epubCallbacks = EpubItemCallbacks(
+        onClick = localLibraryViewModel::onEpubItemClick,
+        onLongClick = localLibraryViewModel::onEpubItemLongClick,
+        onMultiSelect = localLibraryViewModel::onEpubMultiSelect
+      ),
       bottomAppBarScrollBehaviour = mainActivity.bottomAppBarScrollBehaviour,
       onUserBackPressed = localLibraryViewModel::handleUserBackPressed,
       navHostController = navController,

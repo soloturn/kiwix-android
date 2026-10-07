@@ -15,6 +15,17 @@ plugins.apply(KiwixConfigurationPlugin::class)
 android {
   defaultConfig {
     buildConfigField("long", "VERSION_CODE", "".getVersionCode().toString())
+    externalNativeBuild {
+      cmake {
+        cppFlags += "-std=c++17"
+      }
+    }
+  }
+  externalNativeBuild {
+    cmake {
+      path = file("src/main/cpp/CMakeLists.txt")
+      version = "3.22.1"
+    }
   }
   buildTypes {
     getByName("release") {
@@ -57,6 +68,8 @@ dependencies {
   api(Libs.MEDIA3_SESSION)
   api(Libs.MEDIA3_COMMON)
 
+  // Readium EPUB toolkit: parsing/metadata (shared, streamer) and the paginated navigator.
   implementation(Libs.READIUM_SHARED)
   implementation(Libs.READIUM_STREAMER)
+  implementation(Libs.READIUM_NAVIGATOR)
 }

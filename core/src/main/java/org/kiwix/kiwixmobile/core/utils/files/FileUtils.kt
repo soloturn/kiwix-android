@@ -130,6 +130,11 @@ object FileUtils {
   suspend fun deleteZimFile(path: String, ioDispatcher: CoroutineDispatcher) {
     withContext(ioDispatcher) {
       fileOperationMutex.withLock {
+        // An EPUB is a single file; the chunk logic below assumes a "zim" suffix.
+        if (isEpubFile(path)) {
+          File(path).deleteFile(ioDispatcher)
+          return@withLock
+        }
         var filePath = path
         if (filePath.substring(filePath.length - ChunkUtils.PART.length) == ChunkUtils.PART) {
           filePath = filePath.substring(0, filePath.length - ChunkUtils.PART.length)
@@ -401,7 +406,7 @@ object FileUtils {
     // For file managers that provide the full path in the URI (common on devices below Android 11).
     // This triggers when the user clicks directly on a ZIM file in the file manager, and the file
     // manager returns the path via its own file provider.
-    "$uri".contains("root") && "$uri".endsWith("zim") -> {
+    "$uri".contains("root") && ("$uri".endsWith("zim") || isEpubFile("$uri")) -> {
       "$uri".substringAfter("/root")
     }
 
@@ -450,7 +455,7 @@ object FileUtils {
     val documentId = extractDocumentId(uri, documentsContractWrapper)
 
     // Attempt to handle cases where the document ID is a direct path to a ZIM file.
-    if (isValidZimFile(documentId)) {
+    if (isValidZimFile(documentId) || isEpubFile(documentId)) {
       return@withContext documentId.substringAfter("raw:")
     }
 

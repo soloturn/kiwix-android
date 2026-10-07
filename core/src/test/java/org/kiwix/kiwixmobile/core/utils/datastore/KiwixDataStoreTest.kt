@@ -37,6 +37,9 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.ThemeConfig
+import org.kiwix.kiwixmobile.core.epub.reader.EpubFontChoice
+import org.kiwix.kiwixmobile.core.epub.reader.EpubReaderSettings
+import org.kiwix.kiwixmobile.core.epub.reader.EpubThemePreset
 import org.kiwix.kiwixmobile.core.zim_manager.Category
 import org.kiwix.kiwixmobile.core.zim_manager.Language
 import org.kiwix.sharedFunctions.MainDispatcherRule
@@ -84,6 +87,21 @@ class KiwixDataStoreTest {
     }
     storageContext.kiwixDataStore.edit { it.clear() }
     return storageContext to KiwixDataStore(storageContext, mainDispatcherRule.dispatcher)
+  }
+
+  @Test
+  fun `epub reader settings default then persist`() = runTest {
+    assertThat(kiwixDataStore.epubReaderSettingsJson.first()).isNull()
+    val changed = EpubReaderSettings(
+      fontScale = 1.5,
+      pageMargins = 0.25,
+      fontChoice = EpubFontChoice.SERIF,
+      themePreset = EpubThemePreset.BLACK,
+      scroll = true
+    )
+    kiwixDataStore.setEpubReaderSettingsJson(changed.toJson())
+    assertThat(EpubReaderSettings.fromJson(kiwixDataStore.epubReaderSettingsJson.first()))
+      .isEqualTo(changed)
   }
 
   @Test
@@ -756,14 +774,6 @@ class KiwixDataStoreTest {
   }
 
   @Test
-  @Config(sdk = [Build.VERSION_CODES.P])
-  fun `below Q without write permission the default stays public documents`() = runTest {
-    val (storageContext, storageDataStore) = storageAwareDataStore()
-    assertThat(storageDataStore.selectedStorage.first())
-      .isEqualTo(expectedDefaultPublicStorage(storageContext))
-  }
-
-  @Test
   fun `selectedStorage moves an empty legacy app folder to public documents`() = runTest {
     val (storageContext, storageDataStore) = storageAwareDataStore()
     val legacyDirectory = File(tempFolder.root, "Android/media/com.github.soloturn.kiwix")
@@ -785,6 +795,14 @@ class KiwixDataStoreTest {
     storageDataStore.setSelectedStorage(legacyDirectory.absolutePath)
 
     assertThat(storageDataStore.selectedStorage.first()).isEqualTo(legacyDirectory.absolutePath)
+  }
+
+  @Test
+  @Config(sdk = [Build.VERSION_CODES.P])
+  fun `below Q without write permission the default stays public documents`() = runTest {
+    val (storageContext, storageDataStore) = storageAwareDataStore()
+    assertThat(storageDataStore.selectedStorage.first())
+      .isEqualTo(expectedDefaultPublicStorage(storageContext))
   }
 
   @Test
