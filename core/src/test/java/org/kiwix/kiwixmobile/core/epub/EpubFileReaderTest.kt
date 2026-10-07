@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core.epub
 
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.kiwix.kiwixmobile.core.reader.BookReader
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -64,6 +66,8 @@ class EpubFileReaderTest {
           <dc:title>My Book</dc:title>
           <dc:creator>Jane Doe</dc:creator><dc:creator>John Roe</dc:creator>
           <dc:language>en</dc:language>
+          <dc:publisher>Pub Co</dc:publisher><dc:date>2020-01-02</dc:date>
+          <dc:description>About it</dc:description>
         </metadata>
         <manifest>
           <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
@@ -149,6 +153,34 @@ class EpubFileReaderTest {
   }
 
   @Test
+  fun bookReaderMapping() = runBlocking {
+    val file = epub3()
+    val r: BookReader = EpubFileReader(file)
+    assertEquals(file.path, r.sourceId)
+    assertEquals("urn:uuid:1234", r.id)
+    assertEquals("My Book", r.name)
+    assertEquals("Jane Doe, John Roe", r.creator)
+    assertEquals("Pub Co", r.publisher)
+    assertEquals("2020-01-02", r.date)
+    assertEquals("About it", r.description)
+    assertEquals("en", r.language)
+    assertEquals("OEBPS/ch%201.xhtml", r.mainPage)
+    assertFalse(r.isRedirect("https://kiwix.app/OEBPS/ch%201.xhtml"))
+    assertEquals("application/xhtml+xml", r.getMimeTypeFromUrl("https://kiwix.app/OEBPS/ch%201.xhtml"))
+    assertEquals("<html>one</html>", r.load("https://kiwix.app/OEBPS/ch%201.xhtml")!!.readBytes().decodeToString())
+    assertNull(r.load("https://example.com/x"))
+    assertNull(r.load("https://kiwix.app/missing.html"))
+    r.dispose()
+  }
+
+  @Test
+  fun epub2IdIsDcIdentifier() {
+    val r = EpubFileReader(epub2())
+    assertEquals("isbn:1", r.id)
+    r.dispose()
+  }
+
+  @Test
   fun epub3TocFromNavPicksTocNavAndNests() {
     val r = EpubFileReader(epub3())
     assertEquals(listOf("Chapter One", "Chapter Two"), r.toc.map { it.title })
@@ -204,7 +236,7 @@ class EpubFileReaderTest {
   @Test
   fun percentEncodedNamesLoad() {
     val r = EpubFileReader(epub3())
-    assertEquals("<html>one</html>", r.load("https://kiwix.app/OEBPS/ch%201.xhtml")!!.readBytes().decodeToString())
+    assertEquals("<html>one</html>", r.open("https://kiwix.app/OEBPS/ch%201.xhtml")!!.readBytes().decodeToString())
     r.dispose()
   }
 
@@ -214,7 +246,7 @@ class EpubFileReaderTest {
     val r = EpubFileReader(f)
     val url = r.resolveUrl("https://kiwix.app/OEBPS/text/ch2.xhtml", "../caf%C3%A9.txt")
     assertEquals("https://kiwix.app/OEBPS/caf%C3%A9.txt", url)
-    assertEquals("latte", r.load(url!!)!!.readBytes().decodeToString())
+    assertEquals("latte", r.open(url!!)!!.readBytes().decodeToString())
     r.dispose()
   }
 
@@ -228,12 +260,12 @@ class EpubFileReaderTest {
       )
     )
     val r = EpubFileReader(f)
-    assertNull(r.load("https://kiwix.app/../evil.txt"))
-    assertNull(r.load("https://kiwix.app/%2e%2e/evil.txt"))
-    assertNull(r.load("https://kiwix.app/OEBPS/%2E%2E/%2E%2E/evil2.txt"))
-    assertNull(r.load("https://kiwix.app/abs.txt"))
+    assertNull(r.open("https://kiwix.app/../evil.txt"))
+    assertNull(r.open("https://kiwix.app/%2e%2e/evil.txt"))
+    assertNull(r.open("https://kiwix.app/OEBPS/%2E%2E/%2E%2E/evil2.txt"))
+    assertNull(r.open("https://kiwix.app/abs.txt"))
     assertNull(r.resolveUrl("https://kiwix.app/OEBPS/nav.xhtml", "../../evil.txt"))
-    assertNull(r.load("https://kiwix.app/OEBPS/a%5C..%5Cb"))
+    assertNull(r.open("https://kiwix.app/OEBPS/a%5C..%5Cb"))
     r.dispose()
   }
 
@@ -241,9 +273,9 @@ class EpubFileReaderTest {
   fun caseInsensitiveFallbackOnlyWhenUnambiguous() {
     val f = epub3(extra = listOf("OEBPS/Dup.txt" to "1", "OEBPS/dup.txt" to "2"))
     val r = EpubFileReader(f)
-    assertNotNull(r.load("https://kiwix.app/oebps/STYLE.CSS"))
-    assertNotNull(r.load("https://kiwix.app/OEBPS/Dup.txt"))
-    assertNull(r.load("https://kiwix.app/OEBPS/DUP.txt"))
+    assertNotNull(r.open("https://kiwix.app/oebps/STYLE.CSS"))
+    assertNotNull(r.open("https://kiwix.app/OEBPS/Dup.txt"))
+    assertNull(r.open("https://kiwix.app/OEBPS/DUP.txt"))
     r.dispose()
   }
 
@@ -271,8 +303,8 @@ class EpubFileReaderTest {
     assertTrue(r.isExternalUrl("file:///etc/passwd"))
     assertTrue(r.isExternalUrl("not a url"))
     assertFalse(r.isExternalUrl("https://KIWIX.app/OEBPS/style.css"))
-    assertNull(r.load("https://example.com/OEBPS/style.css"))
-    assertNull(r.load("file:///etc/passwd"))
+    assertNull(r.open("https://example.com/OEBPS/style.css"))
+    assertNull(r.open("file:///etc/passwd"))
     assertNull(r.resolveUrl("https://example.com/a.xhtml", "b.xhtml"))
     assertNull(r.resolveUrl("https://kiwix.app/OEBPS/nav.xhtml", "https://evil.com/x"))
     assertNull(r.resolveUrl("https://kiwix.app/OEBPS/nav.xhtml", "//evil.com/x"))
@@ -341,6 +373,6 @@ class EpubFileReaderTest {
     val r = EpubFileReader(epub3())
     r.dispose()
     r.dispose()
-    assertNull(r.load("https://kiwix.app/OEBPS/style.css"))
+    assertNull(r.open("https://kiwix.app/OEBPS/style.css"))
   }
 }
