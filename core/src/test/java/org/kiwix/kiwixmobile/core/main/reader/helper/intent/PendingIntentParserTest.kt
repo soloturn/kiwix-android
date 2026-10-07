@@ -72,17 +72,20 @@ class PendingIntentParserTest {
   }
 
   @Test
-  fun `file epub VIEW intent returns OpenEpub, content epub stays None`() {
+  fun `file epub VIEW intent returns OpenEpub, content epub returns OpenEpubContent`() {
     val file = Intent(Intent.ACTION_VIEW, Uri.parse("file:///sdcard/book.epub"))
-    val content = Intent(Intent.ACTION_VIEW, Uri.parse("content://x/1")).apply {
-      type = "application/epub+zip"
+    val content = Intent(Intent.ACTION_VIEW).apply {
+      setDataAndType(Uri.parse("content://x/1"), "application/epub+zip")
     }
 
     assertEquals(
       PendingIntentParser.ReaderIntentAction.OpenEpub("/sdcard/book.epub"),
       parser.parse(file)
     )
-    assertEquals(PendingIntentParser.ReaderIntentAction.None, parser.parse(content))
+    assertEquals(
+      PendingIntentParser.ReaderIntentAction.OpenEpubContent("content://x/1"),
+      parser.parse(content)
+    )
   }
 
   @Test

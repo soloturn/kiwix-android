@@ -54,6 +54,7 @@ import org.kiwix.kiwixmobile.core.settings.StorageCalculator
 import org.kiwix.kiwixmobile.core.utils.StorageDeviceProvider
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
+import org.kiwix.kiwixmobile.core.utils.files.importEpubContentUri
 import org.kiwix.kiwixmobile.nav.destination.library.CopyMoveFileHandler
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
 import org.kiwix.kiwixmobile.nav.destination.library.local.ProcessSelectedZimFilesForPlayStore
@@ -229,6 +230,39 @@ class ProcessSelectedZimFilesForPlayStoreTest {
       processSelectedZimFiles.processSelectedFiles(listOf(uri))
       advanceUntilIdle()
       verify { activity.toast("Invalid file", any()) }
+    }
+
+  @Test
+  fun `single epub is imported and opened without the copy-move prompt`() =
+    testScope.runTest {
+      mockkStatic("org.kiwix.kiwixmobile.core.utils.files.EpubContentImporterKt")
+      val uri = createValidUri("book.epub")
+      val imported = File("/private/book-100.epub")
+      coEvery { importEpubContentUri(any(), uri) } returns imported
+
+      processSelectedZimFiles.processSelectedFiles(listOf(uri))
+      advanceUntilIdle()
+
+      verify { selectedZimFileCallback.onEpubFileSelected(imported) }
+      coVerify(exactly = 0) {
+        copyMoveFileHandler.showMoveFileToPublicDirectoryDialog(any(), any(), any(), any(), any(), any())
+      }
+    }
+
+  @Test
+  fun `epub that fails to import shows the invalid file toast`() =
+    testScope.runTest {
+      mockkStatic("org.kiwix.kiwixmobile.core.utils.files.EpubContentImporterKt")
+      val uri = createValidUri("book.epub")
+      coEvery { importEpubContentUri(any(), uri) } returns null
+      every { activity.getString(R.string.error_file_invalid, "book.epub") } returns "Invalid file"
+      every { activity.toast(any<String>(), any()) } just Runs
+
+      processSelectedZimFiles.processSelectedFiles(listOf(uri))
+      advanceUntilIdle()
+
+      verify { activity.toast("Invalid file", any()) }
+      verify(exactly = 0) { selectedZimFileCallback.onEpubFileSelected(any()) }
     }
 
   @Test
