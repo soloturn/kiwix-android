@@ -127,6 +127,11 @@ object FileUtils {
   suspend fun deleteZimFile(path: String, ioDispatcher: CoroutineDispatcher) {
     withContext(ioDispatcher) {
       fileOperationMutex.withLock {
+        // An EPUB is a single file; the chunk logic below assumes a "zim" suffix.
+        if (isEpubFile(path)) {
+          File(path).deleteFile(ioDispatcher)
+          return@withLock
+        }
         var filePath = path
         if (filePath.substring(filePath.length - ChunkUtils.PART.length) == ChunkUtils.PART) {
           filePath = filePath.substring(0, filePath.length - ChunkUtils.PART.length)
