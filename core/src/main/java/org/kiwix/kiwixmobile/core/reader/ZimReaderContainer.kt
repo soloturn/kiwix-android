@@ -99,6 +99,9 @@ class ZimReaderContainer @Inject constructor(
   private fun <T> withReaderOrNull(block: (ZimFileReader?) -> T): T =
     runBlocking { withReaderSuspend(block) }
 
+  // Format-agnostic view for callers that only need the BookReader surface.
+  private fun <T> withBookReaderOrNull(block: (BookReader?) -> T): T = withReaderOrNull(block)
+
   fun <T> withReaderBlocking(block: (ZimFileReader) -> T): T? =
     withReaderOrNull { it?.let(block) }
 
@@ -140,8 +143,8 @@ class ZimReaderContainer @Inject constructor(
   fun getPageUrlFromTitle(title: String) = withReaderOrNull { it?.getPageUrlFrom(title) }
 
   fun getRandomPageUrl() = withReaderOrNull { it?.getRandomPageUrl() }
-  fun isRedirect(url: String): Boolean = withReaderOrNull { it?.isRedirect(url) == true }
-  fun getRedirect(url: String): String = withReaderOrNull { it?.getRedirect(url) }.orEmpty()
+  fun isRedirect(url: String): Boolean = withBookReaderOrNull { it?.isRedirect(url) == true }
+  fun getRedirect(url: String): String = withBookReaderOrNull { it?.getRedirect(url) }.orEmpty()
   fun load(url: String, requestHeaders: Map<String, String>): WebResourceResponse = runBlocking {
     return@runBlocking withReaderSuspend { reader ->
       WebResourceResponse(
@@ -169,15 +172,15 @@ class ZimReaderContainer @Inject constructor(
   }
 
   val zimReaderSource get() = withReaderOrNull { it?.zimReaderSource }
-  val zimFileTitle get() = withReaderOrNull { it?.title }
-  val mainPage get() = withReaderOrNull { it?.mainPage }
-  val id get() = withReaderOrNull { it?.id }
+  val zimFileTitle get() = withBookReaderOrNull { it?.title }
+  val mainPage get() = withBookReaderOrNull { it?.mainPage }
+  val id get() = withBookReaderOrNull { it?.id }
   val fileSize get() = withReaderOrNull { it?.fileSize } ?: 0L
-  val creator get() = withReaderOrNull { it?.creator }
-  val publisher get() = withReaderOrNull { it?.publisher }
-  val name get() = withReaderOrNull { it?.name }
-  val date get() = withReaderOrNull { it?.date }
-  val description get() = withReaderOrNull { it?.description }
-  val favicon get() = withReaderOrNull { it?.favicon }
-  val language get() = withReaderOrNull { it?.language }
+  val creator get() = withBookReaderOrNull { it?.creator }
+  val publisher get() = withBookReaderOrNull { it?.publisher }
+  val name get() = withBookReaderOrNull { it?.name }
+  val date get() = withBookReaderOrNull { it?.date }
+  val description get() = withBookReaderOrNull { it?.description }
+  val favicon get() = withBookReaderOrNull { it?.favicon }
+  val language get() = withBookReaderOrNull { it?.language }
 }
