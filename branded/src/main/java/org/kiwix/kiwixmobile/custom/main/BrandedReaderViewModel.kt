@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.custom.main
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.util.Log
 import android.view.Menu
@@ -241,6 +242,7 @@ class BrandedReaderViewModel @Inject constructor(
   }
 
   @Suppress("TooGenericExceptionCaught")
+  @SuppressLint("LogNotTimber")
   private suspend fun saveBookToLibrary(zimFile: File?) {
     launchInViewModelScope {
       try {
@@ -268,6 +270,7 @@ class BrandedReaderViewModel @Inject constructor(
     }
   }
 
+  @SuppressLint("LogNotTimber")
   private suspend fun createDemoFile() {
     runCatching {
       File(getDemoFilePathForBrandedApp(context)).also {

@@ -50,6 +50,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.kiwix.kiwixmobile.R.string
 import org.kiwix.kiwixmobile.core.R
+import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
 import org.kiwix.kiwixmobile.core.extensions.snack
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.settings.StorageCalculator
@@ -73,6 +76,7 @@ class ProcessSelectedZimFilesForPlayStoreTest {
   private val storageDeviceProvider: StorageDeviceProvider = mockk(relaxed = true)
   private val alertDialogShower: AlertDialogShower = mockk(relaxed = true)
   private val snackBarHostState: SnackbarHostState = mockk(relaxed = true)
+  private val epubOpenUseCase: EpubOpenUseCase = mockk(relaxed = true)
 
   private val selectedZimFileCallback: SelectedZimFileCallback = mockk(relaxed = true)
 
@@ -92,6 +96,7 @@ class ProcessSelectedZimFilesForPlayStoreTest {
       copyMoveFileHandler,
       storageCalculator,
       storageDeviceProvider,
+      epubOpenUseCase,
       UnconfinedTestDispatcher(testScope.testScheduler)
     )
 
@@ -232,6 +237,63 @@ class ProcessSelectedZimFilesForPlayStoreTest {
       processSelectedZimFiles.processSelectedFiles(listOf(uri))
       advanceUntilIdle()
       verify { activity.toast("Invalid file", any()) }
+    }
+
+  @Test
+  fun `single epub goes to the open use case without the copy-move prompt`() =
+    testScope.runTest {
+      val uri = createValidUri("book.epub")
+
+      processSelectedZimFiles.processSelectedFiles(listOf(uri))
+      advanceUntilIdle()
+
+      coVerify(exactly = 1) { epubOpenUseCase.open(activity, EpubSource.Content(uri)) }
+      coVerify(exactly = 0) {
+        copyMoveFileHandler.showMoveFileToPublicDirectoryDialog(any(), any(), any(), any(), any(), any())
+      }
+    }
+
+  @Test
+  fun `epubs of a multi-selection are added to the library, not opened`() =
+    testScope.runTest {
+      val first = createValidUri("one.epub")
+      val second = createValidUri("two.epub")
+      coEvery { epubOpenUseCase.prepare(any(), any()) } returns
+        EpubOpenResult.Ready(File("/private/a.epub"), "id")
+      every { activity.getString(R.string.your_selected_files_added_to_library) } returns "Added"
+      every { activity.toast(any<String>(), any()) } just Runs
+
+      processSelectedZimFiles.processSelectedFiles(listOf(first, second))
+      advanceUntilIdle()
+
+      coVerify { epubOpenUseCase.prepare(EpubSource.Content(first), false) }
+      coVerify { epubOpenUseCase.prepare(EpubSource.Content(second), false) }
+      coVerify(exactly = 0) { epubOpenUseCase.open(any(), any()) }
+      verify { activity.toast("Added", any()) }
+    }
+
+  @Test
+  fun `a failing epub in a multi-selection shows the reason and continues`() =
+    testScope.runTest {
+      val bad = createValidUri("bad.epub")
+      val good = createValidUri("good.epub")
+      coEvery { epubOpenUseCase.prepare(EpubSource.Content(bad), false) } returns
+        EpubOpenResult.Failed("Too big")
+      coEvery { epubOpenUseCase.prepare(EpubSource.Content(good), false) } returns
+        EpubOpenResult.Ready(File("/private/g.epub"), "id")
+      val onContinue = slot<suspend () -> Unit>()
+      every {
+        selectedZimFileCallback.showFileCopyMoveErrorDialog("Too big", capture(onContinue))
+      } just Runs
+      every { activity.getString(R.string.your_selected_files_added_to_library) } returns "Added"
+      every { activity.toast(any<String>(), any()) } just Runs
+
+      processSelectedZimFiles.processSelectedFiles(listOf(bad, good))
+      advanceUntilIdle()
+      onContinue.captured.invoke()
+      advanceUntilIdle()
+
+      coVerify { epubOpenUseCase.prepare(EpubSource.Content(good), false) }
     }
 
   @Test

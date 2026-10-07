@@ -91,6 +91,11 @@ fun ReaderScreenRoute(
 ) {
   val alertDialogShower = remember { AlertDialogShower() }
   val uiState by viewModel.uiState.collectAsState()
+  val onSystemBarsVisibilityChange = remember(activity) {
+    { visible: Boolean ->
+      if (visible) activity.window.exitFullscreen() else activity.window.enterFullscreen()
+    }
+  }
   val lifeCycleScope = rememberCoroutineScope()
   val snackBarHostState = remember { SnackbarHostState() }
   val readPermissionState =
@@ -106,6 +111,7 @@ fun ReaderScreenRoute(
   }
   DisposableEffect(Unit) {
     onDispose {
+      activity.window.exitFullscreen()
       runCatching {
         viewModel.viewModelScope.launch {
           viewModel.readerWebViewManager.destroyAllTabs()
@@ -149,7 +155,8 @@ fun ReaderScreenRoute(
         key(uiState.showTabSwitcher) {
           NavigationItem(viewModel, activity)
         }
-      }
+      },
+      onSystemBarsVisibilityChange = onSystemBarsVisibilityChange
     )
     DialogHost(alertDialogShower)
   }
