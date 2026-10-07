@@ -44,6 +44,7 @@ import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
+import org.kiwix.kiwixmobile.core.utils.files.isValidEpubFile
 import org.kiwix.kiwixmobile.nav.destination.library.local.ProcessSelectedZimFilesForStandalone
 import org.kiwix.kiwixmobile.nav.destination.library.local.SelectedZimFileCallback
 import org.kiwix.sharedFunctions.MainDispatcherRule
@@ -210,6 +211,36 @@ class ProcessSelectedZimFilesForStandaloneTest {
 
       coVerify { selectedZimFileCallback.addBookToLibkiwixBookOnDisk(any()) }
     }
+
+  @Test
+  fun `a single epub is handed to onEpubFileSelected to open`() = runTest {
+    mockkStatic("org.kiwix.kiwixmobile.core.utils.files.EpubFileUtilsKt")
+    val uri = createValidUri("content://book", "/storage/emulated/0/book.epub")
+    every { isValidEpubFile(any()) } returns true
+
+    processSelectedZimFiles.processSelectedFiles(listOf(uri))
+
+    verify { selectedZimFileCallback.onEpubFileSelected(File("/storage/emulated/0/book.epub")) }
+    verify(exactly = 0) { selectedZimFileCallback.navigateToReaderScreen(any()) }
+  }
+
+  @Test
+  fun `epubs in a multi selection are added to the library without opening`() = runTest {
+    mockkStatic("org.kiwix.kiwixmobile.core.utils.files.EpubFileUtilsKt")
+    val epubUri = createValidUri("content://book", "/storage/emulated/0/book.epub")
+    val zimUri = createValidUri("content://zim", "/storage/emulated/0/test.zim")
+    every { isValidEpubFile(any()) } returns true
+    every {
+      activity.getString(R.string.your_selected_files_added_to_library)
+    } returns "Files added"
+    every { activity.toast(any<String>(), any()) } just Runs
+
+    processSelectedZimFiles.processSelectedFiles(listOf(epubUri, zimUri))
+
+    verify { selectedZimFileCallback.addEpubToLibrary(File("/storage/emulated/0/book.epub")) }
+    verify(exactly = 0) { selectedZimFileCallback.onEpubFileSelected(any()) }
+    verify { selectedZimFileCallback.addBookToLibkiwixBookOnDisk(any()) }
+  }
 
   @AfterEach
   fun tearDown() {

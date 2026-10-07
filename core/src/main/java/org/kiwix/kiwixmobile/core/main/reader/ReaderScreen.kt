@@ -118,7 +118,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -257,6 +256,7 @@ fun ReaderScreen(
   onUserBackPressed: suspend () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
   mainActivityBottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
+  onSystemBarsVisibilityChange: (Boolean) -> Unit = {},
   navigationIcon: @Composable () -> Unit
 ) {
   val topAppBarScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -288,6 +288,15 @@ fun ReaderScreen(
     topAppBarScrollBehavior.state.heightOffset = topOffset
     bottomAppBarScrollBehavior.state.heightOffset = bottomOffset
   }
+  val readerOpen = isReaderOpen(state)
+  val searchVisible = state.findInPageUiState.visible
+  HandleReaderSystemBars(
+    topAppBarScrollBehavior,
+    bottomAppBarScrollBehavior,
+    readerOpen,
+    searchVisible,
+    onSystemBarsVisibilityChange
+  )
   LaunchedEffect(bottomAppBarScrollBehavior.state.heightOffset) {
     mainActivityBottomAppBarScrollBehaviour?.state?.heightOffset =
       bottomAppBarScrollBehavior.state.heightOffset
@@ -370,6 +379,39 @@ fun ReaderScreen(
     }
   }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HandleReaderSystemBars(
+  topAppBarScrollBehavior: TopAppBarScrollBehavior,
+  bottomAppBarScrollBehavior: BottomAppBarScrollBehavior,
+  readerOpen: Boolean,
+  searchVisible: Boolean,
+  onSystemBarsVisibilityChange: (Boolean) -> Unit
+) {
+  LaunchedEffect(topAppBarScrollBehavior, bottomAppBarScrollBehavior, readerOpen, searchVisible) {
+    snapshotFlow {
+      shouldShowSystemBars(
+        readerOpen = readerOpen,
+        searchVisible = searchVisible,
+        topBarVisible = topAppBarScrollBehavior.state.heightOffset == 0f,
+        bottomBarVisible = bottomAppBarScrollBehavior.state.heightOffset == 0f
+      )
+    }.collect { onSystemBarsVisibilityChange(it) }
+  }
+}
+
+private fun isReaderOpen(state: ReaderUiState): Boolean =
+  state.tabsState.currentWebView != null &&
+    !state.showNoBookOpenInReader &&
+    !state.showTabSwitcher
+
+private fun shouldShowSystemBars(
+  readerOpen: Boolean,
+  searchVisible: Boolean,
+  topBarVisible: Boolean,
+  bottomBarVisible: Boolean
+): Boolean = !readerOpen || searchVisible || topBarVisible || bottomBarVisible
 
 @Composable
 fun OnBackPressed(
@@ -1251,39 +1293,39 @@ fun TabSwitcherView(
   onReaderAction: (ReaderAction) -> Unit
 ) {
   val state = rememberLazyGridState()
-  LazyVerticalGrid(
-    columns = GridCells.Adaptive(minSize = TAB_CARD_MIN_WIDTH),
-    modifier = Modifier.fillMaxSize(),
-    contentPadding = PaddingValues(
-      start = TWELVE_DP,
-      top = TWELVE_DP,
-      end = TWELVE_DP,
-      bottom = TAB_SWITCHER_BOTTOM_PADDING
-    ),
-    horizontalArrangement = Arrangement.spacedBy(TWELVE_DP),
-    verticalArrangement = Arrangement.spacedBy(TWELVE_DP),
-    state = state
-  ) {
-    itemsIndexed(tabsState.webViews, key = { _, item -> item.hashCode() }) { index, webView ->
-      val context = LocalContext.current
-      val title = remember(webView, webView.title) {
-        webView.title?.fromHtml()?.toString()
-          ?: context.getString(R.string.menu_home)
+  Box(modifier = Modifier.fillMaxSize()) {
+    LazyVerticalGrid(
+      columns = GridCells.Adaptive(minSize = TAB_CARD_MIN_WIDTH),
+      modifier = Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(
+        start = TWELVE_DP,
+        top = TWELVE_DP,
+        end = TWELVE_DP,
+        bottom = TAB_SWITCHER_BOTTOM_PADDING
+      ),
+      horizontalArrangement = Arrangement.spacedBy(TWELVE_DP),
+      verticalArrangement = Arrangement.spacedBy(TWELVE_DP),
+      state = state
+    ) {
+      itemsIndexed(tabsState.webViews, key = { _, item -> item.hashCode() }) { index, webView ->
+        val homeTitle = stringResource(R.string.menu_home)
+        val title = remember(webView, webView.title) {
+          webView.title?.fromHtml()?.toString() ?: homeTitle
+        }
+        TabItemView(
+          index = index,
+          title = title,
+          isSelected = index == tabsState.selectedIndex,
+          webView = webView,
+          showTabSwitcher = showTabSwitcher,
+          onReaderAction = onReaderAction,
+        )
       }
-
-      TabItemView(
-        index = index,
-        title = title,
-        isSelected = index == tabsState.selectedIndex,
-        webView = webView,
-        showTabSwitcher = showTabSwitcher,
-        onReaderAction = onReaderAction,
-      )
     }
-  }
-  LaunchedEffect(tabsState.selectedIndex) {
-    if (tabsState.selectedIndex in tabsState.webViews.indices) {
-      state.animateScrollToItem(tabsState.selectedIndex)
+    LaunchedEffect(tabsState.selectedIndex) {
+      if (tabsState.selectedIndex in tabsState.webViews.indices) {
+        state.animateScrollToItem(tabsState.selectedIndex)
+      }
     }
   }
 }

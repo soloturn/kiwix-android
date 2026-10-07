@@ -59,7 +59,13 @@ import org.kiwix.kiwixmobile.core.base.SideEffect
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.data.DataSource
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
+import org.kiwix.kiwixmobile.core.epub.EpubOnDisk
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
+import org.kiwix.kiwixmobile.core.epub.toEpubItems
 import org.kiwix.kiwixmobile.core.extensions.canReadFile
+import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
@@ -81,7 +87,6 @@ import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.SelectionMode.MULTI
-import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.SelectionMode.NORMAL
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.CopyMoveErrorDialog
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.FileSystemScanDialog
@@ -142,6 +147,8 @@ class LocalLibraryViewModel @Inject constructor(
   val kiwixDataStore: KiwixDataStore,
   private val zimReaderFactory: ZimFileReader.Factory,
   private val deleteFilesUseCase: DeleteFilesUseCase,
+  private val epubLibraryManager: EpubLibraryManager,
+  private val epubOpenUseCase: EpubOpenUseCase,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel(), SelectedZimFileCallback {
   /**
@@ -278,6 +285,7 @@ class LocalLibraryViewModel @Inject constructor(
     coroutineJobs.apply {
       add(scanBooksFromStorage())
       add(updateBookItems())
+      add(updateEpubItems())
       add(processFileSelectActions())
     }
   }
@@ -331,7 +339,8 @@ class LocalLibraryViewModel @Inject constructor(
           alertDialogShower,
           deleteFilesUseCase,
           viewModelScope,
-          ioDispatcher
+          ioDispatcher,
+          uiState.value.fileSelectListState.selectedEpubs
         )
 
       RequestShareMultiSelection -> ShareFiles(selectionsFromState(), viewModelScope, ioDispatcher)
@@ -399,38 +408,38 @@ class LocalLibraryViewModel @Inject constructor(
     updateState {
       val updatedList = selectBook(it.fileSelectListState, bookOnDisk)
       it.copy(
-        fileSelectListState = it.fileSelectListState.copy(
-          bookOnDiskListItems = updatedList,
-          selectionMode =
-            if (updatedList.filterIsInstance<BookOnDisk>().none(BookOnDisk::isSelected)) {
-              NORMAL
-            } else {
-              MULTI
-            }
-        )
+        fileSelectListState = it.fileSelectListState
+          .copy(bookOnDiskListItems = updatedList)
+          .withSelectionMode()
       )
     }
     return None
   }
 
+  fun onEpubItemLongClick(epub: EpubOnDisk) = onEpubMultiSelect(epub)
+
+  fun onEpubMultiSelect(epub: EpubOnDisk) {
+    updateState { it.copy(fileSelectListState = it.fileSelectListState.toggleEpub(epub.id)) }
+  }
+
+  fun onEpubItemClick(epub: EpubOnDisk) {
+    viewModelScope.launch {
+      if (!kiwixPermissionChecker.isManageExternalStoragePermissionGranted()) {
+        sendAction(ManageFilesPermissionDialog)
+      } else if (!epub.file.isFileExist(ioDispatcher)) {
+        // The file is gone (deleted outside the app): drop the stale library entry.
+        epubLibraryManager.remove(epub.id)
+        context.toast(context.getString(string.error_file_not_found, epub.file.path))
+      } else {
+        onEpubFileSelected(epub.file)
+      }
+    }
+  }
+
   private fun selectionsFromState() = uiState.value.fileSelectListState.selectedBooks
 
   private fun noSideEffectAndClearSelectionState(): SideEffect<Unit> {
-    updateState {
-      it.copy(
-        fileSelectListState = it.fileSelectListState.copy(
-          bookOnDiskListItems =
-            it.fileSelectListState.bookOnDiskListItems.map { bookOnDisk ->
-              if (bookOnDisk is BookOnDisk) {
-                bookOnDisk.copy(isSelected = false)
-              } else {
-                bookOnDisk
-              }
-            },
-          selectionMode = NORMAL
-        )
-      )
-    }
+    updateState { it.copy(fileSelectListState = it.fileSelectListState.clearSelections()) }
     return None
   }
 
@@ -503,7 +512,7 @@ class LocalLibraryViewModel @Inject constructor(
         updateState { current ->
           val updatedListState = current.fileSelectListState.let {
             if (it.bookOnDiskListItems.isEmpty()) {
-              FileSelectListState(newList)
+              FileSelectListState(newList, it.selectionMode, it.epubItems)
             } else {
               inheritSelections(it, newList.toMutableList())
             }
@@ -511,7 +520,7 @@ class LocalLibraryViewModel @Inject constructor(
           current.copy(
             fileSelectListState = updatedListState,
             noFileView = current.noFileView.copy(
-              isVisible = updatedListState.bookOnDiskListItems.isEmpty() || current.permissionDeniedLayoutShowing,
+              isVisible = updatedListState.isEmpty || current.permissionDeniedLayoutShowing,
               title = if (current.permissionDeniedLayoutShowing) {
                 context.getString(string.grant_read_storage_permission)
               } else {
@@ -522,6 +531,23 @@ class LocalLibraryViewModel @Inject constructor(
               } else {
                 context.getString(string.download_books)
               }
+            )
+          )
+        }
+      }.launchIn(viewModelScope)
+
+  private fun updateEpubItems() =
+    epubLibraryManager.epubs()
+      .catch { it.printStackTrace() }
+      .onEach { entities ->
+        updateState { current ->
+          val listState = current.fileSelectListState.let {
+            it.copy(epubItems = entities.toEpubItems(it.epubItems)).withSelectionMode()
+          }
+          current.copy(
+            fileSelectListState = listState,
+            noFileView = current.noFileView.copy(
+              isVisible = listState.isEmpty || current.permissionDeniedLayoutShowing
             )
           )
         }
@@ -814,6 +840,16 @@ class LocalLibraryViewModel @Inject constructor(
         // Open the ZIM file in reader screen.
         sendAction(RequestNavigateTo(ZimReaderSource(file)))
       }
+    }
+  }
+
+  override fun onEpubFileSelected(file: File) {
+    viewModelScope.launch { epubOpenUseCase.open(context, EpubSource.Path(file)) }
+  }
+
+  override fun addEpubToLibrary(file: File) {
+    viewModelScope.launch {
+      runCatching { epubLibraryManager.add(file) }
     }
   }
 

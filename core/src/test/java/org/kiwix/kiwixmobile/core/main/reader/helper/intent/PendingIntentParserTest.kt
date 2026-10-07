@@ -61,6 +61,41 @@ class PendingIntentParserTest {
   }
 
   @Test
+  fun `epub VIEW intent is recognised and not turned into a search`() {
+    val byType = Intent(Intent.ACTION_VIEW).apply { type = "application/epub+zip" }
+    val byPath = Intent(Intent.ACTION_VIEW, Uri.parse("https://x/a/book.epub"))
+
+    assertEquals(true, parser.isEpubViewIntent(byType))
+    assertEquals(true, parser.isEpubViewIntent(byPath))
+    assertEquals(PendingIntentParser.ReaderIntentAction.None, parser.parse(byType))
+    assertEquals(false, parser.isEpubViewIntent(Intent(Intent.ACTION_VIEW, Uri.parse("https://x/a.zim"))))
+  }
+
+  @Test
+  fun `file and content epub VIEW intents are left to the main activity`() {
+    val file = Intent(Intent.ACTION_VIEW, Uri.parse("file:///sdcard/book.epub"))
+    val content = Intent(Intent.ACTION_VIEW).apply {
+      setDataAndType(Uri.parse("content://x/1"), "application/epub+zip")
+    }
+    val typedFile = Intent(Intent.ACTION_VIEW).apply {
+      setDataAndType(Uri.parse("file:///sdcard/Download/test-book.epub"), "application/epub+zip")
+    }
+    val extensionlessContent = Intent(Intent.ACTION_VIEW, Uri.parse("content://x/dl/book.epub"))
+
+    listOf(file, content, typedFile, extensionlessContent).forEach {
+      assertEquals(true, parser.isEpubViewIntent(it))
+      assertEquals(PendingIntentParser.ReaderIntentAction.None, parser.parse(it))
+    }
+  }
+
+  @Test
+  fun `a zim VIEW intent is not an epub intent`() {
+    val zim = Intent(Intent.ACTION_VIEW, Uri.parse("file:///sdcard/a.zim"))
+    assertEquals(false, parser.isEpubViewIntent(zim))
+    assertEquals(false, parser.isEpubViewIntent(Intent(Intent.ACTION_SEND).setType("application/epub+zip")))
+  }
+
+  @Test
   fun `TEXT_CLICKED returns empty OpenSearch`() {
     val intent = Intent(CoreSearchWidget.TEXT_CLICKED)
 
@@ -135,6 +170,7 @@ class PendingIntentParserTest {
     every { intent.hasExtra(ZIM_FILE_URI_KEY) } returns false
     every { intent.scheme } returns "file"
     every { intent.type } returns "text/plain"
+    every { intent.data } returns null
 
     assertEquals(
       PendingIntentParser.ReaderIntentAction.None,
@@ -149,6 +185,7 @@ class PendingIntentParserTest {
     every { intent.hasExtra(ZIM_FILE_URI_KEY) } returns false
     every { intent.scheme } returns "https"
     every { intent.type } returns "application/octet-stream"
+    every { intent.data } returns null
 
     assertEquals(
       PendingIntentParser.ReaderIntentAction.None,
@@ -168,7 +205,7 @@ class PendingIntentParserTest {
 
   @Test
   fun `ACTION_VIEW with search uri returns OpenSearch`() {
-    val uri = mockk<Uri>()
+    val uri = mockk<Uri>(relaxed = true)
     every { uri.lastPathSegment } returns "Albert"
     val intent = mockk<Intent>()
     every { intent.action } returns Intent.ACTION_VIEW

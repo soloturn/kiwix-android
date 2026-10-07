@@ -345,9 +345,7 @@ class KiwixMainActivity : CoreMainActivity() {
     intent?.data?.let {
       when (it.scheme) {
         "file",
-        "content" -> {
-          externalZimIntentHandler.handleIntent(intent)
-        }
+        "content" -> externalZimIntentHandler.handleIntent(intent)
 
         "zim" -> {
           val zimId = it.host

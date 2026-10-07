@@ -28,7 +28,9 @@ import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -479,6 +481,12 @@ class KiwixDataStore @Inject constructor(
             setSelectedStoragePosition(ZERO)
           }
 
+        isEmptyLegacyLibraryStorage(File(storage)) ->
+          defaultLibraryStorage().also {
+            setSelectedStorage(it)
+            setSelectedStoragePosition(ZERO)
+          }
+
         else -> storage
       }
     }
@@ -535,6 +543,17 @@ class KiwixDataStore @Inject constructor(
     context.kiwixDataStore.data.map { prefs ->
       prefs[PreferencesKeys.PREF_LEGACY_BOOKS_MOVE_DECLINED] ?: false
     }
+
+  val mediaScanTreeUri: Flow<String?> = scanTreeUri(context, PreferencesKeys.PREF_MEDIA_SCAN_TREE_URI)
+
+  suspend fun setMediaScanTreeUri(treeUri: String?) =
+    setScanTreeUri(context, PreferencesKeys.PREF_MEDIA_SCAN_TREE_URI, treeUri)
+
+  val documentsScanTreeUri: Flow<String?> =
+    scanTreeUri(context, PreferencesKeys.PREF_DOCUMENTS_SCAN_TREE_URI)
+
+  suspend fun setDocumentsScanTreeUri(treeUri: String?) =
+    setScanTreeUri(context, PreferencesKeys.PREF_DOCUMENTS_SCAN_TREE_URI, treeUri)
 
   suspend fun setLegacyBooksMoveDeclined(declined: Boolean) {
     context.kiwixDataStore.edit { prefs ->
@@ -766,13 +785,25 @@ class KiwixDataStore @Inject constructor(
     }
   }
 
+  /** EPUB reader settings as opaque JSON, or null when never saved. */
+  val epubReaderSettingsJson: Flow<String?> =
+    context.kiwixDataStore.data.map { prefs -> prefs[EPUB_SETTINGS_KEY] }
+
+  suspend fun setEpubReaderSettingsJson(json: String) {
+    context.kiwixDataStore.edit { prefs -> prefs[EPUB_SETTINGS_KEY] = json }
+  }
+
   companion object {
+    private val EPUB_SETTINGS_KEY = stringPreferencesKey("epub_reader_settings")
+
     // Prefs
     const val PREF_LANG = "pref_language_chooser"
     const val PREF_SEARCH_MODE = "pref_search_mode"
     const val DEFAULT_SEARCH_MODE = "TITLE"
     const val PREF_STORAGE = "pref_select_folder"
     const val PREF_LIBRARY_TREE_URI = "pref_library_tree_uri"
+    const val PREF_MEDIA_SCAN_TREE_URI = "pref_media_scan_tree_uri"
+    const val PREF_DOCUMENTS_SCAN_TREE_URI = "pref_documents_scan_tree_uri"
     const val PREF_LEGACY_BOOKS_MOVE_DECLINED = "pref_legacy_books_move_declined"
     const val STORAGE_POSITION = "storage_position"
     const val PREF_WIFI_ONLY = "pref_wifi_only"
@@ -826,5 +857,33 @@ class KiwixDataStore @Inject constructor(
     private const val KEY_ONLINE_CATEGORY_ID = "onlineCategoryId"
     const val APP_NAME = "appName"
     const val IS_BRANDED_APP = "isBrandedApp"
+  }
+}
+
+private fun isEmptyLegacyLibraryStorage(directory: File): Boolean {
+  val path = runCatching { directory.canonicalPath }.getOrDefault(directory.absolutePath)
+  return (path.contains("/Android/media/") || path.contains("/Android/data/")) &&
+    directory.isDirectory &&
+    directory.canRead() &&
+    directory.walkTopDown().none { file ->
+      file.isFile &&
+        file.extension.let { extension ->
+          extension.equals("zim", ignoreCase = true) ||
+            extension.equals("zimaa", ignoreCase = true) ||
+            extension.equals("epub", ignoreCase = true)
+        }
+    }
+}
+
+private fun scanTreeUri(context: Context, key: Preferences.Key<String>): Flow<String?> =
+  context.kiwixDataStore.data.map { prefs -> prefs[key] }
+
+private suspend fun setScanTreeUri(
+  context: Context,
+  key: Preferences.Key<String>,
+  treeUri: String?
+) {
+  context.kiwixDataStore.edit { prefs ->
+    if (treeUri == null) prefs.remove(key) else prefs[key] = treeUri
   }
 }
