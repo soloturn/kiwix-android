@@ -27,4 +27,7 @@ class SuggestionIteratorWrapper : SuggestionIterator() {
 
   override fun hasNext(): Boolean = super.hasNext()
   override fun next(): SuggestionItemWrapper = super.next() as SuggestionItemWrapper
+
+  // Native methods have no bytecode for mockk to intercept — override so tests can stub them.
+  override fun dispose() = super.dispose()
 }

@@ -20,6 +20,7 @@ package org.kiwix.kiwixmobile.core.search.viewmodel
 
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -66,7 +67,7 @@ internal class SearchStateTest {
       assertThat(
         SearchState(
           searchTerm,
-          SearchResultsWithTerm("", suggestionSearchWrapper, mockk()),
+          SearchResultsWithTerm("", ZimSearchResultSet.Title(suggestionSearchWrapper), mockk()),
           emptyList(),
           FromWebView
         ).getVisibleResults(0, ioDispatcher = mainDispatcherRule.dispatcher)
@@ -130,7 +131,7 @@ internal class SearchStateTest {
       every { suggestionSearchWrapper.getResults(any(), any()) } returns searchIteratorWrapper
 
       val searchResultsWithTerm =
-        SearchResultsWithTerm(searchTerm, suggestionSearchWrapper, mockk())
+        SearchResultsWithTerm(searchTerm, ZimSearchResultSet.Title(suggestionSearchWrapper), mockk())
       val searchState = SearchState(searchTerm, searchResultsWithTerm, emptyList(), FromWebView)
       var list: List<SearchListItem>? = emptyList()
       var list1: List<SearchListItem>? = emptyList()
@@ -159,4 +160,119 @@ internal class SearchStateTest {
         assertThat(list1?.get(0)?.value).isEqualTo("Result")
       }
     }
+
+  @Test
+  internal fun `cancellation from the match path is rethrown, not logged`() = runTest {
+    val searchIteratorWrapper: SearchIteratorWrapper = mockk()
+    val searchWrapper: SearchWrapper = mockk()
+    every { searchWrapper.getResults(any(), any()) } returns searchIteratorWrapper
+    every { searchIteratorWrapper.hasNext() } returns true
+    every { searchIteratorWrapper.next() } throws CancellationException("match aborted")
+
+    val thrown = runCatching {
+      SearchState(
+        "term",
+        SearchResultsWithTerm("term", ZimSearchResultSet.PageContent(searchWrapper), mockk()),
+        emptyList(),
+        FromWebView
+      ).getVisibleResults(0, ioDispatcher = mainDispatcherRule.dispatcher)
+    }.exceptionOrNull()
+
+    assertThat(thrown).isInstanceOf(CancellationException::class.java)
+  }
+
+  @Test
+  internal fun `snippetOrNull rethrows CancellationException and nulls other errors`() = runTest {
+    val searchIteratorWrapper: SearchIteratorWrapper = mockk()
+    every { searchIteratorWrapper.snippet } throws CancellationException("match aborted")
+    runCatching { searchIteratorWrapper.snippetOrNull() }.exceptionOrNull().let {
+      assertThat(it).isInstanceOf(CancellationException::class.java)
+    }
+
+    every { searchIteratorWrapper.snippet } throws IllegalStateException("no snippet")
+    assertThat(searchIteratorWrapper.snippetOrNull()).isNull()
+  }
+
+  @Test
+  internal fun `visible results use full text search results when in page content mode`() = runTest {
+    val searchIteratorWrapper: SearchIteratorWrapper = mockk()
+    val searchWrapper: SearchWrapper = mockk()
+    val entryWrapper: EntryWrapper = mockk()
+    every { searchWrapper.getResults(any(), any()) } returns searchIteratorWrapper
+    every { searchIteratorWrapper.snippet } returns "the <b>term</b> appears here"
+    every { searchIteratorWrapper.hasNext() } returnsMany listOf(true, false)
+    every { searchIteratorWrapper.next() } returns entryWrapper
+    every { entryWrapper.title } returns "title"
+    every { entryWrapper.path } returns "path"
+
+    val results = SearchState(
+      "term",
+      SearchResultsWithTerm("term", ZimSearchResultSet.PageContent(searchWrapper), mockk()),
+      emptyList(),
+      FromWebView
+    ).getVisibleResults(0, ioDispatcher = mainDispatcherRule.dispatcher)
+
+    assertThat(results).isEqualTo(
+      listOf(
+        SearchListItem.ZimSearchResultListItem(
+          value = "title",
+          url = "path",
+          snippet = "the <b>term</b> appears here"
+        )
+      )
+    )
+  }
+
+  @Test
+  internal fun `token cancel stops result iteration`() = runTest {
+    val searchIteratorWrapper: SearchIteratorWrapper = mockk()
+    val searchWrapper: SearchWrapper = mockk()
+    val entryWrapper: EntryWrapper = mockk()
+    val cancelToken = SearchCancelToken()
+    every { searchWrapper.getResults(any(), any()) } returns searchIteratorWrapper
+    every { entryWrapper.title } returns "title"
+    every { entryWrapper.path } returns "path"
+    every { searchIteratorWrapper.hasNext() } returnsMany listOf(true, true, true, false)
+    every { searchIteratorWrapper.next() } answers {
+      cancelToken.cancel()
+      entryWrapper
+    }
+
+    val results = SearchState(
+      "term",
+      SearchResultsWithTerm("term", ZimSearchResultSet.PageContent(searchWrapper), mockk(), cancelToken),
+      emptyList(),
+      FromWebView
+    ).getVisibleResults(0, ioDispatcher = mainDispatcherRule.dispatcher)
+
+    assertThat(results).hasSize(1)
+  }
+
+  @Test
+  internal fun `each page content result keeps its own snippet, not the next one's`() = runTest {
+    val searchIteratorWrapper: SearchIteratorWrapper = mockk()
+    val searchWrapper: SearchWrapper = mockk()
+    val entryWrapper: EntryWrapper = mockk()
+    // Snippets must be read before next() advances the iterator.
+    var snippetIndex = 0
+    every { searchWrapper.getResults(any(), any()) } returns searchIteratorWrapper
+    every { searchIteratorWrapper.snippet } answers { "snippet-${++snippetIndex}" }
+    every { entryWrapper.title } returns "title"
+    every { entryWrapper.path } returns "path"
+    every { searchIteratorWrapper.hasNext() } returnsMany listOf(true, true, false)
+    every { searchIteratorWrapper.next() } returns entryWrapper
+
+    val results = SearchState(
+      "term",
+      SearchResultsWithTerm("term", ZimSearchResultSet.PageContent(searchWrapper), mockk()),
+      emptyList(),
+      FromWebView
+    ).getVisibleResults(0, ioDispatcher = mainDispatcherRule.dispatcher)
+
+    assertThat(results).hasSize(2)
+    assertThat((results?.get(0) as SearchListItem.ZimSearchResultListItem).snippet)
+      .isEqualTo("snippet-1")
+    assertThat((results?.get(1) as SearchListItem.ZimSearchResultListItem).snippet)
+      .isEqualTo("snippet-2")
+  }
 }
