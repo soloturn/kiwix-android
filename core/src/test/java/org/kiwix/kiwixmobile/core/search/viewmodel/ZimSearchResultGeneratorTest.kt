@@ -39,9 +39,15 @@ internal class ZimSearchResultGeneratorTest {
 
   private val zimSearchResultGenerator: ZimSearchResultGenerator = ZimSearchResultGenerator()
 
+  private suspend fun stubWithReader() {
+    coEvery { zimReaderContainer.withReader<Any?>(any()) } coAnswers {
+      firstArg<(ZimFileReader) -> Any?>().invoke(zimFileReader)
+    }
+  }
+
   @Test
   internal fun `empty search term returns empty list`() = runTest {
-    assertThat(zimSearchResultGenerator.generateSearchResults("", zimReaderContainer))
+    assertThat(zimSearchResultGenerator.generateSearchResults("", SearchMode.TITLE, zimReaderContainer))
       .isEqualTo(null)
   }
 
@@ -50,13 +56,43 @@ internal class ZimSearchResultGeneratorTest {
     val searchTerm = "a"
     val suggestionSearchWrapper: SuggestionSearchWrapper = mockk()
     every { zimFileReader.searchSuggestions(searchTerm) } returns suggestionSearchWrapper
-    coEvery { zimReaderContainer.withReader<Any?>(any()) } coAnswers {
-      firstArg<(ZimFileReader) -> Any?>().invoke(zimFileReader)
-    }
-    assertThat(zimSearchResultGenerator.generateSearchResults(searchTerm, zimReaderContainer))
-      .isEqualTo(suggestionSearchWrapper)
+    stubWithReader()
+    assertThat(
+      zimSearchResultGenerator.generateSearchResults(searchTerm, SearchMode.TITLE, zimReaderContainer)
+    ).isEqualTo(ZimSearchResultSet.Title(suggestionSearchWrapper))
     verify {
       zimFileReader.searchSuggestions(searchTerm)
     }
+  }
+
+  @Test
+  internal fun `page content mode uses full text search`() = runTest {
+    val searchTerm = "a"
+    val searchWrapper: SearchWrapper = mockk()
+    every { zimFileReader.searchFullText(searchTerm) } returns searchWrapper
+    stubWithReader()
+    assertThat(
+      zimSearchResultGenerator.generateSearchResults(
+        searchTerm,
+        SearchMode.PAGE_CONTENT,
+        zimReaderContainer
+      )
+    ).isEqualTo(ZimSearchResultSet.PageContent(searchWrapper))
+  }
+
+  @Test
+  internal fun `page content mode falls back to title search without full text index`() = runTest {
+    val searchTerm = "a"
+    val suggestionSearchWrapper: SuggestionSearchWrapper = mockk()
+    every { zimFileReader.searchFullText(searchTerm) } returns null
+    every { zimFileReader.searchSuggestions(searchTerm) } returns suggestionSearchWrapper
+    stubWithReader()
+    assertThat(
+      zimSearchResultGenerator.generateSearchResults(
+        searchTerm,
+        SearchMode.PAGE_CONTENT,
+        zimReaderContainer
+      )
+    ).isEqualTo(ZimSearchResultSet.Title(suggestionSearchWrapper))
   }
 }
