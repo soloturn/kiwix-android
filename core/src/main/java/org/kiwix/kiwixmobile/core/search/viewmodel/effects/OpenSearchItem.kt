@@ -39,7 +39,8 @@ data class OpenSearchItem(
       SearchItemToOpen(
         searchListItem.value,
         openInNewTab,
-        searchListItem.url?.addContentPrefix
+        searchListItem.url?.addContentPrefix,
+        (searchListItem as? SearchListItem.ZimSearchResultListItem)?.zimReaderSourceDatabaseValue
       ),
       TAG_FILE_SEARCHED
     )
@@ -50,5 +51,6 @@ data class OpenSearchItem(
 data class SearchItemToOpen(
   val pageTitle: String,
   val shouldOpenInNewTab: Boolean,
-  val pageUrl: String?
+  val pageUrl: String?,
+  val zimReaderSourceDatabaseValue: String? = null
 ) : Parcelable

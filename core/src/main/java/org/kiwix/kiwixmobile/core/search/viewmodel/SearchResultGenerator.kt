@@ -19,25 +19,34 @@
 package org.kiwix.kiwixmobile.core.search.viewmodel
 
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
-import org.kiwix.libzim.SuggestionSearch
 import javax.inject.Inject
 
 interface SearchResultGenerator {
   suspend fun generateSearchResults(
     searchTerm: String,
+    searchMode: SearchMode,
     zimReaderContainer: ZimReaderContainer
-  ): SuggestionSearch?
+  ): ZimSearchResultSet?
 }
 
 class ZimSearchResultGenerator @Inject constructor() : SearchResultGenerator {
   override suspend fun generateSearchResults(
     searchTerm: String,
+    searchMode: SearchMode,
     zimReaderContainer: ZimReaderContainer
-  ) = if (searchTerm.isBlank()) {
+  ): ZimSearchResultSet? = if (searchTerm.isBlank()) {
     null
   } else {
     // withReader hops onto ioDispatcher itself and leases the reader for the
     // duration of this call, so it can't be disposed mid-search.
-    zimReaderContainer.withReader { it.searchSuggestions(searchTerm) }
+    zimReaderContainer.withReader {
+      when (searchMode) {
+        SearchMode.TITLE -> it.searchSuggestions(searchTerm)?.let(ZimSearchResultSet::Title)
+        SearchMode.PAGE_CONTENT ->
+          it.searchFullText(searchTerm)?.let(ZimSearchResultSet::PageContent)
+            // Books without a full-text index fall back to the title search.
+            ?: it.searchSuggestions(searchTerm)?.let(ZimSearchResultSet::Title)
+      }
+    }
   }
 }

@@ -22,6 +22,8 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import org.kiwix.kiwixmobile.core.search.viewmodel.GlobalSearchResultGenerator
+import org.kiwix.kiwixmobile.core.search.viewmodel.GlobalSearchResultGeneratorImpl
 import org.kiwix.kiwixmobile.core.search.viewmodel.SearchResultGenerator
 import org.kiwix.kiwixmobile.core.search.viewmodel.ZimSearchResultGenerator
 
@@ -30,4 +32,9 @@ import org.kiwix.kiwixmobile.core.search.viewmodel.ZimSearchResultGenerator
 abstract class SearchModule {
   @Binds
   abstract fun bindsSearchResultGenerator(zimSearchResultGenerator: ZimSearchResultGenerator): SearchResultGenerator
+
+  @Binds
+  abstract fun bindsGlobalSearchResultGenerator(
+    globalSearchResultGeneratorImpl: GlobalSearchResultGeneratorImpl
+  ): GlobalSearchResultGenerator
 }
