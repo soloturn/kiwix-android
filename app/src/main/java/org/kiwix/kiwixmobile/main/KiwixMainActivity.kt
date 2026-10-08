@@ -345,14 +345,7 @@ class KiwixMainActivity : CoreMainActivity() {
     intent?.data?.let {
       when (it.scheme) {
         "file",
-        "content" -> {
-          if (readerIntentManager.isEpubViewIntent(intent)) {
-            // The reader imports/opens the EPUB itself (stored as a pending action).
-            showReaderForEpubIntent()
-          } else {
-            externalZimIntentHandler.handleIntent(intent)
-          }
-        }
+        "content" -> externalZimIntentHandler.handleIntent(intent)
 
         "zim" -> {
           val zimId = it.host
@@ -375,13 +368,6 @@ class KiwixMainActivity : CoreMainActivity() {
         }
       }
     }
-  }
-
-  private fun showReaderForEpubIntent() {
-    if (navController.currentDestination?.route != KiwixDestination.Reader.route) {
-      navigate(KiwixDestination.Reader.route)
-    }
-    clearIntentDataAndAction()
   }
 
   private fun handleShortcutIntent(intent: Intent?) {

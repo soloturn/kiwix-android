@@ -22,7 +22,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -32,13 +31,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
+import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.ReadingProgression
-import org.readium.r2.shared.publication.services.positions
 import java.io.File
 import javax.inject.Inject
 
@@ -64,8 +64,8 @@ class EpubReaderViewModel @Inject constructor(
   savedStateHandle: SavedStateHandle,
   private val opener: EpubPublicationOpener,
   private val libraryManager: EpubLibraryManager,
-  private val kiwixDataStore: KiwixDataStore,
-  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
+  private val openUseCase: EpubOpenUseCase,
+  private val kiwixDataStore: KiwixDataStore
 ) : ViewModel() {
   private val _state = MutableStateFlow<EpubReaderUiState>(EpubReaderUiState.Loading)
   val state: StateFlow<EpubReaderUiState> = _state.asStateFlow()
@@ -100,9 +100,9 @@ class EpubReaderViewModel @Inject constructor(
         return@launch
       }
       _settings.value = EpubReaderSettings.fromJson(kiwixDataStore.epubReaderSettingsJson.first())
-      // Every open lands in the library, whichever way the book was reached.
-      val bookId = runCatching { libraryManager.add(file, markOpened = true) }.getOrNull()?.id
-        ?: file.absolutePath
+      // Idempotent: the launcher already added the book, but a restored task skips the launcher.
+      val prepared = openUseCase.prepare(EpubSource.Path(file), markOpened = false)
+      val bookId = (prepared as? EpubOpenResult.Ready)?.bookId ?: file.absolutePath
       opener.open(file).fold(
         onSuccess = { publication ->
           val locator = EpubLocatorCodec.decode(libraryManager.locator(bookId))
@@ -119,9 +119,7 @@ class EpubReaderViewModel @Inject constructor(
               rtl = publication.metadata.readingProgression == ReadingProgression.RTL
             )
           )
-          _positions.value = withContext(ioDispatcher) {
-            runCatching { publication.positions() }.getOrDefault(emptyList())
-          }
+          _positions.value = opener.positions(publication)
         },
         onFailure = { _state.value = EpubReaderUiState.Failed }
       )
