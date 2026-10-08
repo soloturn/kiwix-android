@@ -74,7 +74,8 @@ class EpubReaderActivity : BaseActivity() {
   private lateinit var navigatorContainer: FragmentContainerView
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    // The navigator fragment needs a factory built from the opened book, so it can't be restored.
+    // The navigator fragment needs a factory built from the opened book, so it can't be restored;
+    // the position and open panels live in the view model instead.
     super.onCreate(null)
     darkTheme.value = isNightMode(resources.configuration)
     navigatorContainer = FragmentContainerView(this).apply { id = View.generateViewId() }
@@ -150,6 +151,7 @@ class EpubReaderActivity : BaseActivity() {
       ),
       chromeVisible = chromeVisible,
       pageReady = bookShown,
+      panels = viewModel.panels,
       actions = EpubReaderActions(
         onBack = { onBackPressedDispatcher.onBackPressed() },
         onTocItem = { navigator?.go(it.link) },
@@ -163,7 +165,7 @@ class EpubReaderActivity : BaseActivity() {
 
   private fun attachNavigator(book: OpenEpub) {
     val factory = EpubNavigatorFactory(book.publication).createFragmentFactory(
-      initialLocator = book.initialLocator,
+      initialLocator = viewModel.startLocator(book),
       initialPreferences = viewModel.settings.value.toPreferences(darkTheme.value),
       listener = linkListener,
       paginationListener = object : EpubNavigatorFragment.PaginationListener {
