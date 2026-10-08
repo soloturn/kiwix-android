@@ -23,6 +23,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +57,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -84,6 +86,7 @@ const val EPUB_READER_PROGRESS_SLIDER_TESTING_TAG = "epubReaderProgressSliderTes
 const val EPUB_READER_PAGE_LABEL_TESTING_TAG = "epubReaderPageLabelTestingTag"
 
 private const val PERCENT = 100
+private const val TRACK_ALPHA = 0.24f
 
 /** What the reader chrome can ask of its host. */
 data class EpubReaderActions(
@@ -115,36 +118,40 @@ fun EpubReaderScreen(
   settings: EpubReaderSettings,
   reading: EpubReadingState,
   chromeVisible: Boolean,
-  actions: EpubReaderActions
+  actions: EpubReaderActions,
+  pageReady: Boolean = true
 ) {
   var showToc by rememberSaveable { mutableStateOf(false) }
   var showSettings by rememberSaveable { mutableStateOf(false) }
   val ready = state as? EpubReaderUiState.Ready
+  val overlay = settings.overlayColors(isSystemInDarkTheme())
   KiwixTheme {
     Box(Modifier.fillMaxSize()) {
-      when (state) {
-        EpubReaderUiState.Loading -> LoadingContent()
-        EpubReaderUiState.Failed -> ErrorContent(actions.onBack)
-        is EpubReaderUiState.Ready -> Unit
+      when {
+        state == EpubReaderUiState.Failed -> ErrorContent(actions.onBack)
+        // The book stays hidden until its first page has painted; show the reading colours.
+        state == EpubReaderUiState.Loading || !pageReady -> LoadingContent(overlay)
       }
-      AnimatedVisibility(
-        visible = ready == null || chromeVisible,
-        modifier = Modifier.align(Alignment.TopCenter),
-        enter = fadeIn(),
-        exit = fadeOut()
-      ) {
-        TopBar(ready?.book?.title.orEmpty(), showSettings = ready != null, actions.onBack) {
-          showSettings = true
+      OverlayTheme(overlay) {
+        AnimatedVisibility(
+          visible = ready == null || chromeVisible,
+          modifier = Modifier.align(Alignment.TopCenter),
+          enter = fadeIn(),
+          exit = fadeOut()
+        ) {
+          TopBar(ready?.book?.title.orEmpty(), showSettings = ready != null, actions.onBack) {
+            showSettings = true
+          }
         }
-      }
-      AnimatedVisibility(
-        visible = ready != null && chromeVisible,
-        modifier = Modifier.align(Alignment.BottomCenter),
-        enter = fadeIn(),
-        exit = fadeOut()
-      ) {
-        if (ready != null) {
-          BottomBar(ready.book, reading, actions, onToc = { showToc = true })
+        AnimatedVisibility(
+          visible = ready != null && chromeVisible,
+          modifier = Modifier.align(Alignment.BottomCenter),
+          enter = fadeIn(),
+          exit = fadeOut()
+        ) {
+          if (ready != null) {
+            BottomBar(ready.book, reading, actions, onToc = { showToc = true })
+          }
         }
       }
     }
@@ -158,6 +165,27 @@ fun EpubReaderScreen(
       EpubSettingsSheet(settings, actions.onSettings) { showSettings = false }
     }
   }
+}
+
+/** Re-colours the Material scheme the overlay reads, so it follows the reading theme. */
+@Composable
+private fun OverlayTheme(colors: EpubOverlayColors, content: @Composable () -> Unit) {
+  val background = Color(colors.background)
+  val foreground = Color(colors.content)
+  MaterialTheme(
+    colorScheme = MaterialTheme.colorScheme.copy(
+      onPrimary = background,
+      surface = background,
+      background = background,
+      onSurface = foreground,
+      onBackground = foreground,
+      primary = foreground,
+      secondaryContainer = foreground.copy(alpha = TRACK_ALPHA)
+    ),
+    typography = MaterialTheme.typography,
+    shapes = MaterialTheme.shapes,
+    content = content
+  )
 }
 
 /** Back, title and the "Aa" button; KiwixAppBar leaves the status bar to its host. */
@@ -281,10 +309,13 @@ private fun ChapterRow(title: String, onToc: () -> Unit) {
 }
 
 @Composable
-private fun LoadingContent() {
-  Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+private fun LoadingContent(colors: EpubOverlayColors) {
+  Surface(Modifier.fillMaxSize(), color = Color(colors.background)) {
     Box(contentAlignment = Alignment.Center) {
-      CircularProgressIndicator(Modifier.testTag(EPUB_READER_LOADING_TESTING_TAG))
+      CircularProgressIndicator(
+        Modifier.testTag(EPUB_READER_LOADING_TESTING_TAG),
+        color = Color(colors.content)
+      )
     }
   }
 }

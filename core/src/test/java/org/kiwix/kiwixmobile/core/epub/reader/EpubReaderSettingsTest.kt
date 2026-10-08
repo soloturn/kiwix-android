@@ -104,6 +104,17 @@ class EpubReaderSettingsTest {
   }
 
   @Test
+  fun `the overlay follows the reading theme, and the app night mode only on auto`() {
+    val auto = EpubReaderSettings()
+    assertEquals(EpubOverlayColors(Theme.LIGHT.backgroundColor, Theme.LIGHT.contentColor), auto.overlayColors(false))
+    assertEquals(EpubOverlayColors(0xFF1C1C1E.toInt(), Theme.DARK.contentColor), auto.overlayColors(true))
+    val black = EpubReaderSettings(themePreset = EpubThemePreset.BLACK)
+    assertEquals(EpubOverlayColors(0xFF000000.toInt(), Theme.DARK.contentColor), black.overlayColors(false))
+    val sepia = EpubReaderSettings(themePreset = EpubThemePreset.SEPIA)
+    assertEquals(EpubOverlayColors(Theme.SEPIA.backgroundColor, Theme.SEPIA.contentColor), sepia.overlayColors(true))
+  }
+
+  @Test
   fun `preferences carry size, margins, scroll and font`() {
     val prefs = EpubReaderSettings(
       fontScale = 1.4,
