@@ -134,19 +134,24 @@ class EpubReaderActivity : BaseActivity() {
     val settings by viewModel.settings.collectAsState()
     val locator by viewModel.currentLocator.collectAsState()
     val chromeVisible by viewModel.chromeVisible.collectAsState()
+    val positions by viewModel.positions.collectAsState()
     val readingOrder = (state as? EpubReaderUiState.Ready)?.book?.publication?.readingOrder.orEmpty()
     EpubReaderScreen(
       state = state,
       settings = settings,
-      currentLocator = locator,
+      reading = EpubReadingState(
+        locator = locator,
+        positionCount = positions.size,
+        hasPreviousChapter = locator?.let { adjacentChapter(readingOrder, it, next = false) } != null,
+        hasNextChapter = locator?.let { adjacentChapter(readingOrder, it, next = true) } != null
+      ),
       chromeVisible = chromeVisible,
-      hasPreviousChapter = locator?.let { adjacentChapter(readingOrder, it, next = false) } != null,
-      hasNextChapter = locator?.let { adjacentChapter(readingOrder, it, next = true) } != null,
       actions = EpubReaderActions(
         onBack = { onBackPressedDispatcher.onBackPressed() },
         onTocItem = { navigator?.go(it.link) },
         onPreviousChapter = { goToAdjacentChapter(next = false) },
         onNextChapter = { goToAdjacentChapter(next = true) },
+        onSeek = { fraction -> seekTarget(positions, fraction)?.let { navigator?.go(it) } },
         onSettings = viewModel::changeSettings
       )
     )

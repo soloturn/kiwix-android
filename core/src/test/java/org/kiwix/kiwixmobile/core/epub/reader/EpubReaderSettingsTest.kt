@@ -22,9 +22,7 @@ package org.kiwix.kiwixmobile.core.epub.reader
 
 import android.os.Build
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.readium.r2.navigator.preferences.Color
@@ -39,28 +37,15 @@ import org.robolectric.annotation.Config
 @Config(sdk = [Build.VERSION_CODES.R])
 class EpubReaderSettingsTest {
   @Test
-  fun `font steps are clamped and free of float drift`() {
-    var settings = EpubReaderSettings()
-    repeat(3) { settings = settings.largerFont() }
-    assertEquals(1.3, settings.fontScale, 0.0)
-    repeat(100) { settings = settings.largerFont() }
-    assertEquals(EpubReaderSettings.MAX_FONT_SCALE, settings.fontScale, 0.0)
-    assertFalse(settings.canIncreaseFont)
-    repeat(100) { settings = settings.smallerFont() }
-    assertEquals(EpubReaderSettings.MIN_FONT_SCALE, settings.fontScale, 0.0)
-    assertFalse(settings.canDecreaseFont)
-    assertTrue(settings.canIncreaseFont)
-  }
-
-  @Test
-  fun `margin steps are clamped`() {
-    var settings = EpubReaderSettings()
-    repeat(100) { settings = settings.widerMargins() }
-    assertEquals(EpubReaderSettings.MAX_PAGE_MARGINS, settings.pageMargins, 0.0)
-    assertFalse(settings.canWidenMargins)
-    repeat(100) { settings = settings.narrowerMargins() }
-    assertEquals(EpubReaderSettings.MIN_PAGE_MARGINS, settings.pageMargins, 0.0)
-    assertFalse(settings.canNarrowMargins)
+  fun `sliders are clamped and free of float drift`() {
+    val settings = EpubReaderSettings()
+    assertEquals(1.3, settings.withFontScale(1.0 + 0.1 + 0.1 + 0.1).fontScale, 0.0)
+    assertEquals(EpubReaderSettings.MAX_FONT_SCALE, settings.withFontScale(99.0).fontScale, 0.0)
+    assertEquals(EpubReaderSettings.MIN_FONT_SCALE, settings.withFontScale(-1.0).fontScale, 0.0)
+    assertEquals(EpubReaderSettings.MAX_PAGE_MARGINS, settings.withPageMargins(9.0).pageMargins, 0.0)
+    assertEquals(EpubReaderSettings.MIN_PAGE_MARGINS, settings.withPageMargins(-9.0).pageMargins, 0.0)
+    assertEquals(EpubReaderSettings.MAX_LINE_SPACING, settings.withLineSpacing(9.0).lineSpacing, 0.0)
+    assertEquals(EpubReaderSettings.MIN_LINE_SPACING, settings.withLineSpacing(0.0).lineSpacing, 0.0)
   }
 
   @Test
@@ -112,7 +97,9 @@ class EpubReaderSettingsTest {
     assertEquals(Theme.DARK, prefs.theme)
     assertEquals(Color(0xFF000000.toInt()), prefs.backgroundColor)
     assertEquals(0xFF000000.toInt(), black.backgroundColor(nightMode = false))
-    assertNull(EpubReaderSettings(themePreset = EpubThemePreset.DARK).toPreferences(true).backgroundColor)
+    val dark = EpubReaderSettings(themePreset = EpubThemePreset.DARK)
+    assertEquals(Color(0xFF1C1C1E.toInt()), dark.toPreferences(true).backgroundColor)
+    assertNull(EpubReaderSettings(themePreset = EpubThemePreset.WHITE).toPreferences(true).backgroundColor)
     assertEquals(Theme.SEPIA.backgroundColor, EpubReaderSettings(themePreset = EpubThemePreset.SEPIA).backgroundColor(false))
   }
 

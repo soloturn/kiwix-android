@@ -28,12 +28,17 @@ import org.readium.r2.navigator.preferences.TextAlign
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
 
-/** Reading colour schemes; [BLACK] is [Theme.DARK] on a pure black page. */
-enum class EpubThemePreset(val readiumTheme: Theme, val backgroundColor: Int) {
-  WHITE(Theme.LIGHT, Theme.LIGHT.backgroundColor),
-  SEPIA(Theme.SEPIA, Theme.SEPIA.backgroundColor),
-  DARK(Theme.DARK, Theme.DARK.backgroundColor),
-  BLACK(Theme.DARK, PURE_BLACK)
+/**
+ * Reading colour schemes. Readium's dark theme is pure black, so [DARK] lifts it to a soft
+ * grey and [BLACK] keeps the pure black; [pageColor] is set only where it overrides the theme.
+ */
+enum class EpubThemePreset(val readiumTheme: Theme, val pageColor: Int?) {
+  WHITE(Theme.LIGHT, null),
+  SEPIA(Theme.SEPIA, null),
+  DARK(Theme.DARK, SOFT_BLACK),
+  BLACK(Theme.DARK, PURE_BLACK);
+
+  val backgroundColor get() = pageColor ?: readiumTheme.backgroundColor
 }
 
 /** Only fonts that need no bundled files: the book's own, or the system's generic families. */
@@ -42,6 +47,7 @@ enum class EpubFontChoice { PUBLISHER, SERIF, SANS_SERIF, MONOSPACE }
 enum class EpubAlignment { LEFT, JUSTIFY }
 
 private const val PURE_BLACK = 0xFF000000.toInt()
+private const val SOFT_BLACK = 0xFF1C1C1E.toInt()
 
 /**
  * User-adjustable reading settings. A null [themePreset] follows the app's night mode;
@@ -66,19 +72,6 @@ data class EpubReaderSettings(
   fun withLineSpacing(value: Double) =
     copy(lineSpacing = value.coerceIn(MIN_LINE_SPACING, MAX_LINE_SPACING).rounded())
 
-  fun largerFont() = withFontScale(fontScale + FONT_STEP)
-
-  fun smallerFont() = withFontScale(fontScale - FONT_STEP)
-
-  fun widerMargins() = withPageMargins(pageMargins + MARGIN_STEP)
-
-  fun narrowerMargins() = withPageMargins(pageMargins - MARGIN_STEP)
-
-  val canIncreaseFont get() = fontScale < MAX_FONT_SCALE
-  val canDecreaseFont get() = fontScale > MIN_FONT_SCALE
-  val canWidenMargins get() = pageMargins < MAX_PAGE_MARGINS
-  val canNarrowMargins get() = pageMargins > MIN_PAGE_MARGINS
-
   /** The preset actually shown: the chosen one, else white or dark by [nightMode]. */
   fun effectivePreset(nightMode: Boolean) =
     themePreset ?: if (nightMode) EpubThemePreset.DARK else EpubThemePreset.WHITE
@@ -91,7 +84,7 @@ data class EpubReaderSettings(
       fontSize = fontScale,
       pageMargins = pageMargins,
       theme = preset.readiumTheme,
-      backgroundColor = if (preset == EpubThemePreset.BLACK) Color(PURE_BLACK) else null,
+      backgroundColor = preset.pageColor?.let { Color(it) },
       fontFamily = fontChoice.readiumFamily(),
       publisherStyles = publisherStyles,
       lineHeight = lineSpacing.takeUnless { publisherStyles },
@@ -131,8 +124,6 @@ data class EpubReaderSettings(
     const val MIN_FONT_SCALE = 0.5
     const val MAX_FONT_SCALE = 3.0
     const val DEFAULT_PAGE_MARGINS = 1.0
-    const val FONT_STEP = 0.1
-    const val MARGIN_STEP = 0.25
     const val MIN_PAGE_MARGINS = 0.0
     const val MAX_PAGE_MARGINS = 3.0
     const val DEFAULT_LINE_SPACING = 1.4
