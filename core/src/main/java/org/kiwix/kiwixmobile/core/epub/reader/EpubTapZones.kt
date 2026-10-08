@@ -41,11 +41,15 @@ object EpubTapZones {
     }
   }
 
-  /** While the overlay is up any page tap only dismisses it; otherwise edges turn pages. */
+  /** Edges always turn the page; the middle toggles the overlay. */
   fun actionFor(zone: TapZone, overlayVisible: Boolean) = when {
-    overlayVisible -> TapAction.HIDE_OVERLAY
     zone == TapZone.PREVIOUS_PAGE -> TapAction.PREVIOUS_PAGE
     zone == TapZone.NEXT_PAGE -> TapAction.NEXT_PAGE
+    overlayVisible -> TapAction.HIDE_OVERLAY
     else -> TapAction.SHOW_OVERLAY
   }
+
+  /** Any tap on the page dismisses a visible overlay, so an edge tap turns the page and hides it. */
+  fun dismissesOverlay(action: TapAction, overlayVisible: Boolean) =
+    overlayVisible && action != TapAction.SHOW_OVERLAY
 }

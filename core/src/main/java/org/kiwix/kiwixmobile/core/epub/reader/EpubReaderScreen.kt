@@ -141,7 +141,7 @@ fun EpubReaderScreen(
       }
       OverlayTheme(overlay) {
         AnimatedVisibility(
-          visible = ready == null || chromeVisible,
+          visible = ready == null || chromeVisible || !pageReady,
           modifier = Modifier.align(Alignment.TopCenter),
           enter = fadeIn(),
           exit = fadeOut()
@@ -355,13 +355,17 @@ private fun ChapterRow(title: String, onToc: () -> Unit) {
 
 @Composable
 private fun LoadingContent(colors: EpubOverlayColors) {
-  Surface(Modifier.fillMaxSize(), color = Color(colors.background)) {
-    Box(contentAlignment = Alignment.Center) {
-      CircularProgressIndicator(
-        Modifier.testTag(EPUB_READER_LOADING_TESTING_TAG),
-        color = Color(colors.content)
-      )
-    }
+  // Not a Surface: that swallows touches, and the bars drawn over this must stay reachable.
+  Box(
+    Modifier
+      .fillMaxSize()
+      .background(Color(colors.background)),
+    contentAlignment = Alignment.Center
+  ) {
+    CircularProgressIndicator(
+      Modifier.testTag(EPUB_READER_LOADING_TESTING_TAG),
+      color = Color(colors.content)
+    )
   }
 }
 
