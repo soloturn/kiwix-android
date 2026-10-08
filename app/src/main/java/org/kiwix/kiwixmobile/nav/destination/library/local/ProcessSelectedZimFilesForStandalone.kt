@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.nav.destination.library.local
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -42,7 +41,6 @@ import javax.inject.Inject
  * Handles the process of validating and opening selected ZIM files
  * for the Standalone (non-Play Store) variant of the app.
  */
-@SuppressLint("LogNotTimber")
 class ProcessSelectedZimFilesForStandalone @Inject constructor(
   private val kiwixDataStore: KiwixDataStore,
   @param:ApplicationContext private val context: Context,
@@ -154,20 +152,12 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
   }
 }
 
-@SuppressLint("LogNotTimber")
 interface SelectedZimFileCallback {
-  /**
-   * A validated EPUB was selected; implementers open it in the native EPUB reader.
-   * Default just logs so existing implementers are unaffected.
-   */
-  fun onEpubFileSelected(file: File) {
-    Log.w(TAG_KIWIX, "EPUB selected but reader not wired yet: ${file.path}")
-  }
+  /** A validated EPUB was selected; implementers open it in the native EPUB reader. */
+  fun onEpubFileSelected(file: File)
 
   /** A validated EPUB from a multi-selection: add it to the library without opening it. */
-  fun addEpubToLibrary(file: File) {
-    Log.w(TAG_KIWIX, "EPUB selected but library not wired yet: ${file.path}")
-  }
+  fun addEpubToLibrary(file: File)
 
   fun navigateToReaderScreen(file: File)
   fun addBookToLibkiwixBookOnDisk(file: File)
