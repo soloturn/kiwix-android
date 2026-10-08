@@ -27,10 +27,12 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -78,7 +80,8 @@ class EpubReaderViewModelTest {
   private fun viewModel(
     path: String?,
     settings: EpubReaderSettings = EpubReaderSettings(),
-    savedLocator: String? = null
+    savedLocator: String? = null,
+    io: CoroutineDispatcher = Dispatchers.IO
   ): EpubReaderViewModel {
     every { store.epubReaderSettings } returns flowOf(settings)
     coEvery { store.getEpubLocator(BOOK_ID) } returns savedLocator
@@ -91,7 +94,8 @@ class EpubReaderViewModelTest {
       SavedStateHandle(path?.let { mapOf(EpubReaderViewModel.EXTRA_PATH to it) } ?: emptyMap()),
       opener,
       library,
-      store
+      store,
+      io
     )
   }
 
@@ -213,6 +217,18 @@ class EpubReaderViewModelTest {
     val vm = viewModel(book().path)
     vm.ready()
     assertTrue(vm.positions.first { it.isNotEmpty() }.isNotEmpty())
+  }
+
+  @Test
+  fun `positions are computed on the injected io dispatcher`() = runTest {
+    val io = StandardTestDispatcher()
+    val vm = viewModel(book().path, io = io)
+    vm.state.first { it is EpubReaderUiState.Ready }
+    assertTrue(vm.positions.value.isEmpty())
+
+    io.scheduler.advanceUntilIdle()
+
+    assertTrue(vm.positions.value.isNotEmpty())
   }
 
   private companion object {

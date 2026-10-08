@@ -22,6 +22,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.readium.r2.shared.publication.Locator
@@ -60,7 +62,8 @@ class EpubReaderViewModel @Inject constructor(
   savedStateHandle: SavedStateHandle,
   private val opener: EpubPublicationOpener,
   private val libraryManager: EpubLibraryManager,
-  private val kiwixDataStore: KiwixDataStore
+  private val kiwixDataStore: KiwixDataStore,
+  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
   private val _state = MutableStateFlow<EpubReaderUiState>(EpubReaderUiState.Loading)
   val state: StateFlow<EpubReaderUiState> = _state.asStateFlow()
@@ -107,7 +110,9 @@ class EpubReaderViewModel @Inject constructor(
           _state.value = EpubReaderUiState.Ready(
             OpenEpub(publication, bookId, title, flattenToc(publication.tableOfContents), locator)
           )
-          _positions.value = runCatching { publication.positions() }.getOrDefault(emptyList())
+          _positions.value = withContext(ioDispatcher) {
+            runCatching { publication.positions() }.getOrDefault(emptyList())
+          }
         },
         onFailure = { _state.value = EpubReaderUiState.Failed }
       )
