@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -40,22 +41,24 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,10 +80,8 @@ const val EPUB_READER_NEXT_CHAPTER_TESTING_TAG = "epubReaderNextChapterTestingTa
 const val EPUB_READER_TOC_TESTING_TAG = "epubReaderTocTestingTag"
 const val EPUB_READER_SETTINGS_TESTING_TAG = "epubReaderSettingsTestingTag"
 const val EPUB_READER_TOC_ITEM_TESTING_TAG = "epubReaderTocItemTestingTag"
-const val EPUB_READER_FONT_SMALLER_TESTING_TAG = "epubReaderFontSmallerTestingTag"
-const val EPUB_READER_FONT_LARGER_TESTING_TAG = "epubReaderFontLargerTestingTag"
-const val EPUB_READER_MARGINS_NARROWER_TESTING_TAG = "epubReaderMarginsNarrowerTestingTag"
-const val EPUB_READER_MARGINS_WIDER_TESTING_TAG = "epubReaderMarginsWiderTestingTag"
+const val EPUB_READER_PROGRESS_SLIDER_TESTING_TAG = "epubReaderProgressSliderTestingTag"
+const val EPUB_READER_PAGE_LABEL_TESTING_TAG = "epubReaderPageLabelTestingTag"
 
 private const val PERCENT = 100
 
@@ -90,23 +91,30 @@ data class EpubReaderActions(
   val onTocItem: (EpubTocItem) -> Unit = {},
   val onPreviousChapter: () -> Unit = {},
   val onNextChapter: () -> Unit = {},
+  val onSeek: (Float) -> Unit = {},
   val onSettings: ((EpubReaderSettings) -> EpubReaderSettings) -> Unit = {}
 )
 
+/** Where the reader is, for the progress bar and the chapter buttons. */
+data class EpubReadingState(
+  val locator: Locator? = null,
+  val positionCount: Int = 0,
+  val hasPreviousChapter: Boolean = false,
+  val hasNextChapter: Boolean = false
+)
+
 /**
- * The reader's own UI around the navigator: top bar, loading and error states, the table of
- * contents and the reading settings. Drawn over the navigator view, so it draws nothing where
- * the book should show through.
+ * The reader's own UI around the navigator: the overlay (top bar, bottom progress bar), loading
+ * and error states, the table of contents and the reading settings. Drawn over the navigator
+ * view, so it draws nothing where the book should show through.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EpubReaderScreen(
   state: EpubReaderUiState,
   settings: EpubReaderSettings,
-  currentLocator: Locator?,
+  reading: EpubReadingState,
   chromeVisible: Boolean,
-  hasPreviousChapter: Boolean,
-  hasNextChapter: Boolean,
   actions: EpubReaderActions
 ) {
   var showToc by rememberSaveable { mutableStateOf(false) }
@@ -125,76 +133,152 @@ fun EpubReaderScreen(
         enter = fadeIn(),
         exit = fadeOut()
       ) {
-        // KiwixAppBar leaves the status bar to its host, so pad for it here.
-        Box(
-          Modifier
-            .background(MaterialTheme.colorScheme.onPrimary)
-            .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
-        ) {
-          KiwixAppBar(
-            title = ready?.book?.title.orEmpty(),
-            navigationIcon = { NavigationIcon(onClick = actions.onBack) },
-            actionMenuItems = if (ready == null) {
-              emptyList()
-            } else {
-              actionItems(
-                hasPreviousChapter,
-                hasNextChapter,
-                actions,
-                onToc = { showToc = true },
-                onSettings = { showSettings = true }
-              )
-            }
-          )
+        TopBar(ready?.book?.title.orEmpty(), showSettings = ready != null, actions.onBack) {
+          showSettings = true
+        }
+      }
+      AnimatedVisibility(
+        visible = ready != null && chromeVisible,
+        modifier = Modifier.align(Alignment.BottomCenter),
+        enter = fadeIn(),
+        exit = fadeOut()
+      ) {
+        if (ready != null) {
+          BottomBar(ready.book, reading, actions, onToc = { showToc = true })
         }
       }
     }
     if (showToc && ready != null) {
-      TocDialog(ready.book.toc, currentLocator, onDismiss = { showToc = false }) {
+      TocDialog(ready.book.toc, reading.locator, onDismiss = { showToc = false }) {
         showToc = false
         actions.onTocItem(it)
       }
     }
     if (showSettings) {
-      SettingsDialog(settings, actions.onSettings) { showSettings = false }
+      EpubSettingsSheet(settings, actions.onSettings) { showSettings = false }
     }
   }
 }
 
-private fun actionItems(
-  hasPreviousChapter: Boolean,
-  hasNextChapter: Boolean,
+/** Back, title and the "Aa" button; KiwixAppBar leaves the status bar to its host. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun TopBar(title: String, showSettings: Boolean, onBack: () -> Unit, onSettings: () -> Unit) {
+  Box(
+    Modifier
+      .background(MaterialTheme.colorScheme.onPrimary)
+      .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
+  ) {
+    KiwixAppBar(
+      title = title,
+      navigationIcon = { NavigationIcon(onClick = onBack) },
+      actionMenuItems = if (showSettings) {
+        listOf(
+          ActionMenuItem(
+            icon = IconItem.Drawable(R.drawable.ic_text_size_24dp),
+            contentDescription = R.string.epub_reading_settings,
+            onClick = onSettings,
+            testingTag = EPUB_READER_SETTINGS_TESTING_TAG
+          )
+        )
+      } else {
+        emptyList()
+      }
+    )
+  }
+}
+
+/** Footer: chapter and table of contents, a seekable progress bar, page label. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BottomBar(
+  book: OpenEpub,
+  reading: EpubReadingState,
   actions: EpubReaderActions,
-  onToc: () -> Unit,
-  onSettings: () -> Unit
-) = listOf(
-  ActionMenuItem(
-    icon = IconItem.Drawable(R.drawable.ic_skip_previous_24dp),
-    contentDescription = R.string.go_to_previous_chapter,
-    onClick = actions.onPreviousChapter,
-    isEnabled = hasPreviousChapter,
-    testingTag = EPUB_READER_PREVIOUS_CHAPTER_TESTING_TAG
-  ),
-  ActionMenuItem(
-    icon = IconItem.Drawable(R.drawable.ic_skip_next_24dp),
-    contentDescription = R.string.go_to_next_chapter,
-    onClick = actions.onNextChapter,
-    isEnabled = hasNextChapter,
-    testingTag = EPUB_READER_NEXT_CHAPTER_TESTING_TAG
-  ),
-  ActionMenuItem(
-    icon = IconItem.Drawable(R.drawable.ic_toc_24dp),
-    contentDescription = R.string.table_of_contents,
-    onClick = onToc,
-    testingTag = EPUB_READER_TOC_TESTING_TAG
-  ),
-  ActionMenuItem(
-    icon = IconItem.Drawable(R.drawable.ic_settings_24px),
-    contentDescription = R.string.epub_reading_settings,
-    onClick = onSettings,
-    testingTag = EPUB_READER_SETTINGS_TESTING_TAG
-  )
-)
+  onToc: () -> Unit
+) {
+  val progress = readingProgress(reading.locator, reading.positionCount)
+  // The preview survives release until the navigator reports the new locator.
+  var drag by remember(reading.locator) { mutableStateOf<Float?>(null) }
+  val shown = drag ?: progress.fraction
+  Surface(
+    color = MaterialTheme.colorScheme.onPrimary,
+    contentColor = MaterialTheme.colorScheme.onSurface
+  ) {
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility)
+        .padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP)
+    ) {
+      ChapterRow(chapterTitle(book.toc, reading.locator).orEmpty(), onToc)
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+          onClick = actions.onPreviousChapter,
+          enabled = reading.hasPreviousChapter,
+          modifier = Modifier.testTag(EPUB_READER_PREVIOUS_CHAPTER_TESTING_TAG)
+        ) {
+          Icon(
+            painterResource(R.drawable.ic_skip_previous_24dp),
+            stringResource(R.string.go_to_previous_chapter)
+          )
+        }
+        Slider(
+          value = shown,
+          onValueChange = { drag = it },
+          onValueChangeFinished = { drag?.let(actions.onSeek) },
+          enabled = reading.positionCount > 0,
+          modifier = Modifier
+            .weight(1f)
+            .testTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG)
+        )
+        IconButton(
+          onClick = actions.onNextChapter,
+          enabled = reading.hasNextChapter,
+          modifier = Modifier.testTag(EPUB_READER_NEXT_CHAPTER_TESTING_TAG)
+        ) {
+          Icon(
+            painterResource(R.drawable.ic_skip_next_24dp),
+            stringResource(R.string.go_to_next_chapter)
+          )
+        }
+      }
+      PageLabels(shown, reading.positionCount)
+    }
+  }
+}
+
+@Composable
+private fun PageLabels(fraction: Float, positionCount: Int) {
+  Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    val page = positionForFraction(fraction, positionCount)
+    Text(
+      text = if (page > 0) stringResource(R.string.epub_page_of, page, positionCount) else "",
+      style = MaterialTheme.typography.labelMedium,
+      modifier = Modifier.testTag(EPUB_READER_PAGE_LABEL_TESTING_TAG)
+    )
+    Text(
+      text = stringResource(R.string.epub_percent_read, (fraction * PERCENT).roundToInt()),
+      style = MaterialTheme.typography.labelMedium
+    )
+  }
+}
+
+@Composable
+private fun ChapterRow(title: String, onToc: () -> Unit) {
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    Text(
+      text = title,
+      style = MaterialTheme.typography.labelLarge,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      modifier = Modifier.weight(1f)
+    )
+    IconButton(onClick = onToc, modifier = Modifier.testTag(EPUB_READER_TOC_TESTING_TAG)) {
+      Icon(painterResource(R.drawable.ic_toc_24dp), stringResource(R.string.table_of_contents))
+    }
+  }
+}
 
 @Composable
 private fun LoadingContent() {
@@ -264,85 +348,4 @@ private fun TocDialog(
     },
     confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.epub_close)) } }
   )
-}
-
-@Composable
-private fun SettingsDialog(
-  settings: EpubReaderSettings,
-  onSettings: ((EpubReaderSettings) -> EpubReaderSettings) -> Unit,
-  onDismiss: () -> Unit
-) {
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = { Text(stringResource(R.string.epub_reading_settings)) },
-    text = {
-      Column(verticalArrangement = Arrangement.spacedBy(SIXTEEN_DP)) {
-        StepperRow(
-          label = stringResource(R.string.epub_text_size),
-          value = "${(settings.fontScale * PERCENT).roundToInt()}%",
-          decreaseDescription = stringResource(R.string.epub_decrease_text_size),
-          increaseDescription = stringResource(R.string.epub_increase_text_size),
-          canDecrease = settings.canDecreaseFont,
-          canIncrease = settings.canIncreaseFont,
-          decreaseTag = EPUB_READER_FONT_SMALLER_TESTING_TAG,
-          increaseTag = EPUB_READER_FONT_LARGER_TESTING_TAG,
-          onDecrease = { onSettings { it.smallerFont() } },
-          onIncrease = { onSettings { it.largerFont() } }
-        )
-        StepperRow(
-          label = stringResource(R.string.epub_page_margins),
-          value = "${(settings.pageMargins * PERCENT).roundToInt()}%",
-          decreaseDescription = stringResource(R.string.epub_decrease_margins),
-          increaseDescription = stringResource(R.string.epub_increase_margins),
-          canDecrease = settings.canNarrowMargins,
-          canIncrease = settings.canWidenMargins,
-          decreaseTag = EPUB_READER_MARGINS_NARROWER_TESTING_TAG,
-          increaseTag = EPUB_READER_MARGINS_WIDER_TESTING_TAG,
-          onDecrease = { onSettings { it.narrowerMargins() } },
-          onIncrease = { onSettings { it.widerMargins() } }
-        )
-      }
-    },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.epub_close)) } }
-  )
-}
-
-@Composable
-@Suppress("LongParameterList")
-private fun StepperRow(
-  label: String,
-  value: String,
-  decreaseDescription: String,
-  increaseDescription: String,
-  canDecrease: Boolean,
-  canIncrease: Boolean,
-  decreaseTag: String,
-  increaseTag: String,
-  onDecrease: () -> Unit,
-  onIncrease: () -> Unit
-) {
-  Column {
-    Text(label, style = MaterialTheme.typography.labelLarge)
-    Row(
-      Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(SIXTEEN_DP),
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      OutlinedButton(
-        onClick = onDecrease,
-        enabled = canDecrease,
-        modifier = Modifier
-          .testTag(decreaseTag)
-          .semantics { contentDescription = decreaseDescription }
-      ) { Text("−") }
-      Text(value, style = MaterialTheme.typography.bodyLarge)
-      OutlinedButton(
-        onClick = onIncrease,
-        enabled = canIncrease,
-        modifier = Modifier
-          .testTag(increaseTag)
-          .semantics { contentDescription = increaseDescription }
-      ) { Text("+") }
-    }
-  }
 }
