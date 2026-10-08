@@ -238,6 +238,8 @@
   <string name="go_to_next_chapter">Go to next chapter</string>
   <string name="table_of_contents">Table of contents</string>
   <string name="epub_open_failed">This book could not be opened. The file may be damaged or not a valid EPUB.</string>
+  <string name="epub_import_too_large">This book is too large to open (%1$s; the limit is %2$s).</string>
+  <string name="epub_import_no_space">Not enough free space to open this book (%1$s needed, %2$s available).</string>
   <string name="epub_close">Close</string>
   <string name="epub_reading_settings">Reading settings</string>
   <string name="epub_text_size">Text size</string>
