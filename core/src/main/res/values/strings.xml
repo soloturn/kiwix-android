@@ -242,7 +242,7 @@
   <string name="epub_reading_settings">Reading settings</string>
   <string name="epub_text_size">Text size</string>
   <string name="epub_page_margins">Page margins</string>
-  <string name="epub_page_of">Page %1$d of %2$d</string>
+  <string name="epub_position_of">Position %1$d of %2$d</string>
   <string name="epub_percent_read">%1$d%%</string>
   <string name="epub_theme_auto">Auto</string>
   <string name="epub_theme_white">White</string>
