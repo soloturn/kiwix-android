@@ -21,6 +21,7 @@ package org.kiwix.kiwixmobile.zimManager.fileselectView.effects
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.epub.reader.EpubReaderActivity
@@ -49,5 +50,7 @@ class OpenEpubInReaderTest {
     val started = shadowOf(activity).nextStartedActivity
     assertEquals(EpubReaderActivity::class.java.name, started.component?.className)
     assertEquals(file.path, started.getStringExtra(EpubReaderViewModel.EXTRA_PATH))
+    // The data URI makes each book its own document task.
+    assertTrue(started.filterEquals(EpubReaderActivity.intent(activity, file)))
   }
 }
