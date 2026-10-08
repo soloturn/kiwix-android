@@ -56,4 +56,9 @@ dependencies {
   implementation(Libs.PLAYSTORE_REVIEW_KTX)
   api(Libs.MEDIA3_SESSION)
   api(Libs.MEDIA3_COMMON)
+
+  // Readium EPUB toolkit: parsing/metadata (shared, streamer) and the paginated navigator.
+  api(Libs.READIUM_SHARED)
+  api(Libs.READIUM_STREAMER)
+  api(Libs.READIUM_NAVIGATOR)
 }

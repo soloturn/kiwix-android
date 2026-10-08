@@ -380,4 +380,13 @@ object Libs {
 
   const val MEDIA3_SESSION: String = "androidx.media3:media3-session:${Versions.ANDROIDX_MEDIA3}"
   const val MEDIA3_COMMON: String = "androidx.media3:media3-common:${Versions.ANDROIDX_MEDIA3}"
+
+  const val READIUM_SHARED: String = "org.readium.kotlin-toolkit:readium-shared:${Versions.READIUM}"
+  const val READIUM_STREAMER: String =
+    "org.readium.kotlin-toolkit:readium-streamer:${Versions.READIUM}"
+  const val READIUM_NAVIGATOR: String =
+    "org.readium.kotlin-toolkit:readium-navigator:${Versions.READIUM}"
+  const val ERROR_PRONE_ANNOTATIONS: String = "com.google.errorprone:error_prone_annotations:2.30.0"
+  const val DESUGAR_JDK_LIBS: String =
+    "com.android.tools:desugar_jdk_libs:${Versions.DESUGAR_JDK_LIBS}"
 }

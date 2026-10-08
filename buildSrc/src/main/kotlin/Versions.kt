@@ -121,6 +121,8 @@ object Versions {
   const val PLAYSTORE_REVIEW: String = "2.0.2"
   const val KOTLIN_KSP: String = "2.3.11"
   const val ANDROIDX_MEDIA3: String = "1.11.0"
+  const val READIUM: String = "3.4.0"
+  const val DESUGAR_JDK_LIBS: String = "2.1.5"
 
   /**
    * https://developer.android.com/studio/preview/compose-screenshot-testing-release-notes
