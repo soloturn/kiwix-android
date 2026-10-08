@@ -176,8 +176,8 @@ class EpubReaderViewModelTest {
     val vm = viewModel(book().path)
     vm.ready()
 
-    vm.changeSettings { it.largerFont() }
-    vm.changeSettings { it.largerFont().smallerFont().smallerFont() }
+    vm.changeSettings { it.withFontScale(1.1) }
+    vm.changeSettings { it.withFontScale(1.2).withFontScale(1.0) }
     vm.changeSettings { it }
     runCurrent()
 
