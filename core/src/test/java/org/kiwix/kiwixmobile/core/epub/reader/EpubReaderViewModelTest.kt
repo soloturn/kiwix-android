@@ -125,6 +125,18 @@ class EpubReaderViewModelTest {
   }
 
   @Test
+  fun `a recreated navigator starts at the latest position, not the opening one`() = runTest {
+    val vm = viewModel(book().path, savedLocator = EpubLocatorCodec.encode(locator("c1.xhtml", 0.1)))
+    val open = vm.ready()
+    assertEquals(open.initialLocator, vm.startLocator(open))
+
+    val latest = locator("c2.xhtml", 0.7)
+    vm.onLocatorChanged(latest)
+
+    assertEquals(latest, vm.startLocator(open))
+  }
+
+  @Test
   fun `a corrupt stored locator opens at the start`() = runTest {
     val vm = viewModel(book().path, savedLocator = "{garbage")
     assertEquals(null, vm.ready().initialLocator)

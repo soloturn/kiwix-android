@@ -53,7 +53,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -106,6 +105,12 @@ data class EpubReadingState(
   val hasNextChapter: Boolean = false
 )
 
+/** Which panels are open. Held by the view model: the activity is recreated without saved state. */
+class EpubReaderPanels {
+  var showToc by mutableStateOf(false)
+  var showSettings by mutableStateOf(false)
+}
+
 /**
  * The reader's own UI around the navigator: the overlay (top bar, bottom progress bar), loading
  * and error states, the table of contents and the reading settings. Drawn over the navigator
@@ -119,10 +124,9 @@ fun EpubReaderScreen(
   reading: EpubReadingState,
   chromeVisible: Boolean,
   actions: EpubReaderActions,
-  pageReady: Boolean = true
+  pageReady: Boolean = true,
+  panels: EpubReaderPanels = remember { EpubReaderPanels() }
 ) {
-  var showToc by rememberSaveable { mutableStateOf(false) }
-  var showSettings by rememberSaveable { mutableStateOf(false) }
   val ready = state as? EpubReaderUiState.Ready
   val overlay = settings.overlayColors(isSystemInDarkTheme())
   KiwixTheme {
@@ -140,7 +144,7 @@ fun EpubReaderScreen(
           exit = fadeOut()
         ) {
           TopBar(ready?.book?.title.orEmpty(), showSettings = ready != null, actions.onBack) {
-            showSettings = true
+            panels.showSettings = true
           }
         }
         AnimatedVisibility(
@@ -150,19 +154,19 @@ fun EpubReaderScreen(
           exit = fadeOut()
         ) {
           if (ready != null) {
-            BottomBar(ready.book, reading, actions, onToc = { showToc = true })
+            BottomBar(ready.book, reading, actions, onToc = { panels.showToc = true })
           }
         }
       }
     }
-    if (showToc && ready != null) {
-      TocDialog(ready.book.toc, reading.locator, onDismiss = { showToc = false }) {
-        showToc = false
+    if (panels.showToc && ready != null) {
+      TocDialog(ready.book.toc, reading.locator, onDismiss = { panels.showToc = false }) {
+        panels.showToc = false
         actions.onTocItem(it)
       }
     }
-    if (showSettings) {
-      EpubSettingsSheet(settings, actions.onSettings) { showSettings = false }
+    if (panels.showSettings) {
+      EpubSettingsSheet(settings, actions.onSettings) { panels.showSettings = false }
     }
   }
 }

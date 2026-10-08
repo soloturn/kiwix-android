@@ -19,6 +19,7 @@
 package org.kiwix.kiwixmobile.core.epub.reader
 
 import android.os.Build
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
@@ -173,6 +174,31 @@ class EpubReaderScreenTest {
 
     assertEquals(toc[1], opened)
     composeTestRule.onNodeWithText("Section 1.1").assertDoesNotExist()
+  }
+
+  @Test
+  fun `open panels survive the screen being composed again`() {
+    val panels = EpubReaderPanels()
+    val generation = mutableStateOf(0)
+    composeTestRule.setContent {
+      key(generation.value) {
+        EpubReaderScreen(
+          ready,
+          EpubReaderSettings(),
+          EpubReadingState(locator, 100),
+          true,
+          EpubReaderActions(),
+          panels = panels
+        )
+      }
+    }
+    composeTestRule.onNodeWithTag(EPUB_READER_TOC_TESTING_TAG).performClick()
+    composeTestRule.onNodeWithText("Section 1.1").assertIsDisplayed()
+
+    generation.value++
+    composeTestRule.waitForIdle()
+
+    composeTestRule.onNodeWithText("Section 1.1").assertIsDisplayed()
   }
 
   @Test
