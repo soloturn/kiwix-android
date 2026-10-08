@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core.epub.reader
 
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -41,6 +42,39 @@ class EpubContentCssTest {
   @Test
   fun `html without a head is unchanged`() {
     assertEquals("<p>x</p>", EpubContentCss.inject("<p>x</p>"))
+  }
+
+  private fun transform(bytes: ByteArray) = String(EpubContentCss.transform(bytes), Charsets.UTF_8)
+
+  @Test
+  fun `utf-8 content, with or without a declaration or BOM, gets the rules and keeps its text`() {
+    val html = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><html><head></head><body>caf\u00e9 \u4e2d</body></html>"
+    assertTrue(transform(html.toByteArray()).contains(EpubContentCss.CSS))
+    assertTrue(transform(html.toByteArray()).contains("caf\u00e9 \u4e2d"))
+    val bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + html.toByteArray()
+    assertTrue(transform(bom).contains(EpubContentCss.CSS))
+  }
+
+  @Test
+  fun `content in another encoding passes through byte for byte`() {
+    val latin1 = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><html><head></head><body>caf\u00e9</body></html>"
+      .toByteArray(Charsets.ISO_8859_1)
+    assertArrayEquals(latin1, EpubContentCss.transform(latin1))
+
+    val meta = "<html><head><meta charset=\"windows-1252\"></head><body>caf\u00e9</body></html>"
+      .toByteArray(Charsets.ISO_8859_1)
+    assertArrayEquals(meta, EpubContentCss.transform(meta))
+  }
+
+  @Test
+  fun `utf-16 and invalid utf-8 pass through untouched`() {
+    val utf16 = "<html><head></head><body>x</body></html>".toByteArray(Charsets.UTF_16)
+    assertArrayEquals(utf16, EpubContentCss.transform(utf16))
+    val utf16le = "<html><head></head></html>".toByteArray(Charsets.UTF_16LE)
+    assertArrayEquals(utf16le, EpubContentCss.transform(utf16le))
+
+    val invalid = "<html><head></head><body>".toByteArray() + byteArrayOf(0xE9.toByte()) + "</body></html>".toByteArray()
+    assertArrayEquals(invalid, EpubContentCss.transform(invalid))
   }
 
   @Test
