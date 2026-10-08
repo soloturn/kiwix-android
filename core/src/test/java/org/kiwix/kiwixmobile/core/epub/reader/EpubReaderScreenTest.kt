@@ -19,13 +19,19 @@
 package org.kiwix.kiwixmobile.core.epub.reader
 
 import android.os.Build
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -73,15 +79,45 @@ class EpubReaderScreenTest {
       hasPreviousChapter = true,
       hasNextChapter = true
     ),
-    actions: EpubReaderActions = EpubReaderActions()
+    actions: EpubReaderActions = EpubReaderActions(),
+    pageReady: Boolean = true
   ) = composeTestRule.setContent {
-    EpubReaderScreen(state, settings, reading, chromeVisible, actions)
+    EpubReaderScreen(state, settings, reading, chromeVisible, actions, pageReady)
   }
 
   @Test
   fun `loading shows a progress indicator`() {
     show(EpubReaderUiState.Loading)
     composeTestRule.onNodeWithTag(EPUB_READER_LOADING_TESTING_TAG).assertIsDisplayed()
+  }
+
+  @Test
+  fun `while the first page paints the bar stays reachable and touches pass through`() {
+    var taps = 0
+    composeTestRule.setContent {
+      Box(Modifier.fillMaxSize()) {
+        Box(
+          Modifier
+            .fillMaxSize()
+            .clickable { taps++ }
+            .testTag("underneath")
+        )
+        EpubReaderScreen(
+          ready,
+          EpubReaderSettings(),
+          EpubReadingState(),
+          false,
+          EpubReaderActions(),
+          pageReady = false
+        )
+      }
+    }
+    composeTestRule.onNodeWithTag(EPUB_READER_LOADING_TESTING_TAG).assertIsDisplayed()
+    composeTestRule.onNodeWithText("A Book").assertIsDisplayed()
+
+    composeTestRule.onNodeWithTag("underneath").performTouchInput { click(Offset(width / 2f, height / 2f)) }
+
+    assertEquals(1, taps)
   }
 
   @Test
