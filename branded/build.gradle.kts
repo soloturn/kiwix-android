@@ -73,8 +73,11 @@ androidComponents {
 dependencies {
   // Keep the migration for branded apps, since they are released on playStore.
   implementation(project(":objectboxmigration"))
-  // Needed: without it AGP's androidTest classpath fails to resolve (espresso wants 2.30.0, main strictly 2.15.0).
-  implementation(Libs.ERROR_PRONE_ANNOTATIONS)
+  constraints {
+    // Without it the androidTest classpath fails to resolve (espresso wants 2.30.0, main pins 2.15.0).
+    // Only raises the version; adds no dependency to the APK.
+    implementation(Libs.ERROR_PRONE_ANNOTATIONS)
+  }
 }
 
 fun ApplicationProductFlavor.createDownloadTask(

@@ -281,6 +281,10 @@ class AllProjectConfigurer {
 
   fun configureDependencies(target: Project) {
     target.dependencies {
+      constraints {
+        Libs.READIUM_UPLIFTED.forEach { add("implementation", it) }
+        Libs.READIUM_UPLIFTED_RUNTIME.forEach { add("runtimeOnly", it) }
+      }
       implementation(Libs.KOTLIN_STDLIB_JDK8)
       implementation(Libs.appcompat)
       implementation(Libs.appcompat_resource)
