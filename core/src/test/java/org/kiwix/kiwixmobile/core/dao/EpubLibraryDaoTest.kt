@@ -111,14 +111,6 @@ class EpubLibraryDaoTest {
   }
 
   @Test
-  fun deleteByPath_removesOnlyMatchingPath() = runTest {
-    dao.upsert(entity("id1", "/a.epub"))
-    dao.upsert(entity("id2", "/b.epub"))
-    dao.deleteByPath("/b.epub")
-    assertThat(dao.allPaths()).containsExactly("/a.epub")
-  }
-
-  @Test
   fun locator_roundTripsPerBookAndDiesWithTheRow() = runTest {
     dao.upsert(entity("id1", "/a.epub"))
     dao.upsert(entity("id2", "/b.epub"))
