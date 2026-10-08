@@ -35,6 +35,8 @@ import java.util.Locale
 class AppConfigurer {
   fun configure(target: Project) {
     target.configureExtension<ApplicationExtension> {
+      // Readium's comic (Divina) player is never used for EPUBs and bundles third-party JS.
+      androidResources.ignoreAssetsPatterns.add("!divina")
       signingConfigs {
         create("releaseSigningConfig") {
           // KEY_STORE_FILE selects a personal key; without it the checked-in
