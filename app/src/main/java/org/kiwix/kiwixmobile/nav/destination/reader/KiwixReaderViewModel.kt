@@ -30,7 +30,6 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
-import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.getObservableNavigationResult
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -67,7 +66,6 @@ import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.UnsupportedMimeTypeHandler
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.utils.files.Log
-import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
 import org.kiwix.kiwixmobile.ui.KiwixDestination
 import java.io.File
 import javax.inject.Inject
@@ -94,7 +92,6 @@ class KiwixReaderViewModel @Inject constructor(
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
   @MainDispatcher mainDispatcher: MainCoroutineDispatcher,
-  private val epubLibraryManager: EpubLibraryManager,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CoreReaderViewModel(
     context,
