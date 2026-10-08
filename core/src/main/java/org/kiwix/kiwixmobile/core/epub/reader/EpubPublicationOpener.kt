@@ -23,7 +23,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
 import org.readium.r2.shared.util.http.DefaultHttpClient
@@ -43,6 +45,11 @@ class EpubPublicationOpener @Inject constructor(
 ) {
   private val assetRetriever by lazy { AssetRetriever(context.contentResolver, DefaultHttpClient()) }
   private val opener by lazy { PublicationOpener(publicationParser = EpubParser()) }
+
+  /** Every reading position of [publication]; empty if they can't be computed. */
+  suspend fun positions(publication: Publication): List<Locator> = withContext(ioDispatcher) {
+    runCatching { publication.positions() }.getOrDefault(emptyList())
+  }
 
   /** The caller owns the result and must [Publication.close] it. */
   suspend fun open(file: File): Result<Publication> = withContext(ioDispatcher) {

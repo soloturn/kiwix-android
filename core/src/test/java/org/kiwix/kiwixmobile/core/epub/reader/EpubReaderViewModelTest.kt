@@ -27,11 +27,9 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -43,8 +41,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
-import org.kiwix.kiwixmobile.core.dao.entities.EpubBookRoomEntity
 import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
+import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.sharedFunctions.MainDispatcherRule
 import org.readium.r2.shared.publication.Locator
@@ -58,7 +58,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.R])
 class EpubReaderViewModelTest {
-  // One dispatcher for Main, the opener and io: all work runs on virtual time.
+  // One dispatcher for Main and the opener: all work runs on virtual time.
   private val testDispatcher = UnconfinedTestDispatcher()
 
   @get:Rule
@@ -68,12 +68,10 @@ class EpubReaderViewModelTest {
   val mainDispatcherRule = MainDispatcherRule(testDispatcher)
 
   private val library: EpubLibraryManager = mockk()
+  private val openUseCase: EpubOpenUseCase = mockk()
   private val store: KiwixDataStore = mockk()
   private val opener =
     EpubPublicationOpener(ApplicationProvider.getApplicationContext(), testDispatcher)
-
-  private fun entity(id: String, path: String) =
-    EpubBookRoomEntity(id, path, "t", "a", "en", null, 1L, 0L, 0L)
 
   private fun locator(path: String, progression: Double) =
     Locator(href = Url(path)!!, mediaType = MediaType.XHTML)
@@ -82,22 +80,21 @@ class EpubReaderViewModelTest {
   private fun viewModel(
     path: String?,
     settings: EpubReaderSettings = EpubReaderSettings(),
-    savedLocator: String? = null,
-    io: CoroutineDispatcher = testDispatcher
+    savedLocator: String? = null
   ): EpubReaderViewModel {
     every { store.epubReaderSettingsJson } returns flowOf(settings.toJson())
     coEvery { library.locator(BOOK_ID) } returns savedLocator
     coEvery { library.saveLocator(any(), any()) } just Runs
     coEvery { store.setEpubReaderSettingsJson(any()) } just Runs
-    coEvery { library.add(any(), any()) } answers {
-      entity(BOOK_ID, firstArg<File>().absolutePath)
+    coEvery { openUseCase.prepare(any(), any()) } answers {
+      EpubOpenResult.Ready((firstArg<EpubSource>() as EpubSource.Path).file, BOOK_ID)
     }
     return EpubReaderViewModel(
       SavedStateHandle(path?.let { mapOf(EpubReaderViewModel.EXTRA_PATH to it) } ?: emptyMap()),
       opener,
       library,
-      store,
-      io
+      openUseCase,
+      store
     )
   }
 
@@ -119,7 +116,7 @@ class EpubReaderViewModelTest {
     assertEquals(null, open.initialLocator)
     assertFalse(open.rtl)
     assertEquals(1.4, vm.settings.value.fontScale, 0.0)
-    coVerify { library.add(file, true) }
+    coVerify { openUseCase.prepare(EpubSource.Path(file), false) }
   }
 
   @Test
@@ -220,18 +217,6 @@ class EpubReaderViewModelTest {
     val vm = viewModel(book().path)
     vm.ready()
     assertTrue(vm.positions.first { it.isNotEmpty() }.isNotEmpty())
-  }
-
-  @Test
-  fun `positions are computed on the injected io dispatcher`() = runTest {
-    val io = StandardTestDispatcher()
-    val vm = viewModel(book().path, io = io)
-    vm.state.first { it is EpubReaderUiState.Ready }
-    assertTrue(vm.positions.value.isEmpty())
-
-    io.scheduler.advanceUntilIdle()
-
-    assertTrue(vm.positions.value.isNotEmpty())
   }
 
   private companion object {

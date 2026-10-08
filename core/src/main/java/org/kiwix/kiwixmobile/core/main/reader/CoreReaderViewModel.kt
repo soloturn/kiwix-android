@@ -22,7 +22,6 @@ import android.Manifest.permission.POST_NOTIFICATIONS
 import android.app.Activity
 import android.app.Application
 import android.content.Intent
-import android.net.Uri
 import android.view.ActionMode
 import android.view.Menu
 import android.view.ViewGroup
@@ -104,8 +103,6 @@ import org.kiwix.kiwixmobile.core.main.reader.helper.documentparser.DocumentPars
 import org.kiwix.kiwixmobile.core.main.reader.helper.documentparser.DocumentParser.SectionsListener
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.None
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenBookmarks
-import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenEpub
-import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenEpubContent
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenSearch
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser.ReaderIntentAction.OpenZim
 import org.kiwix.kiwixmobile.core.main.reader.helper.intent.ReaderIntentManager
@@ -136,8 +133,6 @@ import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
 import org.kiwix.kiwixmobile.core.utils.dialog.UnsupportedMimeTypeHandler
 import org.kiwix.kiwixmobile.core.utils.files.Log
-import org.kiwix.kiwixmobile.core.utils.files.importEpubContentUri
-import org.kiwix.kiwixmobile.core.utils.files.isAppPrivateFile
 import org.kiwix.kiwixmobile.core.utils.titleToUrl
 import org.kiwix.kiwixmobile.core.utils.urlSuffixToParsableUrl
 import java.io.File
@@ -289,7 +284,6 @@ abstract class CoreReaderViewModel(
     data object ShowActivityBottomAppBar : ReaderEffect
     data object HideActivityBottomAppBar : ReaderEffect
     data object RequestReadStoragePermission : ReaderEffect
-    data class OpenEpub(val file: File) : ReaderEffect
     data class NavigateTo(val route: String, val navOptions: NavOptions? = null) : ReaderEffect
     data class ConsumeSavedStateHandle(val keys: List<String>) : ReaderEffect
     data object ClearActivityIntentAction : ReaderEffect
@@ -707,20 +701,8 @@ abstract class CoreReaderViewModel(
     }
   }
 
-  /**
-   * Like [emitEffect], but waits for a collector: a cold-start intent is handled before the
-   * screen collects [effects], and a plain emit would drop it.
-   */
-  private fun emitEffectWhenCollected(effect: ReaderEffect) {
-    launchInViewModelScope {
-      _effects.subscriptionCount.first { it > 0 }
-      _effects.emit(effect)
-    }
-  }
-
   @Volatile var isWebViewHistoryRestoring = false
   protected var zimReaderSource: ZimReaderSource? = null
-  private var pendingEpubFile: File? = null
 
   /**
    * Returns true if user enables the backToTop setting from setting screen.
@@ -1342,44 +1324,8 @@ abstract class CoreReaderViewModel(
       }
     } else {
       this.zimReaderSource = zimReaderSource
-      pendingEpubFile = null
       emitEffect(ReaderEffect.RequestReadStoragePermission)
     }
-  }
-
-  /** Copies a `content://` EPUB to app-private storage (off the main thread), then opens it. */
-  private suspend fun openEpubContentUri(uri: Uri) {
-    updateState { copy(loading = true) }
-    val file = try {
-      importEpubContentUri(context, uri)
-    } finally {
-      updateState { copy(loading = false) }
-    }
-    if (file == null) {
-      emitEffectWhenCollected(ReaderEffect.ShowToast(context.getString(string.epub_open_failed)))
-      return
-    }
-    openEpubFile(file)
-  }
-
-  /**
-   * Opens [file] in the Readium reader screen, asking for storage access first when the file
-   * lives outside app-private storage; the permission result retries the open.
-   */
-  suspend fun openEpubFile(file: File) {
-    if (uiState.value.ttsControlsItem.isTtsPlaying) {
-      stopReadAloud()
-    }
-    if (!isAppPrivateFile(context, file) &&
-      !isBrandedApp() &&
-      !kiwixPermissionChecker.hasReadExternalStoragePermission()
-    ) {
-      pendingEpubFile = file
-      emitEffectWhenCollected(ReaderEffect.RequestReadStoragePermission)
-      return
-    }
-    pendingEpubFile = null
-    emitEffectWhenCollected(ReaderEffect.OpenEpub(file))
   }
 
   /**
@@ -1541,12 +1487,6 @@ abstract class CoreReaderViewModel(
         isOpenedFromTabView = result.isOpenedFromTabView,
         result.isVoice
       ).also { clearActivityIntentAction() }
-
-      is OpenEpub ->
-        launchInViewModelScope { openEpubFile(File(result.epubFilePath)) }
-
-      is OpenEpubContent ->
-        launchInViewModelScope { openEpubContentUri(result.uri.toUri()) }
 
       is OpenZim ->
         launchInViewModelScope {
@@ -1760,8 +1700,7 @@ abstract class CoreReaderViewModel(
   fun onReadStoragePermissionResult(isGranted: Boolean) {
     if (isGranted) {
       launchInViewModelScope {
-        val epub = pendingEpubFile
-        if (epub != null) openEpubFile(epub) else zimReaderSource?.let { openZimFile(it) }
+        zimReaderSource?.let { openZimFile(it) }
       }
       return
     }

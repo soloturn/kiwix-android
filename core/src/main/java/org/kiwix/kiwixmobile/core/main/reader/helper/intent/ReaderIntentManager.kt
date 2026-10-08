@@ -40,8 +40,6 @@ class ReaderIntentManager @Inject constructor(private val pendingIntentParser: P
     _events.tryEmit(Unit)
   }
 
-  fun isEpubViewIntent(intent: Intent): Boolean = pendingIntentParser.isEpubViewIntent(intent)
-
   fun openZimFileFromPath(path: String, pageUrl: String) {
     pendingAction = ReaderIntentAction.OpenZim(path, pageUrl)
     _events.tryEmit(Unit)

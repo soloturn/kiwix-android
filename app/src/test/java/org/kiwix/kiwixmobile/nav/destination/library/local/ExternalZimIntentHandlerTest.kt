@@ -41,7 +41,11 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.LibkiwixBookFactory
+import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
+import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
@@ -68,6 +72,8 @@ class ExternalZimIntentHandlerTest {
   private val processSelectedZimFilesForPlayStore: ProcessSelectedZimFilesForPlayStore =
     mockk(relaxed = true)
   private val kiwixPermissionChecker: KiwixPermissionChecker = mockk(relaxed = true)
+  private val epubOpenUseCase: EpubOpenUseCase = mockk(relaxed = true)
+  private val pendingIntentParser: PendingIntentParser = mockk(relaxed = true)
 
   private lateinit var handler: ExternalZimIntentHandler
   private val activity: KiwixMainActivity = mockk(relaxed = true)
@@ -101,6 +107,8 @@ class ExternalZimIntentHandlerTest {
       processSelectedZimFilesForStandalone,
       processSelectedZimFilesForPlayStore,
       kiwixPermissionChecker,
+      epubOpenUseCase,
+      pendingIntentParser,
       testDispatcher,
       Dispatchers.Main
     )
@@ -281,6 +289,66 @@ class ExternalZimIntentHandlerTest {
     advanceUntilIdle()
 
     coVerify { processSelectedZimFilesForStandalone.processSelectedFiles(listOf(uri)) }
+  }
+
+  @Test
+  fun `a content epub intent opens the epub reader and leaves the main activity alone`() = runTest {
+    every { pendingIntentParser.isEpubViewIntent(intent) } returns true
+    every { uri.scheme } returns "content"
+    handler.init(activity, this)
+
+    handler.handleIntent(intent)
+    advanceUntilIdle()
+
+    coVerify(exactly = 1) { epubOpenUseCase.open(activity, EpubSource.Content(uri)) }
+    coVerify(exactly = 0) { processSelectedZimFilesForStandalone.processSelectedFiles(any()) }
+    coVerify(exactly = 0) { processSelectedZimFilesForPlayStore.processSelectedFiles(any()) }
+    verify(exactly = 0) { activity.openZimFromFilePath(any(), any()) }
+    verify { activity.clearIntentDataAndAction() }
+  }
+
+  @Test
+  fun `a file epub intent opens that path without any permission dialog`() = runTest {
+    every { pendingIntentParser.isEpubViewIntent(intent) } returns true
+    every { uri.scheme } returns "file"
+    every { uri.path } returns "/sdcard/Books/b.epub"
+    handler.init(activity, this)
+
+    handler.handleIntent(intent)
+    advanceUntilIdle()
+
+    coVerify { epubOpenUseCase.open(activity, EpubSource.Path(File("/sdcard/Books/b.epub"))) }
+    coVerify(exactly = 0) { kiwixPermissionChecker.hasWriteExternalStoragePermission() }
+  }
+
+  @Test
+  fun `an epub needing storage permission requests it and reopens once granted`() = runTest {
+    val file = File("/sdcard/Books/b.epub")
+    every { pendingIntentParser.isEpubViewIntent(intent) } returns true
+    every { uri.scheme } returns "file"
+    every { uri.path } returns file.path
+    coEvery { epubOpenUseCase.open(activity, EpubSource.Path(file)) } returns
+      EpubOpenResult.NeedsStoragePermission(file)
+    handler.init(activity, this)
+    var requests = 0
+    val collectJob = launch { handler.requestReadWritePermission.collect { requests++ } }
+    advanceUntilIdle()
+
+    handler.handleIntent(intent)
+    advanceUntilIdle()
+    assertThat(requests).isEqualTo(1)
+
+    coEvery { epubOpenUseCase.open(activity, EpubSource.Path(file)) } returns
+      EpubOpenResult.Ready(file, "id")
+    handler.handlePendingUri()
+    advanceUntilIdle()
+
+    coVerify(exactly = 2) { epubOpenUseCase.open(activity, EpubSource.Path(file)) }
+    // The grant is consumed: a second callback must not reopen the book.
+    handler.handlePendingUri()
+    advanceUntilIdle()
+    coVerify(exactly = 2) { epubOpenUseCase.open(activity, EpubSource.Path(file)) }
+    collectJob.cancel()
   }
 
   @Test

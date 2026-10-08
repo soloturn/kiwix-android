@@ -61,6 +61,8 @@ import org.kiwix.kiwixmobile.core.data.DataSource
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.epub.EpubOnDisk
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
 import org.kiwix.kiwixmobile.core.epub.toEpubItems
 import org.kiwix.kiwixmobile.core.extensions.canReadFile
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
@@ -94,7 +96,6 @@ import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestDrawerToggle
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestMultiSelection
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestNavigateTo
-import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestOpenEpub
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestReadWritePermission
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestSelect
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestShareMultiSelection
@@ -111,7 +112,6 @@ import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.DeleteFilesUseCas
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.NavigateToDownloads
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.NavigationDrawerToggle
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.None
-import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.OpenEpubInReader
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.OpenFileWithNavigation
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.ShareFiles
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.ValidateZIMFiles
@@ -147,6 +147,7 @@ class LocalLibraryViewModel @Inject constructor(
   private val zimReaderFactory: ZimFileReader.Factory,
   private val deleteFilesUseCase: DeleteFilesUseCase,
   private val epubLibraryManager: EpubLibraryManager,
+  private val epubOpenUseCase: EpubOpenUseCase,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel(), SelectedZimFileCallback {
   /**
@@ -154,7 +155,6 @@ class LocalLibraryViewModel @Inject constructor(
    */
   sealed class LocalLibraryUiActions {
     data class RequestNavigateTo(val zimReaderSource: ZimReaderSource) : LocalLibraryUiActions()
-    data class RequestOpenEpub(val file: File) : LocalLibraryUiActions()
     data class RequestSelect(val bookOnDisk: BookOnDisk) : LocalLibraryUiActions()
     data class RequestMultiSelection(val bookOnDisk: BookOnDisk) : LocalLibraryUiActions()
     data object RequestValidateZimFiles : LocalLibraryUiActions()
@@ -387,8 +387,6 @@ class LocalLibraryViewModel @Inject constructor(
           coroutineScope = viewModelScope,
           ioDispatcher = ioDispatcher
         )
-
-      is RequestOpenEpub -> OpenEpubInReader(action.file)
 
       RequestDrawerToggle -> NavigationDrawerToggle
     }
@@ -841,14 +839,7 @@ class LocalLibraryViewModel @Inject constructor(
   }
 
   override fun onEpubFileSelected(file: File) {
-    viewModelScope.launch {
-      if (!file.canReadFile(ioDispatcher)) {
-        context.toast(string.unable_to_read_zim_file)
-      } else {
-        runCatching { epubLibraryManager.add(file, markOpened = true) }
-        sendAction(RequestOpenEpub(file))
-      }
-    }
+    viewModelScope.launch { epubOpenUseCase.open(context, EpubSource.Path(file)) }
   }
 
   override fun addEpubToLibrary(file: File) {

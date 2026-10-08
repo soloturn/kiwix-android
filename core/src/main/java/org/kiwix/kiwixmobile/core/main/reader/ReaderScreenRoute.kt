@@ -52,7 +52,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
-import org.kiwix.kiwixmobile.core.epub.reader.EpubReaderActivity
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.safelyConsumeObservable
 import org.kiwix.kiwixmobile.core.extensions.enterFullscreen
 import org.kiwix.kiwixmobile.core.extensions.exitFullscreen
@@ -295,9 +294,6 @@ private fun CollectEffect(
         is ReaderEffect.NavigateTo -> handleNavigateTo(navHostController, effect)
         ReaderEffect.RequestNotificationPermission -> notificationPermission?.launchPermissionRequest()
         ReaderEffect.RequestReadStoragePermission -> readPermissionState.launchPermissionRequest()
-        is ReaderEffect.OpenEpub ->
-          activity.startActivity(EpubReaderActivity.intent(activity, effect.file))
-
         is ReaderEffect.SharePdfFile -> sharePdfFile(activity, effect.pdfFile)
         is ReaderEffect.ShowKiwixDialog -> showKiwixDialog(effect, alertDialogShower)
         is ReaderEffect.ShowToast -> showToast(activity, effect)

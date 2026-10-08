@@ -33,6 +33,9 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
+import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
 import org.kiwix.kiwixmobile.core.extensions.runSafelyInLifecycleScope
 import org.kiwix.kiwixmobile.core.extensions.snack
 import org.kiwix.kiwixmobile.core.extensions.toast
@@ -46,9 +49,7 @@ import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.KiwixDialog
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils.isSplittedZimFile
-import org.kiwix.kiwixmobile.core.utils.files.importEpubContentUri
 import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
-import org.kiwix.kiwixmobile.core.utils.files.isValidEpubFile
 import org.kiwix.kiwixmobile.nav.destination.library.CopyMoveFileHandler
 import org.kiwix.kiwixmobile.nav.destination.library.StorageSelectDialogConfig
 import java.io.File
@@ -73,6 +74,7 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
   private val copyMoveFileHandler: CopyMoveFileHandler,
   private val storageCalculator: StorageCalculator,
   private val storageDeviceProvider: StorageDeviceProvider,
+  private val epubOpenUseCase: EpubOpenUseCase,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : CopyMoveFileHandler.FileCopyMoveCallback {
   private var snackBarHostState: SnackbarHostState? = null
@@ -186,23 +188,27 @@ class ProcessSelectedZimFilesForPlayStore @Inject constructor(
 
   /**
    * EPUBs are read from app-private storage, so unlike ZIMs there is no copy/move-to-public
-   * prompt: a `content://` URI is imported there, a `file://` one is validated in place.
+   * prompt. A single file is opened; files of a multi-selection are only added to the library.
    */
   private suspend fun openEpub(uri: Uri, fileName: String, isFromMultipleFiles: Boolean) {
-    val file = withContext(ioDispatcher) {
-      if (uri.scheme == "file") {
-        uri.path?.let(::File)?.takeIf(::isValidEpubFile)
-      } else {
-        importEpubContentUri(context, uri)
+    val source = if (uri.scheme == "file") {
+      uri.path?.let { EpubSource.Path(File(it)) }
+    } else {
+      EpubSource.Content(uri)
+    }
+    when {
+      source == null -> handleInvalidFile(uri, fileName, isFromMultipleFiles)
+      !isFromMultipleFiles -> epubOpenUseCase.open(context, source)
+      else -> {
+        val result = epubOpenUseCase.prepare(source, markOpened = false)
+        if (result is EpubOpenResult.Failed) {
+          selectedZimFileCallback?.showFileCopyMoveErrorDialog(result.message) {
+            processSelectedFiles(selectedZimFileUriList.drop(ONE), isAfterRetry = true)
+          }
+        } else {
+          processSelectedFiles(selectedZimFileUriList.drop(ONE), isAfterRetry = true)
+        }
       }
-    }
-    if (file == null) {
-      handleInvalidFile(uri, fileName, isFromMultipleFiles)
-      return
-    }
-    selectedZimFileCallback?.onEpubFileSelected(file)
-    if (isFromMultipleFiles) {
-      processSelectedFiles(selectedZimFileUriList.drop(ONE), isAfterRetry = true)
     }
   }
 

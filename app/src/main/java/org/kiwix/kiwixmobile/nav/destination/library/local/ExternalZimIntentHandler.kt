@@ -28,9 +28,15 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.LibkiwixBookFactory
+import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
+import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
+import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
+import org.kiwix.kiwixmobile.core.main.reader.helper.intent.PendingIntentParser
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.KiwixPermissionChecker
@@ -53,12 +59,15 @@ class ExternalZimIntentHandler @Inject constructor(
   private val processSelectedZimFilesForStandalone: ProcessSelectedZimFilesForStandalone,
   private val processSelectedZimFilesForPlayStore: ProcessSelectedZimFilesForPlayStore,
   private val kiwixPermissionChecker: KiwixPermissionChecker,
+  private val epubOpenUseCase: EpubOpenUseCase,
+  private val pendingIntentParser: PendingIntentParser,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
   @param:MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
 ) : SelectedZimFileCallback {
   private var activityRef: WeakReference<KiwixMainActivity>? = null
   private var lifecycleScope: CoroutineScope? = null
   private var pendingUri: Uri? = null
+  private var pendingEpubFile: File? = null
 
   private val _requestReadWritePermission = MutableSharedFlow<Unit>()
   val requestReadWritePermission: SharedFlow<Unit> = _requestReadWritePermission.asSharedFlow()
@@ -86,11 +95,43 @@ class ExternalZimIntentHandler @Inject constructor(
 
   fun handleIntent(intent: Intent?) {
     val uri = intent?.data ?: return
-    checkPermissionsAndProceed(uri)
+    if (pendingIntentParser.isEpubViewIntent(intent)) {
+      openEpub(uri)
+    } else {
+      checkPermissionsAndProceed(uri)
+    }
     requireMainActivity().clearIntentDataAndAction()
   }
 
+  /** Opens the EPUB in its own reader activity; the main activity keeps its destination. */
+  private fun openEpub(uri: Uri) {
+    val activity = requireMainActivity()
+    requireLifecycleScope().launch {
+      val source = if (uri.scheme == "file") {
+        uri.path?.let { EpubSource.Path(File(it)) }
+      } else {
+        EpubSource.Content(uri)
+      }
+      if (source == null) {
+        activity.toast(string.epub_open_failed)
+        return@launch
+      }
+      val result = epubOpenUseCase.open(activity, source)
+      if (result is EpubOpenResult.NeedsStoragePermission) {
+        pendingEpubFile = result.file
+        _requestReadWritePermission.emit(Unit)
+      }
+    }
+  }
+
   fun handlePendingUri() {
+    pendingEpubFile?.let { file ->
+      pendingEpubFile = null
+      requireLifecycleScope().launch {
+        epubOpenUseCase.open(requireMainActivity(), EpubSource.Path(file))
+      }
+      return
+    }
     val uri = pendingUri ?: return
     checkPermissionsAndProceed(uri)
   }
@@ -161,7 +202,7 @@ class ExternalZimIntentHandler @Inject constructor(
     }
   }
 
-  // EPUB view intents never reach this handler: KiwixMainActivity routes them to the reader.
+  // EPUBs from view intents are opened by [openEpub], not through the file-selection callbacks.
   override fun onEpubFileSelected(file: File) = Unit
 
   override fun addEpubToLibrary(file: File) = Unit
