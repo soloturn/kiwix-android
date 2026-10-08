@@ -389,4 +389,45 @@ object Libs {
   const val ERROR_PRONE_ANNOTATIONS: String = "com.google.errorprone:error_prone_annotations:2.30.0"
   const val DESUGAR_JDK_LIBS: String =
     "com.android.tools:desugar_jdk_libs:${Versions.DESUGAR_JDK_LIBS}"
+
+  /**
+   * Libraries nothing here declares directly, which Readium 3.4.0 raises above what the app
+   * had before it. Applied as minimum-version constraints so the uplift is visible and a
+   * Readium change cannot silently move them.
+   */
+  val READIUM_UPLIFTED: List<String> = listOf(
+    "androidx.fragment:fragment:1.9.0",
+    "androidx.fragment:fragment-ktx:1.9.0",
+    "androidx.recyclerview:recyclerview:1.4.0",
+    "androidx.savedstate:savedstate:1.4.0",
+    "androidx.savedstate:savedstate-ktx:1.4.0",
+    "androidx.viewpager2:viewpager2:1.1.0-beta02",
+    "androidx.window:window:1.5.0",
+    "androidx.transition:transition:1.6.0",
+    "androidx.constraintlayout:constraintlayout:2.2.2",
+    "org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0",
+    "org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0",
+    "org.jetbrains.kotlin:kotlin-stdlib:2.4.20"
+  )
+
+  /**
+   * Lifecycle 2.11 (via Readium) at runtime only: compiling and linting against it fails on
+   * EmptySuperCall for every `super.onCleared()`, so the compile classpath stays on 2.8.x.
+   */
+  val READIUM_UPLIFTED_RUNTIME: List<String> = listOf(
+    "common",
+    "common-java8",
+    "livedata",
+    "livedata-core",
+    "livedata-core-ktx",
+    "process",
+    "runtime",
+    "runtime-ktx",
+    "runtime-compose",
+    "service",
+    "viewmodel",
+    "viewmodel-ktx",
+    "viewmodel-compose",
+    "viewmodel-savedstate"
+  ).map { "androidx.lifecycle:lifecycle-$it:2.11.0" }
 }

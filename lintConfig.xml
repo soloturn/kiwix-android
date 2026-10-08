@@ -47,6 +47,8 @@
   <issue id="ConvertToWebp">
     <ignore path="src/main/res/drawable/search_widget_preview.png" />
   </issue>
+  <!-- Only fires because Readium puts Timber on the classpath; the app logs via android.util.Log. -->
+  <issue id="LogNotTimber" severity="ignore" />
   <issue id="UnusedIds" severity="warning" />
   <issue id="DataExtractionRules" severity="warning" />
   <issue id="ObsoleteSdkInt" severity="warning" />

@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.nav.destination.library.online.repository
 
-import android.annotation.SuppressLint
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -53,7 +52,6 @@ class OnlineLibraryRepositoryImpl @Inject constructor(
   @param:OPDSKiwixService private val kiwixService: KiwixService,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : OnlineLibraryRepository {
-  @SuppressLint("LogNotTimber")
   override fun fetchOnlineLibrary(
     request: OnlineLibraryRequest
   ): Flow<OnlineLibraryState> = flow {

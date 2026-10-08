@@ -161,6 +161,11 @@ class ExternalZimIntentHandler @Inject constructor(
     }
   }
 
+  // EPUB view intents never reach this handler: KiwixMainActivity routes them to the reader.
+  override fun onEpubFileSelected(file: File) = Unit
+
+  override fun addEpubToLibrary(file: File) = Unit
+
   override fun navigateToReaderScreen(file: File) {
     requireLifecycleScope().launch(mainDispatcher) {
       requireMainActivity().openZimFromFilePath(file.path)

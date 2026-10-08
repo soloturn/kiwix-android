@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<!-- excludes any external files -->
+<!-- Android 11 and below. Excludes external files and the imported EPUB copies (whole books). -->
 <full-backup-content>
   <exclude domain="external" />
+  <exclude domain="file" path="epub/" />
+  <exclude domain="file" path="epub_covers/" />
 </full-backup-content>
-

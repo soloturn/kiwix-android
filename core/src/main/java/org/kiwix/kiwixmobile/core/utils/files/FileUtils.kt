@@ -648,10 +648,6 @@ object FileUtils {
   fun isValidZimFile(filePath: String): Boolean =
     filePath.endsWith(".zim") || filePath.endsWith(".zimaa")
 
-  /** Extension-only EPUB check; use [isValidEpubFile] for a content check. */
-  @JvmStatic
-  fun isEpubPath(filePath: String): Boolean = isEpubFile(filePath)
-
   /**
    * Determines whether the given file path corresponds to a split ZIM file.
    *
