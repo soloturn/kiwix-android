@@ -35,6 +35,8 @@ import java.util.Locale
 class AppConfigurer {
   fun configure(target: Project) {
     target.configureExtension<ApplicationExtension> {
+      // Readium's comic (Divina) player is never used for EPUBs and bundles third-party JS.
+      androidResources.ignoreAssetsPatterns.add("!divina")
       signingConfigs {
         create("releaseSigningConfig") {
           storeFile = File(target.rootDir, "kiwix-android.keystore")
