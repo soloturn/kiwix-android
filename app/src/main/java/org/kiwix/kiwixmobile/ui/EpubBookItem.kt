@@ -121,9 +121,9 @@ private fun EpubCover(epub: EpubOnDisk) {
     contentDescription = epub.title,
     modifier = Modifier.size(BOOK_ICON_SIZE),
     contentScale = ContentScale.Fit,
-    placeholder = painterResource(R.drawable.default_zim_file_icon),
-    error = painterResource(R.drawable.default_zim_file_icon),
-    fallback = painterResource(R.drawable.default_zim_file_icon)
+    placeholder = painterResource(R.drawable.default_epub_cover_icon),
+    error = painterResource(R.drawable.default_epub_cover_icon),
+    fallback = painterResource(R.drawable.default_epub_cover_icon)
   )
 }
 

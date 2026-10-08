@@ -78,7 +78,10 @@ class EpubReaderActivity : BaseActivity() {
       val bars = insets.getInsets(
         WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
       )
-      view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+      // Reserve the top bar's height so text never sits under it; a fixed band avoids
+      // re-paginating when the bar toggles.
+      val barHeight = (APP_BAR_HEIGHT_DP * resources.displayMetrics.density).toInt()
+      view.setPadding(bars.left, bars.top + barHeight, bars.right, bars.bottom)
       insets
     }
     root = FrameLayout(this).apply {
@@ -182,6 +185,9 @@ class EpubReaderActivity : BaseActivity() {
 
   companion object {
     private const val NAVIGATOR_TAG = "epubNavigator"
+
+    // Material 3 small top app bar height.
+    private const val APP_BAR_HEIGHT_DP = 64
 
     fun intent(context: Context, file: File) =
       Intent(context, EpubReaderActivity::class.java)

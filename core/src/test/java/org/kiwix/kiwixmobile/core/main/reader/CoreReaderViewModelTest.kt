@@ -2281,6 +2281,18 @@ internal class CoreReaderViewModelTest {
     }
 
     @Test
+    fun openRequestedBeforeAnyCollector_isDeliveredToTheLateCollector() = runTest {
+      coEvery { kiwixPermissionChecker.hasReadExternalStoragePermission() } returns true
+
+      viewModel.openEpubFile(epub)
+      advanceUntilIdle()
+
+      viewModel.effects.test {
+        assertThat(awaitItem()).isEqualTo(ReaderEffect.OpenEpub(epub))
+      }
+    }
+
+    @Test
     fun whenNoStoragePermission_requestsItAndOpensAfterTheGrant() = runTest {
       coEvery { kiwixPermissionChecker.hasReadExternalStoragePermission() } returns false
 
