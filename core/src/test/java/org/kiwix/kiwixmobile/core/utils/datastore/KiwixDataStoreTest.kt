@@ -36,7 +36,9 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.ThemeConfig
+import org.kiwix.kiwixmobile.core.epub.reader.EpubFontChoice
 import org.kiwix.kiwixmobile.core.epub.reader.EpubReaderSettings
+import org.kiwix.kiwixmobile.core.epub.reader.EpubThemePreset
 import org.kiwix.kiwixmobile.core.zim_manager.Category
 import org.kiwix.kiwixmobile.core.zim_manager.Language
 import org.kiwix.sharedFunctions.MainDispatcherRule
@@ -104,7 +106,13 @@ class KiwixDataStoreTest {
   @Test
   fun `epub reader settings default then persist`() = runTest {
     assertThat(kiwixDataStore.epubReaderSettings.first()).isEqualTo(EpubReaderSettings())
-    val changed = EpubReaderSettings(fontScale = 1.5, pageMargins = 0.25)
+    val changed = EpubReaderSettings(
+      fontScale = 1.5,
+      pageMargins = 0.25,
+      fontChoice = EpubFontChoice.SERIF,
+      themePreset = EpubThemePreset.BLACK,
+      scroll = true
+    )
     kiwixDataStore.setEpubReaderSettings(changed)
     assertThat(kiwixDataStore.epubReaderSettings.first()).isEqualTo(changed)
   }

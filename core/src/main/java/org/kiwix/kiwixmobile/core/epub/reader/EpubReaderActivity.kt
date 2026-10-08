@@ -49,7 +49,6 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
-import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.navigator.util.DirectionalNavigationAdapter
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.util.AbsoluteUrl
@@ -98,7 +97,7 @@ class EpubReaderActivity : BaseActivity() {
     }
     lifecycleScope.launch {
       combine(viewModel.settings, darkTheme, ::Pair).collect { (settings, dark) ->
-        root.setBackgroundColor(if (dark) Theme.DARK.backgroundColor else Theme.LIGHT.backgroundColor)
+        root.setBackgroundColor(settings.backgroundColor(dark))
         navigator?.submitPreferences(settings.toPreferences(dark))
       }
     }
