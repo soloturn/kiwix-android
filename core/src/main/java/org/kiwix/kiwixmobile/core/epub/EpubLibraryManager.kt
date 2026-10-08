@@ -35,6 +35,7 @@ import javax.inject.Singleton
 class EpubLibraryManager @Inject constructor(
   private val dao: EpubLibraryDao,
   private val coverStore: EpubCoverStore,
+  private val metadataReader: EpubMetadataReader,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
   @VisibleForTesting
@@ -55,14 +56,14 @@ class EpubLibraryManager @Inject constructor(
         if (markOpened) dao.markOpened(existing.id, now)
         return@withContext if (markOpened) existing.copy(lastOpenedAt = now) else existing
       }
-      val parsed = readBook(file) ?: return@withContext null
-      val id = existing?.id ?: resolveId(parsed.metadata.identifier, path)
+      val info = metadataReader.read(file) ?: return@withContext null
+      val id = existing?.id ?: resolveId(info.identifier, path)
       coverStore.delete(existing?.coverPath)
-      val entity = parsed.toEntity(
+      val entity = info.toEntity(
         id = id,
         path = path,
         size = file.length(),
-        coverPath = parsed.coverBytes?.let { coverStore.save(id, it) },
+        coverPath = info.cover?.takeIf { it.size <= MAX_COVER_BYTES }?.let { coverStore.save(id, it) },
         addedAt = existing?.addedAt ?: now,
         lastOpenedAt = if (markOpened) now else existing?.lastOpenedAt ?: 0L
       )
@@ -98,38 +99,24 @@ class EpubLibraryManager @Inject constructor(
     return if (owner == null || owner.path == path) candidate else path
   }
 
-  private fun readBook(file: File): ParsedEpub? {
-    val reader = runCatching { EpubFileReader(file) }.getOrNull() ?: return null
-    return try {
-      val cover = reader.coverUrl?.let { url ->
-        runCatching { reader.open(url)?.use { it.readBytes() } }.getOrNull()
-      }?.takeIf { it.size <= MAX_COVER_BYTES }
-      ParsedEpub(reader.metadata, cover)
-    } finally {
-      reader.dispose()
-    }
-  }
-
-  internal class ParsedEpub(val metadata: EpubMetadata, val coverBytes: ByteArray?) {
-    fun toEntity(
-      id: String,
-      path: String,
-      size: Long,
-      coverPath: String?,
-      addedAt: Long,
-      lastOpenedAt: Long
-    ) = EpubBookRoomEntity(
-      id = id,
-      path = path,
-      title = metadata.title.ifBlank { File(path).nameWithoutExtension },
-      authors = metadata.creators.joinToString(", "),
-      language = metadata.language.orEmpty(),
-      coverPath = coverPath,
-      size = size,
-      addedAt = addedAt,
-      lastOpenedAt = lastOpenedAt
-    )
-  }
+  private fun EpubBookInfo.toEntity(
+    id: String,
+    path: String,
+    size: Long,
+    coverPath: String?,
+    addedAt: Long,
+    lastOpenedAt: Long
+  ) = EpubBookRoomEntity(
+    id = id,
+    path = path,
+    title = title.ifBlank { File(path).nameWithoutExtension },
+    authors = authors.joinToString(", "),
+    language = language.orEmpty(),
+    coverPath = coverPath,
+    size = size,
+    addedAt = addedAt,
+    lastOpenedAt = lastOpenedAt
+  )
 
   private companion object {
     const val MAX_COVER_BYTES = 8 * 1024 * 1024

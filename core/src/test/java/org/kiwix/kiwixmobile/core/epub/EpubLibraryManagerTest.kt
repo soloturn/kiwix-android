@@ -53,37 +53,22 @@ class EpubLibraryManagerTest {
     dao = FakeEpubLibraryDao()
     dir = File(root, "t${System.nanoTime()}").also { it.mkdirs() }
     now = 1000L
-    manager = EpubLibraryManager(dao, coverStore, Dispatchers.Unconfined).apply { clock = { now } }
+    infos.clear()
+    manager = EpubLibraryManager(dao, coverStore, { infos[it.name] }, Dispatchers.Unconfined)
+      .apply { clock = { now } }
   }
 
+  /** What the (faked) Readium metadata reader returns, by file name; unknown files can't be parsed. */
+  private val infos = mutableMapOf<String, EpubBookInfo>()
+
   private fun epub(name: String, identifier: String?, title: String = "My Book"): File {
-    val idTag = identifier?.let { """<dc:identifier id="bid">$it</dc:identifier>""" }.orEmpty()
-    val opf = """<?xml version="1.0"?>
-      <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bid">
-        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-          $idTag<dc:title>$title</dc:title>
-          <dc:creator>Jane Doe</dc:creator><dc:creator>John Roe</dc:creator>
-          <dc:language>en</dc:language>
-        </metadata>
-        <manifest><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest>
-        <spine><itemref idref="c1"/></spine>
-      </package>"""
-    val container = """<?xml version="1.0"?>
-      <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-        <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
-      </container>"""
+    infos[name] = EpubBookInfo(identifier, title, listOf("Jane Doe", "John Roe"), "en", null)
+    // Just valid enough for the content check; parsing is the (fake) reader's job here.
     return File(dir, name).also { f ->
       ZipOutputStream(f.outputStream()).use { z ->
-        listOf(
-          "mimetype" to "application/epub+zip",
-          "META-INF/container.xml" to container,
-          "OEBPS/content.opf" to opf,
-          "OEBPS/c1.xhtml" to "<html>x</html>"
-        ).forEach { (n, c) ->
-          z.putNextEntry(ZipEntry(n))
-          z.write(c.toByteArray())
-          z.closeEntry()
-        }
+        z.putNextEntry(ZipEntry("mimetype"))
+        z.write("application/epub+zip".toByteArray())
+        z.closeEntry()
       }
     }
   }
@@ -135,6 +120,14 @@ class EpubLibraryManagerTest {
   fun `a title-less epub is named after its file`() = runTest {
     val entry = manager.add(epub("fallback.epub", "x", title = ""))!!
     assertEquals("fallback", entry.title)
+  }
+
+  @Test
+  fun `add keeps the cover through the cover store`() = runTest {
+    val file = epub("c.epub", "c")
+    infos[file.name] = EpubBookInfo("c", "T", emptyList(), null, byteArrayOf(1, 2, 3))
+    every { coverStore.save("c", any()) } returns "/covers/c.jpg"
+    assertEquals("/covers/c.jpg", manager.add(file)!!.coverPath)
   }
 
   @Test
