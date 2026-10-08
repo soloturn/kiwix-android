@@ -99,13 +99,13 @@ class EpubReaderViewModel @Inject constructor(
         _state.value = EpubReaderUiState.Failed
         return@launch
       }
-      _settings.value = kiwixDataStore.epubReaderSettings.first()
+      _settings.value = EpubReaderSettings.fromJson(kiwixDataStore.epubReaderSettingsJson.first())
       // Every open lands in the library, whichever way the book was reached.
       val bookId = runCatching { libraryManager.add(file, markOpened = true) }.getOrNull()?.id
         ?: file.absolutePath
       opener.open(file).fold(
         onSuccess = { publication ->
-          val locator = EpubLocatorCodec.decode(kiwixDataStore.getEpubLocator(bookId))
+          val locator = EpubLocatorCodec.decode(libraryManager.locator(bookId))
           val title = publication.metadata.title?.takeIf { it.isNotBlank() }
             ?: file.nameWithoutExtension
           _currentLocator.value = locator
@@ -139,7 +139,7 @@ class EpubReaderViewModel @Inject constructor(
     val updated = transform(_settings.value)
     if (updated == _settings.value) return
     _settings.value = updated
-    viewModelScope.launch { kiwixDataStore.setEpubReaderSettings(updated) }
+    viewModelScope.launch { kiwixDataStore.setEpubReaderSettingsJson(updated.toJson()) }
   }
 
   /** Called on every page turn; the write is debounced. */
@@ -162,7 +162,7 @@ class EpubReaderViewModel @Inject constructor(
   private suspend fun persist(locator: Locator) {
     val book = (_state.value as? EpubReaderUiState.Ready)?.book ?: return
     withContext(NonCancellable) {
-      kiwixDataStore.setEpubLocator(book.bookId, EpubLocatorCodec.encode(locator))
+      libraryManager.saveLocator(book.bookId, EpubLocatorCodec.encode(locator))
     }
   }
 
