@@ -763,20 +763,16 @@ class KiwixDataStore @Inject constructor(
   }
 
   val epubReaderSettings: Flow<EpubReaderSettings> = context.kiwixDataStore.data.map { prefs ->
-    EpubReaderSettings.of(prefs[EPUB_FONT_SCALE_KEY], prefs[EPUB_PAGE_MARGINS_KEY])
+    EpubReaderSettings.fromJson(prefs[EPUB_SETTINGS_KEY])
   }
 
   suspend fun setEpubReaderSettings(settings: EpubReaderSettings) {
-    context.kiwixDataStore.edit { prefs ->
-      prefs[EPUB_FONT_SCALE_KEY] = settings.fontScale
-      prefs[EPUB_PAGE_MARGINS_KEY] = settings.pageMargins
-    }
+    context.kiwixDataStore.edit { prefs -> prefs[EPUB_SETTINGS_KEY] = settings.toJson() }
   }
 
   companion object {
     private const val EPUB_LOCATOR_PREFIX = "epub_locator_"
-    private val EPUB_FONT_SCALE_KEY = doublePreferencesKey("epub_font_scale")
-    private val EPUB_PAGE_MARGINS_KEY = doublePreferencesKey("epub_page_margins")
+    private val EPUB_SETTINGS_KEY = stringPreferencesKey("epub_reader_settings")
 
     // Prefs
     const val PREF_LANG = "pref_language_chooser"
