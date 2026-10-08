@@ -50,6 +50,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,11 +59,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.kiwix.kiwixmobile.core.R
@@ -270,7 +274,7 @@ private fun BottomBar(
         .padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP)
     ) {
       ChapterRow(chapterTitle(book.toc, reading.locator).orEmpty(), onToc)
-      SeekRow(shown, preview, reading, actions)
+      SeekRow(shown, preview, reading, actions, book.rtl)
       PositionLabels(shown, position, reading.positionCount)
     }
   }
@@ -281,44 +285,48 @@ private fun SeekRow(
   shown: Float,
   preview: SeekPreview,
   reading: EpubReadingState,
-  actions: EpubReaderActions
+  actions: EpubReaderActions,
+  rtl: Boolean
 ) {
-  Row(verticalAlignment = Alignment.CenterVertically) {
-    IconButton(
-      onClick = actions.onPreviousChapter,
-      enabled = reading.hasPreviousChapter,
-      modifier = Modifier.testTag(EPUB_READER_PREVIOUS_CHAPTER_TESTING_TAG)
-    ) {
-      Icon(
-        painterResource(R.drawable.ic_skip_previous_24dp),
-        stringResource(R.string.go_to_previous_chapter)
+  // The scrubber runs the way the book reads, whatever the app's own layout direction.
+  val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+  CompositionLocalProvider(LocalLayoutDirection provides direction) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      ChapterButton(actions.onPreviousChapter, reading.hasPreviousChapter, rtl, previous = true)
+      Slider(
+        value = shown,
+        onValueChange = {
+          preview.drag = it
+          preview.released = false
+        },
+        onValueChangeFinished = {
+          preview.drag?.let(actions.onSeek)
+          preview.released = true
+        },
+        enabled = reading.positionCount > 0,
+        modifier = Modifier
+          .weight(1f)
+          .testTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG)
       )
+      ChapterButton(actions.onNextChapter, reading.hasNextChapter, rtl, previous = false)
     }
-    Slider(
-      value = shown,
-      onValueChange = {
-        preview.drag = it
-        preview.released = false
-      },
-      onValueChangeFinished = {
-        preview.drag?.let(actions.onSeek)
-        preview.released = true
-      },
-      enabled = reading.positionCount > 0,
-      modifier = Modifier
-        .weight(1f)
-        .testTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG)
+  }
+}
+
+/** The icons point left and right, so they mirror when the book reads right to left. */
+@Composable
+private fun ChapterButton(onClick: () -> Unit, enabled: Boolean, rtl: Boolean, previous: Boolean) {
+  val tag = if (previous) {
+    EPUB_READER_PREVIOUS_CHAPTER_TESTING_TAG
+  } else {
+    EPUB_READER_NEXT_CHAPTER_TESTING_TAG
+  }
+  IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.testTag(tag)) {
+    Icon(
+      painterResource(if (previous) R.drawable.ic_skip_previous_24dp else R.drawable.ic_skip_next_24dp),
+      stringResource(if (previous) R.string.go_to_previous_chapter else R.string.go_to_next_chapter),
+      Modifier.graphicsLayer { scaleX = if (rtl) -1f else 1f }
     )
-    IconButton(
-      onClick = actions.onNextChapter,
-      enabled = reading.hasNextChapter,
-      modifier = Modifier.testTag(EPUB_READER_NEXT_CHAPTER_TESTING_TAG)
-    ) {
-      Icon(
-        painterResource(R.drawable.ic_skip_next_24dp),
-        stringResource(R.string.go_to_next_chapter)
-      )
-    }
   }
 }
 
