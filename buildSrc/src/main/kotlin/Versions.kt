@@ -18,7 +18,7 @@ object Versions {
 
   const val androidx_test_espresso: String = "3.7.0"
 
-  const val tracing: String = "1.3.0"
+  const val tracing: String = "2.0.0"
 
   const val com_squareup_retrofit2: String = "2.11.0"
 
@@ -65,13 +65,13 @@ object Versions {
 
   const val uiautomator: String = "2.3.0"
 
-  const val annotation: String = "1.9.1"
+  const val annotation: String = "1.10.0"
 
   const val simple_xml: String = "2.7.1"
 
-  const val appcompat: String = "1.7.1"
+  const val appcompat: String = "1.8.0"
 
-  const val core_ktx: String = "1.18.0"
+  const val core_ktx: String = "1.19.0"
 
   const val androidx_activity: String = "1.9.3"
 
@@ -95,7 +95,7 @@ object Versions {
 
   const val COMPOSE_ACTIVITY_VERSION = "1.10.0"
 
-  const val COMPOSE_VERSION = "1.7.8"
+  const val COMPOSE_VERSION = "1.11.0"
 
   const val COMPOSE_ACCESSIBILITY_TEST_VERSION = "1.8.0"
 
