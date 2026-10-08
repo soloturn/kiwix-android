@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
@@ -125,6 +126,7 @@ private fun ShowDetectingFileSystemUi(
 ) {
   if (!isClickable) {
     val context = LocalContext.current
+    val detectingFileSystemDescription = stringResource(R.string.detecting_file_system)
     val handleStorageCheckClick = {
       when (item.fileSystemState) {
         CannotWrite4GbFile -> context.toast(R.string.file_system_does_not_support_4gb)
@@ -148,7 +150,7 @@ private fun ShowDetectingFileSystemUi(
             }
           }
         }.semantics {
-          contentDescription = context.getString(R.string.detecting_file_system)
+          contentDescription = detectingFileSystemDescription
         }.testTag(ONLINE_BOOK_OVERLAY_TESTING_TAG)
         .throttledClickable(
           onClick = handleStorageCheckClick,
