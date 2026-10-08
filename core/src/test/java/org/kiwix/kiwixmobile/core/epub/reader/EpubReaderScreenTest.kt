@@ -20,6 +20,8 @@ package org.kiwix.kiwixmobile.core.epub.reader
 
 import android.os.Build
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -28,13 +30,18 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.readium.r2.shared.publication.Link
+import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.util.Url
+import org.readium.r2.shared.util.mediatype.MediaType
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -52,23 +59,22 @@ class EpubReaderScreenTest {
     OpenEpub(mockk(relaxed = true), "id", "A Book", toc, null)
   )
 
+  private val locator = Locator(href = Url("c1.xhtml")!!, mediaType = MediaType.XHTML)
+    .copyWithLocations(totalProgression = 0.25)
+
   private fun show(
     state: EpubReaderUiState = ready,
     settings: EpubReaderSettings = EpubReaderSettings(),
     chromeVisible: Boolean = true,
-    hasPreviousChapter: Boolean = true,
-    hasNextChapter: Boolean = true,
+    reading: EpubReadingState = EpubReadingState(
+      locator = locator,
+      positionCount = 100,
+      hasPreviousChapter = true,
+      hasNextChapter = true
+    ),
     actions: EpubReaderActions = EpubReaderActions()
   ) = composeTestRule.setContent {
-    EpubReaderScreen(
-      state = state,
-      settings = settings,
-      currentLocator = null,
-      chromeVisible = chromeVisible,
-      hasPreviousChapter = hasPreviousChapter,
-      hasNextChapter = hasNextChapter,
-      actions = actions
-    )
+    EpubReaderScreen(state, settings, reading, chromeVisible, actions)
   }
 
   @Test
@@ -91,18 +97,54 @@ class EpubReaderScreenTest {
   fun `a ready book shows its title in the top bar, which can be hidden`() {
     val chrome = mutableStateOf(true)
     composeTestRule.setContent {
-      EpubReaderScreen(ready, EpubReaderSettings(), null, chrome.value, true, true, EpubReaderActions())
+      EpubReaderScreen(ready, EpubReaderSettings(), EpubReadingState(), chrome.value, EpubReaderActions())
     }
     composeTestRule.onNodeWithText("A Book").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG).assertIsDisplayed()
 
     chrome.value = false
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("A Book").assertDoesNotExist()
+    composeTestRule.onNodeWithTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG).assertDoesNotExist()
+  }
+
+  @Test
+  fun `the bottom bar shows the chapter, the page and the percentage`() {
+    show()
+    composeTestRule.onNodeWithText("Chapter One").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Page 26 of 100").assertIsDisplayed()
+    composeTestRule.onNodeWithText("25%").assertIsDisplayed()
+  }
+
+  @Test
+  fun `the progress bar is disabled until the positions are known`() {
+    show(reading = EpubReadingState(locator = locator, positionCount = 0))
+    composeTestRule.onNodeWithTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG).assertIsNotEnabled()
+    composeTestRule.onNodeWithText("25%").assertIsDisplayed()
+  }
+
+  @Test
+  fun `dragging previews the page and releasing seeks once`() {
+    val seeks = mutableListOf<Float>()
+    show(actions = EpubReaderActions(onSeek = { seeks += it }))
+
+    composeTestRule.onNodeWithTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG).performTouchInput {
+      // The thumb sits at 25%; dragging it right moves it by the same distance.
+      down(Offset(width * 0.25f, centerY))
+      moveTo(Offset(width * 0.75f, centerY))
+    }
+    composeTestRule.onNodeWithText("Page 26 of 100").assertDoesNotExist()
+    composeTestRule.onNodeWithText("25%").assertDoesNotExist()
+    assertEquals(emptyList<Float>(), seeks)
+
+    composeTestRule.onNodeWithTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG).performTouchInput { up() }
+    assertEquals(1, seeks.size)
+    assertEquals(0.75f, seeks.single(), 0.1f)
   }
 
   @Test
   fun `chapter buttons follow whether a neighbouring chapter exists`() {
-    show(hasPreviousChapter = false, hasNextChapter = true)
+    show(reading = EpubReadingState(locator, 100, hasPreviousChapter = false, hasNextChapter = true))
     composeTestRule.onNodeWithTag(EPUB_READER_PREVIOUS_CHAPTER_TESTING_TAG).assertIsNotEnabled()
     composeTestRule.onNodeWithTag(EPUB_READER_NEXT_CHAPTER_TESTING_TAG).assertIsEnabled()
   }
@@ -141,21 +183,62 @@ class EpubReaderScreenTest {
   }
 
   @Test
-  fun `settings change text size and margins and stop at the limits`() {
+  fun `the Aa sheet changes size, margins and spacing through the sliders`() {
     val applied = mutableListOf<EpubReaderSettings>()
     show(
-      settings = EpubReaderSettings(fontScale = EpubReaderSettings.MAX_FONT_SCALE),
+      settings = EpubReaderSettings(publisherStyles = false),
       actions = EpubReaderActions(onSettings = { applied += it(EpubReaderSettings()) })
     )
 
     composeTestRule.onNodeWithTag(EPUB_READER_SETTINGS_TESTING_TAG).performClick()
-    composeTestRule.onNodeWithTag(EPUB_READER_FONT_LARGER_TESTING_TAG).assertIsNotEnabled()
-    composeTestRule.onNodeWithTag(EPUB_READER_FONT_SMALLER_TESTING_TAG).performClick()
-    composeTestRule.onNodeWithTag(EPUB_READER_MARGINS_WIDER_TESTING_TAG).performClick()
+    setSlider(EPUB_SETTINGS_FONT_SIZE_TESTING_TAG, 2.0f)
+    setSlider(EPUB_SETTINGS_MARGINS_TESTING_TAG, 0.5f)
+    setSlider(EPUB_SETTINGS_LINE_SPACING_TESTING_TAG, 1.8f)
 
     assertEquals(
-      listOf(EpubReaderSettings().smallerFont(), EpubReaderSettings().widerMargins()),
+      listOf(
+        EpubReaderSettings().withFontScale(2.0),
+        EpubReaderSettings().withPageMargins(0.5),
+        EpubReaderSettings().withLineSpacing(1.8)
+      ),
       applied
     )
+  }
+
+  @Test
+  fun `the Aa sheet picks theme, font, layout and book formatting`() {
+    val applied = mutableListOf<EpubReaderSettings>()
+    show(actions = EpubReaderActions(onSettings = { applied += it(EpubReaderSettings()) }))
+
+    composeTestRule.onNodeWithTag(EPUB_READER_SETTINGS_TESTING_TAG).performClick()
+    composeTestRule.onNodeWithTag("${EPUB_SETTINGS_THEME_TESTING_TAG_PREFIX}BLACK").performClick()
+    composeTestRule.onNodeWithTag("${EPUB_SETTINGS_THEME_TESTING_TAG_PREFIX}AUTO").performClick()
+    composeTestRule.onNodeWithTag("${EPUB_SETTINGS_FONT_TESTING_TAG_PREFIX}SERIF").performClick()
+    composeTestRule.onNodeWithTag(EPUB_SETTINGS_SCROLL_TESTING_TAG).performClick()
+    composeTestRule.onNodeWithTag(EPUB_SETTINGS_BOOK_STYLES_TESTING_TAG).performScrollTo().performClick()
+
+    val base = EpubReaderSettings()
+    assertEquals(
+      listOf(
+        base.copy(themePreset = EpubThemePreset.BLACK),
+        base.copy(themePreset = null),
+        base.copy(fontChoice = EpubFontChoice.SERIF),
+        base.copy(scroll = true),
+        base.copy(publisherStyles = false)
+      ),
+      applied
+    )
+  }
+
+  @Test
+  fun `line spacing and alignment are disabled while the book formatting is on`() {
+    show(settings = EpubReaderSettings(publisherStyles = true))
+    composeTestRule.onNodeWithTag(EPUB_READER_SETTINGS_TESTING_TAG).performClick()
+    composeTestRule.onNodeWithTag(EPUB_SETTINGS_LINE_SPACING_TESTING_TAG).assertIsNotEnabled()
+    composeTestRule.onNodeWithTag("${EPUB_SETTINGS_ALIGN_TESTING_TAG_PREFIX}JUSTIFY").assertIsNotEnabled()
+  }
+
+  private fun setSlider(tag: String, value: Float) {
+    composeTestRule.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.SetProgress) { it(value) }
   }
 }
