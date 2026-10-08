@@ -96,7 +96,7 @@
 
     <activity
       android:name=".epub.reader.EpubReaderActivity"
-      android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode"
+      android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode|density|fontScale|locale|layoutDirection"
       android:exported="false" />
 
     <service android:name=".read_aloud.ReadAloudService"
