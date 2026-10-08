@@ -48,7 +48,8 @@ class EpubPublicationOpener @Inject constructor(
   suspend fun open(file: File): Result<Publication> = withContext(ioDispatcher) {
     runCatching {
       val asset = assetRetriever.retrieve(file).getOrElse { throw EpubOpenException("$it") }
-      val publication = opener.open(asset, allowUserInteraction = false)
+      val publication = opener
+        .open(asset, allowUserInteraction = false, onCreatePublication = { injectContentCss() })
         .getOrElse { throw EpubOpenException("$it") }
       if (!publication.conformsTo(Publication.Profile.EPUB)) {
         publication.close()

@@ -706,6 +706,17 @@ abstract class CoreReaderViewModel(
     }
   }
 
+  /**
+   * Like [emitEffect], but waits for a collector: a cold-start intent is handled before the
+   * screen collects [effects], and a plain emit would drop it.
+   */
+  private fun emitEffectWhenCollected(effect: ReaderEffect) {
+    launchInViewModelScope {
+      _effects.subscriptionCount.first { it > 0 }
+      _effects.emit(effect)
+    }
+  }
+
   @Volatile var isWebViewHistoryRestoring = false
   protected var zimReaderSource: ZimReaderSource? = null
   private var pendingEpubFile: File? = null
@@ -1337,7 +1348,7 @@ abstract class CoreReaderViewModel(
       updateState { copy(loading = false) }
     }
     if (file == null) {
-      emitEffect(ReaderEffect.ShowToast(context.getString(string.epub_open_failed)))
+      emitEffectWhenCollected(ReaderEffect.ShowToast(context.getString(string.epub_open_failed)))
       return
     }
     openEpubFile(file)
@@ -1356,11 +1367,11 @@ abstract class CoreReaderViewModel(
       !kiwixPermissionChecker.hasReadExternalStoragePermission()
     ) {
       pendingEpubFile = file
-      emitEffect(ReaderEffect.RequestReadStoragePermission)
+      emitEffectWhenCollected(ReaderEffect.RequestReadStoragePermission)
       return
     }
     pendingEpubFile = null
-    emitEffect(ReaderEffect.OpenEpub(file))
+    emitEffectWhenCollected(ReaderEffect.OpenEpub(file))
   }
 
   /**
