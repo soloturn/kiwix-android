@@ -24,6 +24,7 @@ import android.os.Build
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -40,6 +41,7 @@ import org.kiwix.kiwixmobile.core.ThemeConfig
 import org.kiwix.kiwixmobile.core.ThemeConfig.Theme.Companion.from
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.epub.EpubReadingPosition
+import org.kiwix.kiwixmobile.core.epub.reader.EpubReaderSettings
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.zim_manager.Category
@@ -714,8 +716,32 @@ class KiwixDataStore @Inject constructor(
     }
   }
 
+  /** The Readium locator JSON last stored for [bookId], or null. */
+  suspend fun getEpubLocator(bookId: String): String? =
+    context.kiwixDataStore.data.first()[stringPreferencesKey("$EPUB_LOCATOR_PREFIX$bookId")]
+
+  suspend fun setEpubLocator(bookId: String, locatorJson: String) {
+    context.kiwixDataStore.edit { prefs ->
+      prefs[stringPreferencesKey("$EPUB_LOCATOR_PREFIX$bookId")] = locatorJson
+    }
+  }
+
+  val epubReaderSettings: Flow<EpubReaderSettings> = context.kiwixDataStore.data.map { prefs ->
+    EpubReaderSettings.of(prefs[EPUB_FONT_SCALE_KEY], prefs[EPUB_PAGE_MARGINS_KEY])
+  }
+
+  suspend fun setEpubReaderSettings(settings: EpubReaderSettings) {
+    context.kiwixDataStore.edit { prefs ->
+      prefs[EPUB_FONT_SCALE_KEY] = settings.fontScale
+      prefs[EPUB_PAGE_MARGINS_KEY] = settings.pageMargins
+    }
+  }
+
   companion object {
     private const val EPUB_POSITION_PREFIX = "epub_position_"
+    private const val EPUB_LOCATOR_PREFIX = "epub_locator_"
+    private val EPUB_FONT_SCALE_KEY = doublePreferencesKey("epub_font_scale")
+    private val EPUB_PAGE_MARGINS_KEY = doublePreferencesKey("epub_page_margins")
 
     // Prefs
     const val PREF_LANG = "pref_language_chooser"

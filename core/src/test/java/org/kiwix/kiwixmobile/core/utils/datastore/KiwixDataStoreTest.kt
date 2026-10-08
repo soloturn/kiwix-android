@@ -37,6 +37,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.ThemeConfig
 import org.kiwix.kiwixmobile.core.epub.EpubReadingPosition
+import org.kiwix.kiwixmobile.core.epub.reader.EpubReaderSettings
 import org.kiwix.kiwixmobile.core.zim_manager.Category
 import org.kiwix.kiwixmobile.core.zim_manager.Language
 import org.kiwix.sharedFunctions.MainDispatcherRule
@@ -101,6 +102,25 @@ class KiwixDataStoreTest {
     assertThat(kiwixDataStore.getEpubPosition("book-b")).isEqualTo(b)
     kiwixDataStore.setEpubPosition("book-a", b)
     assertThat(kiwixDataStore.getEpubPosition("book-a")).isEqualTo(b)
+  }
+
+  @Test
+  fun `epub locator is stored per book and null when unset`() = runTest {
+    assertThat(kiwixDataStore.getEpubLocator("book-a")).isNull()
+    kiwixDataStore.setEpubLocator("book-a", """{"href":"a.xhtml"}""")
+    kiwixDataStore.setEpubLocator("book-b", """{"href":"b.xhtml"}""")
+    assertThat(kiwixDataStore.getEpubLocator("book-a")).isEqualTo("""{"href":"a.xhtml"}""")
+    assertThat(kiwixDataStore.getEpubLocator("book-b")).isEqualTo("""{"href":"b.xhtml"}""")
+    kiwixDataStore.setEpubLocator("book-a", """{"href":"c.xhtml"}""")
+    assertThat(kiwixDataStore.getEpubLocator("book-a")).isEqualTo("""{"href":"c.xhtml"}""")
+  }
+
+  @Test
+  fun `epub reader settings default then persist`() = runTest {
+    assertThat(kiwixDataStore.epubReaderSettings.first()).isEqualTo(EpubReaderSettings())
+    val changed = EpubReaderSettings(fontScale = 1.5, pageMargins = 0.25)
+    kiwixDataStore.setEpubReaderSettings(changed)
+    assertThat(kiwixDataStore.epubReaderSettings.first()).isEqualTo(changed)
   }
 
   @Test
