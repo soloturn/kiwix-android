@@ -513,26 +513,4 @@ internal class ReaderMenuStateTest {
     readerMenuState.hideTabSwitcher()
     assertThat(hasMenuItem(CLOSE_ALL_TABS_MENU_ITEM_TESTING_TAG)).isFalse()
   }
-
-  @Test
-  internal fun `zim-only items are hidden while an epub is open, others stay`() {
-    readerMenuState.onFileOpened(urlIsValid = true, isEpub = true)
-    assertThat(hasMenuItem(SEARCH_ICON_TESTING_TAG)).isFalse()
-    assertThat(hasMenuItem(RANDOM_PAGE_MENU_ITEM_TESTING_TAG)).isFalse()
-    assertThat(hasMenuItem(TAKE_NOTE_MENU_ITEM_TESTING_TAG)).isFalse()
-    assertThat(hasMenuItem(ADD_TO_HOME_SCREEN_MENU_ITEM_TESTING_TAG)).isFalse()
-    assertThat(hasMenuItem(FIND_IN_PAGE_MENU_ITEM_TESTING_TAG)).isTrue()
-    assertThat(hasMenuItem(SHARE_ARTICLE_MENU_ITEM_TESTING_TAG)).isTrue()
-  }
-
-  @Test
-  internal fun `epub hiding survives showing book items and ends when a zim opens`() {
-    readerMenuState.onFileOpened(urlIsValid = true, isEpub = true)
-    readerMenuState.showBookSpecificMenuItems()
-    assertThat(hasMenuItem(RANDOM_PAGE_MENU_ITEM_TESTING_TAG)).isFalse()
-
-    readerMenuState.onFileOpened(urlIsValid = true)
-    assertThat(hasMenuItem(SEARCH_ICON_TESTING_TAG)).isTrue()
-    assertThat(hasMenuItem(RANDOM_PAGE_MENU_ITEM_TESTING_TAG)).isTrue()
-  }
 }

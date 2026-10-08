@@ -237,6 +237,16 @@
   <string name="go_to_previous_chapter">Go to previous chapter</string>
   <string name="go_to_next_chapter">Go to next chapter</string>
   <string name="table_of_contents">Table of contents</string>
+  <string name="epub_open_failed">This book could not be opened. The file may be damaged or not a valid EPUB.</string>
+  <string name="epub_close">Close</string>
+  <string name="epub_reading_settings">Reading settings</string>
+  <string name="epub_text_size">Text size</string>
+  <string name="epub_page_margins">Page margins</string>
+  <string name="epub_decrease_text_size">Decrease text size</string>
+  <string name="epub_increase_text_size">Increase text size</string>
+  <string name="epub_decrease_margins">Narrower margins</string>
+  <string name="epub_increase_margins">Wider margins</string>
+  <string name="epub_no_table_of_contents">This book has no table of contents.</string>
   <string name="select_language" tools:keep="@string/select_language">Select language</string>
   <string name="save_languages" tools:keep="@string/save_languages">Save languages</string>
   <string name="all_languages" tools:keep="@string/all_languages">All languages</string>

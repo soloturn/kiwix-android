@@ -2256,6 +2256,86 @@ internal class CoreReaderViewModelTest {
   }
 
   @Nested
+  inner class OpenEpubFile {
+    private val epub = File("/storage/emulated/0/Books/book.epub")
+
+    @BeforeEach
+    fun setUpAppPrivateDirs() {
+      // A relaxed mock's empty canonical paths would make every file look app-private.
+      every { context.filesDir } returns File("/data/user/0/app/files")
+      every { context.cacheDir } returns File("/data/user/0/app/cache")
+      every { context.getExternalFilesDir(null) } returns
+        File("/storage/emulated/0/Android/data/app/files")
+    }
+
+    @Test
+    fun whenStoragePermissionGranted_emitsOpenEpubEffect() = runTest {
+      coEvery { kiwixPermissionChecker.hasReadExternalStoragePermission() } returns true
+
+      viewModel.effects.test {
+        viewModel.openEpubFile(epub)
+        advanceUntilIdle()
+
+        assertThat(awaitItem()).isEqualTo(ReaderEffect.OpenEpub(epub))
+      }
+    }
+
+    @Test
+    fun whenNoStoragePermission_requestsItAndOpensAfterTheGrant() = runTest {
+      coEvery { kiwixPermissionChecker.hasReadExternalStoragePermission() } returns false
+
+      viewModel.effects.test {
+        viewModel.openEpubFile(epub)
+        advanceUntilIdle()
+        assertThat(awaitItem()).isEqualTo(ReaderEffect.RequestReadStoragePermission)
+
+        coEvery { kiwixPermissionChecker.hasReadExternalStoragePermission() } returns true
+        viewModel.onReadStoragePermissionResult(isGranted = true)
+        advanceUntilIdle()
+
+        assertThat(awaitItem()).isEqualTo(ReaderEffect.OpenEpub(epub))
+        expectNoEvents()
+      }
+    }
+
+    @Test
+    fun whenFileIsAppPrivate_opensWithoutAskingForPermission() = runTest {
+      val privateDir = File(System.getProperty("java.io.tmpdir"), "epub-private-test")
+      val privateEpub = File(privateDir, "imported.epub")
+      every { context.filesDir } returns privateDir
+      coEvery { kiwixPermissionChecker.hasReadExternalStoragePermission() } returns false
+
+      viewModel.effects.test {
+        viewModel.openEpubFile(privateEpub)
+        advanceUntilIdle()
+
+        assertThat(awaitItem()).isEqualTo(ReaderEffect.OpenEpub(privateEpub))
+        expectNoEvents()
+      }
+    }
+
+    @Test
+    fun aPendingEpubIsNotReopenedAsZim() = runTest {
+      coEvery { kiwixPermissionChecker.hasReadExternalStoragePermission() } returns false
+      val viewModel = spyk(viewModel)
+      coEvery { viewModel.openZimFile(any()) } just Runs
+
+      viewModel.effects.test {
+        viewModel.openEpubFile(epub)
+        advanceUntilIdle()
+        assertThat(awaitItem()).isEqualTo(ReaderEffect.RequestReadStoragePermission)
+
+        coEvery { kiwixPermissionChecker.hasReadExternalStoragePermission() } returns true
+        viewModel.onReadStoragePermissionResult(isGranted = true)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { viewModel.openZimFile(any()) }
+        assertThat(awaitItem()).isEqualTo(ReaderEffect.OpenEpub(epub))
+      }
+    }
+  }
+
+  @Nested
   inner class OnReadStoragePermissionResult {
     @Test
     fun whenPermissionIsGrantedAndZimReaderSourceIsNotNull_opensZimFile() = runTest {

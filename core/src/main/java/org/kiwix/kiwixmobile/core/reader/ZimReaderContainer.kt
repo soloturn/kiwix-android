@@ -26,9 +26,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
-import org.kiwix.kiwixmobile.core.epub.EpubFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Factory
-import java.io.File
 import java.net.HttpURLConnection
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -86,7 +84,7 @@ class ZimReaderContainer @Inject constructor(
   // Volatile so hasReader can read it lock-free below - every other accessor still
   // goes through lock.read {} because it calls into the disposable native Archive.
   @Volatile
-  private var backingReader: BookReader? = null
+  private var backingZimFileReader: ZimFileReader? = null
 
   // Serializes setZimReaderSource() itself so callers (CoreReaderViewModel,
   // DeleteFilesUseCase, ...) can never race to dispose each other's reader
@@ -94,19 +92,12 @@ class ZimReaderContainer @Inject constructor(
   private val setReaderMutex = Mutex()
 
   private suspend fun <T> withReaderSuspend(block: suspend (ZimFileReader?) -> T): T =
-    lock.read { block(backingReader as? ZimFileReader) }
-
-  private suspend fun <T> withBookReaderSuspend(block: suspend (BookReader?) -> T): T =
-    lock.read { block(backingReader) }
+    lock.read { block(backingZimFileReader) }
 
   // For synchronous callers (WebView's own thread); parks only that caller's thread,
   // not a shared dispatcher.
   private fun <T> withReaderOrNull(block: (ZimFileReader?) -> T): T =
     runBlocking { withReaderSuspend(block) }
-
-  // Format-agnostic view for callers that only need the BookReader surface.
-  private fun <T> withBookReaderOrNull(block: (BookReader?) -> T): T =
-    runBlocking { withBookReaderSuspend(block) }
 
   fun <T> withReaderBlocking(block: (ZimFileReader) -> T): T? =
     withReaderOrNull { it?.let(block) }
@@ -118,17 +109,13 @@ class ZimReaderContainer @Inject constructor(
   // A reference check, not a native call - reading it directly avoids the runBlocking
   // deadlock this hit when polled from Main while a writer was also queued on Main
   // (see setZimReaderSource, which now hops off Main for the same reason).
-  val hasReader: Boolean get() = backingReader != null
+  val hasReader: Boolean get() = backingZimFileReader != null
 
   suspend fun setZimReaderSource(
     zimReaderSource: ZimReaderSource?,
     showSearchSuggestionsSpellChecked: Boolean = false
   ) = setReaderMutex.withLock {
-    // A non-ZIM (EPUB) reader is never "the same" as a ZIM source, including null (closes it).
-    val current = withBookReaderSuspend { it }
-    if ((current == null || current is ZimFileReader) &&
-      zimReaderSource == (current as? ZimFileReader)?.zimReaderSource
-    ) {
+    if (zimReaderSource == withReaderSuspend { it?.zimReaderSource }) {
       return@withLock
     }
     withContext(ioDispatcher) {
@@ -144,87 +131,53 @@ class ZimReaderContainer @Inject constructor(
       // dispatcher: a reader anywhere can only unblock this by unlocking writerMutex,
       // and that resumption must never depend on the Main looper being free to run it.
       lock.write {
-        backingReader?.dispose()
-        backingReader = newReader
+        backingZimFileReader?.dispose()
+        backingZimFileReader = newReader
       }
     }
   }
 
-  /** Opens [file] as an EPUB (or closes any reader when null). False if it can't be parsed. */
-  suspend fun setEpubFile(file: File?): Boolean = setReaderMutex.withLock {
-    withContext(ioDispatcher) {
-      val newReader = file?.let { runCatching { EpubFileReader(it) }.getOrNull() }
-      // Parse the lazy ToC here, off Main.
-      runCatching { newReader?.toc }
-      lock.write {
-        backingReader?.dispose()
-        backingReader = newReader
-      }
-      file == null || newReader != null
-    }
-  }
-
-  /** True when the open book is an EPUB (ZIM-only features are unavailable). */
-  val isEpubOpen: Boolean get() = backingReader is EpubFileReader
-
-  /** The open EPUB reader, or null. Lock-free like [isEpubOpen]; its zip reads fail safe once disposed. */
-  val epubReader: EpubFileReader? get() = backingReader as? EpubFileReader
-
-  /** Persistable identity of the open book, any format. */
-  val sourceId: String? get() = withBookReaderOrNull { it?.sourceId }
-
-  // ZIM-only: null for EPUB (no title index or random entries).
   fun getPageUrlFromTitle(title: String) = withReaderOrNull { it?.getPageUrlFrom(title) }
 
   fun getRandomPageUrl() = withReaderOrNull { it?.getRandomPageUrl() }
-  fun isRedirect(url: String): Boolean = withBookReaderOrNull { it?.isRedirect(url) == true }
-  fun getRedirect(url: String): String = withBookReaderOrNull { it?.getRedirect(url) }.orEmpty()
+  fun isRedirect(url: String): Boolean = withReaderOrNull { it?.isRedirect(url) == true }
+  fun getRedirect(url: String): String = withReaderOrNull { it?.getRedirect(url) }.orEmpty()
   fun load(url: String, requestHeaders: Map<String, String>): WebResourceResponse = runBlocking {
-    return@runBlocking withBookReaderSuspend { reader ->
-      val stream = reader?.load(url)
+    return@runBlocking withReaderSuspend { reader ->
       WebResourceResponse(
         reader?.getMimeTypeFromUrl(url),
         Charsets.UTF_8.name(),
-        stream
+        reader?.load(url)
       )
         .apply {
           val headers = mutableMapOf("Accept-Ranges" to "bytes")
-          if (reader is EpubFileReader) {
-            // EPUB entries are small and not range-addressable; external or missing => 404.
-            if (stream == null) {
-              setStatusCodeAndReasonPhrase(HttpURLConnection.HTTP_NOT_FOUND, "Not Found")
-            } else {
-              setStatusCodeAndReasonPhrase(HttpURLConnection.HTTP_OK, "OK")
-            }
-            responseHeaders = emptyMap()
-          } else if ("Range" in requestHeaders.keys) {
+          if ("Range" in requestHeaders.keys) {
             setStatusCodeAndReasonPhrase(HttpURLConnection.HTTP_PARTIAL, "Partial Content")
-            val fullSize = (reader as? ZimFileReader)?.getItem(url)?.itemSize() ?: 0L
+            val fullSize = reader?.getItem(url)?.itemSize() ?: 0L
             val lastByte = fullSize - 1
             val byteRanges = requestHeaders.getValue("Range").substringAfter("=").split("-")
             headers["Content-Range"] = "bytes ${byteRanges[0]}-$lastByte/$fullSize"
             if (byteRanges.size == 1) {
               headers["Connection"] = "close"
             }
-            responseHeaders = headers
           } else {
             setStatusCodeAndReasonPhrase(HttpURLConnection.HTTP_OK, "OK")
-            responseHeaders = headers
           }
+          responseHeaders = headers
         }
     }
   }
 
   val zimReaderSource get() = withReaderOrNull { it?.zimReaderSource }
-  val zimFileTitle get() = withBookReaderOrNull { it?.title }
-  val mainPage get() = withBookReaderOrNull { it?.mainPage }
-  val id get() = withBookReaderOrNull { it?.id }
+  val zimFileTitle get() = withReaderOrNull { it?.title }
+  val mainPage get() = withReaderOrNull { it?.mainPage }
+  val id get() = withReaderOrNull { it?.id }
   val fileSize get() = withReaderOrNull { it?.fileSize } ?: 0L
-  val creator get() = withBookReaderOrNull { it?.creator }
-  val publisher get() = withBookReaderOrNull { it?.publisher }
-  val name get() = withBookReaderOrNull { it?.name }
-  val date get() = withBookReaderOrNull { it?.date }
-  val description get() = withBookReaderOrNull { it?.description }
-  val favicon get() = withBookReaderOrNull { it?.favicon }
-  val language get() = withBookReaderOrNull { it?.language }
+  val creator get() = withReaderOrNull { it?.creator }
+  val publisher get() = withReaderOrNull { it?.publisher }
+  val name get() = withReaderOrNull { it?.name }
+  val date get() = withReaderOrNull { it?.date }
+  val description get() = withReaderOrNull { it?.description }
+  val favicon get() = withReaderOrNull { it?.favicon }
+  val language get() = withReaderOrNull { it?.language }
 }

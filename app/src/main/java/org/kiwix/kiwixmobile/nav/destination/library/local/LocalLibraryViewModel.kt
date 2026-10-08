@@ -111,7 +111,7 @@ import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.DeleteFilesUseCas
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.NavigateToDownloads
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.NavigationDrawerToggle
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.None
-import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.OpenEpubWithNavigation
+import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.OpenEpubInReader
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.OpenFileWithNavigation
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.ShareFiles
 import org.kiwix.kiwixmobile.zimManager.fileselectView.effects.ValidateZIMFiles
@@ -388,7 +388,7 @@ class LocalLibraryViewModel @Inject constructor(
           ioDispatcher = ioDispatcher
         )
 
-      is RequestOpenEpub -> OpenEpubWithNavigation(action.file)
+      is RequestOpenEpub -> OpenEpubInReader(action.file)
 
       RequestDrawerToggle -> NavigationDrawerToggle
     }

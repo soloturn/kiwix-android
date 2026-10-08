@@ -67,11 +67,6 @@ import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
-import org.kiwix.kiwixmobile.core.epub.EpubNavState
-import org.kiwix.kiwixmobile.core.epub.EpubPaths
-import org.kiwix.kiwixmobile.core.epub.EpubReadingPosition
-import org.kiwix.kiwixmobile.core.epub.EpubTocMapper
-import org.kiwix.kiwixmobile.core.epub.navStateFor
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -223,8 +218,6 @@ abstract class CoreReaderViewModel(
     val showTableOfContentDrawer: Boolean = false,
     val tableOfContentTitle: String = "",
     val documentSections: List<DocumentSection> = emptyList(),
-    /** Non-null only while an EPUB is open; drives the chapter buttons. */
-    val epubNavState: EpubNavState? = null,
     val showDonationPopup: Boolean = false,
     val findInPageUiState: FindInPageManager.FindInPageUiState = FindInPageManager.FindInPageUiState()
   )
@@ -241,9 +234,6 @@ abstract class CoreReaderViewModel(
     data object NextLongClicked : ReaderAction
     data object OpenTocDrawer : ReaderAction
     data object CloseTocDrawer : ReaderAction
-    data object EpubPreviousChapter : ReaderAction
-    data object EpubNextChapter : ReaderAction
-    data class OpenEpubUrl(val url: String) : ReaderAction
     data object CloseAllTabs : ReaderAction
     data object NewTab : ReaderAction
     data class SelectTab(val position: Int) : ReaderAction
@@ -299,6 +289,7 @@ abstract class CoreReaderViewModel(
     data object ShowActivityBottomAppBar : ReaderEffect
     data object HideActivityBottomAppBar : ReaderEffect
     data object RequestReadStoragePermission : ReaderEffect
+    data class OpenEpub(val file: File) : ReaderEffect
     data class NavigateTo(val route: String, val navOptions: NavOptions? = null) : ReaderEffect
     data class ConsumeSavedStateHandle(val keys: List<String>) : ReaderEffect
     data object ClearActivityIntentAction : ReaderEffect
@@ -631,9 +622,6 @@ abstract class CoreReaderViewModel(
       ReaderAction.PreviousLongClicked -> showBackwordForwardHistory(false)
       ReaderAction.OpenTocDrawer -> updateState { copy(showTableOfContentDrawer = true) }
       ReaderAction.CloseTocDrawer -> updateState { copy(showTableOfContentDrawer = false) }
-      ReaderAction.EpubPreviousChapter -> openEpubChapter(next = false)
-      ReaderAction.EpubNextChapter -> openEpubChapter(next = true)
-      is ReaderAction.OpenEpubUrl -> launchInMainScope { loadUrlWithCurrentWebview(action.url) }
       ReaderAction.BackToTopButtonClick -> backToTop()
       ReaderAction.PauseTts -> readAloudManager.pauseTts()
       ReaderAction.StopTts -> launchInViewModelScope { stopReadAloud() }
@@ -774,7 +762,6 @@ abstract class CoreReaderViewModel(
   }
 
   override fun onAddNoteMenuClicked() {
-    if (zimReaderContainer.isEpubOpen) return
     launchInViewModelScope {
       emitEffect(ReaderEffect.ShowAddNoteDialog(getCurrentWebView()))
     }
@@ -959,7 +946,6 @@ abstract class CoreReaderViewModel(
   }
 
   override fun onSearchMenuClickedMenuClicked() {
-    if (zimReaderContainer.isEpubOpen) return
     launchInViewModelScope {
       readerSessionManager.saveReaderSession {
         // Pass this function to saveTabStates so that after saving
@@ -985,7 +971,7 @@ abstract class CoreReaderViewModel(
   }
 
   override fun onAddToHomeScreenMenuClicked() {
-    if (!zimReaderContainer.hasReader || zimReaderContainer.isEpubOpen) {
+    if (!zimReaderContainer.hasReader) {
       Log.e(TAG_KIWIX, "Reader or ZimFileReader is null, cannot add to home screen")
       return
     }
@@ -1094,23 +1080,18 @@ abstract class CoreReaderViewModel(
     launchInViewModelScope {
       updateTableOfContents()
       updateBottomToolbarArrowsAlpha()
-      onEpubPageFinished()
       val currentWebView = getCurrentWebView()
-      // History and session restore are ZIM-keyed; EPUB persistence lands separately.
-      val isEpub = zimReaderContainer.isEpubOpen
-      if (!isEpub) {
-        readerHistoryManager.saveHistory(
-          currentWebView.url,
-          currentWebView.title,
-          zimReaderContainer.id,
-          zimReaderContainer.name,
-          zimReaderContainer.zimReaderSource,
-          zimReaderContainer.favicon
-        )
-      }
+      readerHistoryManager.saveHistory(
+        currentWebView.url,
+        currentWebView.title,
+        zimReaderContainer.id,
+        zimReaderContainer.name,
+        zimReaderContainer.zimReaderSource,
+        zimReaderContainer.favicon
+      )
       kiwixDataStore.incrementRateAppReadingCount()
       updateBottomToolbarVisibility()
-      if (!isWebViewHistoryRestoring && !isEpub) {
+      if (!isWebViewHistoryRestoring) {
         readerSessionManager.saveReaderSession()
       }
     }
@@ -1149,7 +1130,6 @@ abstract class CoreReaderViewModel(
 
   @Suppress("MagicNumber")
   override fun webViewPageChanged(page: Int, maxPages: Int) {
-    scheduleEpubPositionSave()
     launchInMainScope {
       if (!isBackToTopEnabled()) return@launchInMainScope
       val scrollY = getCurrentWebView().scrollY
@@ -1307,8 +1287,6 @@ abstract class CoreReaderViewModel(
   }
 
   private suspend fun updateTableOfContents() {
-    // EPUB shows the book-level ToC set in openEpubFile, not the page's headings.
-    if (zimReaderContainer.isEpubOpen) return
     val js = documentParser?.requireDocumentParserJs()
     loadUrlWithCurrentWebview("javascript:($js)()")
   }
@@ -1333,7 +1311,6 @@ abstract class CoreReaderViewModel(
           readerMenuState?.onFileOpened(urlIsValid())
           updateState { copy(showTabSwitcher = false) }
           observeBookmarks(result.id)
-          updateState { copy(epubNavState = null) }
           updateTitle()
         }
 
@@ -1368,21 +1345,20 @@ abstract class CoreReaderViewModel(
       updateState { copy(loading = false) }
     }
     if (file == null) {
-      emitEffect(ReaderEffect.ShowToast(context.getString(string.error_file_invalid, "$uri")))
+      emitEffect(ReaderEffect.ShowToast(context.getString(string.epub_open_failed)))
       return
     }
     openEpubFile(file)
   }
 
   /**
-   * Opens [file] in the native EPUB reader and renders its first spine page.
-   * TODO(epub-reader): bookmarks and in-book search.
+   * Opens [file] in the Readium reader screen, asking for storage access first when the file
+   * lives outside app-private storage; the permission result retries the open.
    */
-  open suspend fun openEpubFile(file: File) {
+  suspend fun openEpubFile(file: File) {
     if (uiState.value.ttsControlsItem.isTtsPlaying) {
       stopReadAloud()
     }
-    // App-private copies (e.g. imported content:// EPUBs) need no storage permission.
     if (!isAppPrivateFile(context, file) &&
       !isBrandedApp() &&
       !kiwixPermissionChecker.hasReadExternalStoragePermission()
@@ -1392,75 +1368,7 @@ abstract class CoreReaderViewModel(
       return
     }
     pendingEpubFile = null
-    // Same as openZimFile: WebViews must not outlive the reader they were serving.
-    readerWebViewManager.destroyAllTabs()
-    if (!zimReaderContainer.setEpubFile(file)) {
-      exitBook()
-      emitEffect(
-        ReaderEffect.ShowToast(context.getString(string.error_file_invalid, file.path))
-      )
-      return
-    }
-    val reader = zimReaderContainer.epubReader
-    pendingEpubRestore = reader?.let { r ->
-      kiwixDataStore.getEpubPosition(r.id)?.takeIf { r.isInternalUrl(it.url) }
-    }
-    updateState {
-      copy(
-        epubNavState = EpubNavState(),
-        tableOfContentTitle = reader?.title.orEmpty(),
-        documentSections = reader?.let { EpubTocMapper.toSections(it.toc) }.orEmpty()
-      )
-    }
-    hideNoBookOpenViews()
-    pendingEpubRestore?.let { loadUrlWithCurrentWebview(it.url) } ?: openMainPage()
-    readerMenuState?.onFileOpened(urlIsValid(), isEpub = true)
-    updateState { copy(showTabSwitcher = false) }
-    updateTitle()
-  }
-
-  private var pendingEpubRestore: EpubReadingPosition? = null
-  private var epubPositionSaveJob: Job? = null
-
-  private fun openEpubChapter(next: Boolean) {
-    launchInMainScope {
-      val reader = zimReaderContainer.epubReader ?: return@launchInMainScope
-      val current = getCurrentWebView().url ?: return@launchInMainScope
-      val target = if (next) reader.nextUrl(current) else reader.previousUrl(current)
-      target?.let { loadUrlWithCurrentWebview(it) }
-    }
-  }
-
-  /** Refreshes chapter buttons, then restores the saved scroll once or records the new page. */
-  private suspend fun onEpubPageFinished() {
-    val reader = zimReaderContainer.epubReader ?: return
-    val webView = withContext(mainDispatcher) { getCurrentWebView() }
-    val url = webView.url
-    updateState { copy(epubNavState = reader.navStateFor(url)) }
-    val restore = pendingEpubRestore
-    pendingEpubRestore = null
-    if (restore != null &&
-      url != null &&
-      EpubPaths.entryPathFromUrl(url) ==
-      EpubPaths.entryPathFromUrl(restore.url)
-    ) {
-      webView.postDelayed({ webView.scrollTo(0, restore.scrollY) }, EPUB_RESTORE_DELAY_MS)
-    } else if (url != null) {
-      kiwixDataStore.setEpubPosition(reader.id, EpubReadingPosition(url, 0))
-    }
-  }
-
-  private fun scheduleEpubPositionSave() {
-    if (!zimReaderContainer.isEpubOpen) return
-    epubPositionSaveJob?.cancel()
-    epubPositionSaveJob = viewModelScope.launch(mainDispatcher) {
-      delay(EPUB_POSITION_SAVE_DELAY_MS.milliseconds)
-      val reader = zimReaderContainer.epubReader ?: return@launch
-      val webView = getCurrentWebView()
-      webView.url?.let {
-        kiwixDataStore.setEpubPosition(reader.id, EpubReadingPosition(it, webView.scrollY))
-      }
-    }
+    emitEffect(ReaderEffect.OpenEpub(file))
   }
 
   /**
@@ -2205,7 +2113,6 @@ abstract class CoreReaderViewModel(
     donationDialogHandler.setDonationDialogCallBack(null)
     hideBackToTopJob?.cancel()
     hideBackToTopJob = null
-    epubPositionSaveJob?.cancel()
     actionMode = null
     findInPageManager.stop()
     super.onCleared()
@@ -2214,8 +2121,6 @@ abstract class CoreReaderViewModel(
   protected fun mainDispatcherImmediate() = mainDispatcher.immediate
 }
 
-private const val EPUB_RESTORE_DELAY_MS = 150L
-private const val EPUB_POSITION_SAVE_DELAY_MS = 500L
 private const val TTS_TICKER_INTERVAL_MS = 250L
 private val CYCLIC_TTS_SPEEDS = listOf(1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 0.5f, 0.75f)
 private const val TTS_SPEED_TOLERANCE = 0.01f

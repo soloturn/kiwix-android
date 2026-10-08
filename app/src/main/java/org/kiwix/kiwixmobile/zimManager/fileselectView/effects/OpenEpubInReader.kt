@@ -19,23 +19,13 @@
 package org.kiwix.kiwixmobile.zimManager.fileselectView.effects
 
 import androidx.appcompat.app.AppCompatActivity
-import androidx.navigation.NavOptions
 import org.kiwix.kiwixmobile.core.base.SideEffect
-import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.setNavigationResultOnCurrent
-import org.kiwix.kiwixmobile.core.main.CoreMainActivity
-import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
-import org.kiwix.kiwixmobile.ui.KiwixDestination
+import org.kiwix.kiwixmobile.core.epub.reader.EpubReaderActivity
 import java.io.File
 
-/** Opens an EPUB in the reader; the reader screen routes `.epub` paths to the EPUB reader. */
-data class OpenEpubWithNavigation(private val file: File) : SideEffect<Unit> {
+/** Opens an EPUB in the Readium reader screen. */
+data class OpenEpubInReader(private val file: File) : SideEffect<Unit> {
   override fun invokeWith(activity: AppCompatActivity) {
-    val navOptions = NavOptions.Builder()
-      .setPopUpTo(KiwixDestination.Reader.route, inclusive = true)
-      .build()
-    (activity as CoreMainActivity).apply {
-      navigate(KiwixDestination.Reader.route, navOptions)
-      setNavigationResultOnCurrent(file.path, ZIM_FILE_URI_KEY)
-    }
+    activity.startActivity(EpubReaderActivity.intent(activity, file))
   }
 }

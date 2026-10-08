@@ -98,9 +98,6 @@ class ReaderMenuState(
 
   private var isReadingAloud by mutableStateOf(false)
 
-  // While an EPUB is open, ZIM-only items stay hidden whatever else asks to show them.
-  private var isEpubOpen = false
-
   private var webViewCount by mutableIntStateOf(0)
   private var urlIsValid by mutableStateOf(false)
 
@@ -129,8 +126,7 @@ class ReaderMenuState(
     )
   }
 
-  fun onFileOpened(urlIsValid: Boolean, isEpub: Boolean = false) {
-    isEpubOpen = isEpub
+  fun onFileOpened(urlIsValid: Boolean) {
     showWebViewOptions(urlIsValid)
   }
 
@@ -339,12 +335,9 @@ class ReaderMenuState(
     }
   }
 
-  private fun isForcedHidden(type: MenuItemType): Boolean =
-    (type == MenuItemType.Search && disableSearch) || (isEpubOpen && type in ZIM_ONLY_ITEMS)
-
   private fun setVisibility(visible: Boolean, vararg types: MenuItemType) {
     types.forEach {
-      if (isForcedHidden(it)) {
+      if (it == MenuItemType.Search && disableSearch) {
         menuItemVisibility[it] = false
       } else {
         menuItemVisibility[it] = visible
@@ -353,14 +346,6 @@ class ReaderMenuState(
     updateMenuItems()
   }
 }
-
-/** Items backed by ZIM-only features: title search, random entry, ZIM-keyed notes and shortcuts. */
-internal val ZIM_ONLY_ITEMS = setOf(
-  MenuItemType.Search,
-  MenuItemType.RandomPage,
-  MenuItemType.AddNote,
-  MenuItemType.AddToHomeScreen
-)
 
 enum class MenuItemType {
   Search,

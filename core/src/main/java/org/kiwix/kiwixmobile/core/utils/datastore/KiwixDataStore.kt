@@ -40,7 +40,6 @@ import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ThemeConfig
 import org.kiwix.kiwixmobile.core.ThemeConfig.Theme.Companion.from
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
-import org.kiwix.kiwixmobile.core.epub.EpubReadingPosition
 import org.kiwix.kiwixmobile.core.epub.reader.EpubReaderSettings
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.utils.ZERO
@@ -705,17 +704,6 @@ class KiwixDataStore @Inject constructor(
     }
   }
 
-  suspend fun getEpubPosition(bookId: String): EpubReadingPosition? =
-    EpubReadingPosition.decode(
-      context.kiwixDataStore.data.first()[stringPreferencesKey("$EPUB_POSITION_PREFIX$bookId")]
-    )
-
-  suspend fun setEpubPosition(bookId: String, position: EpubReadingPosition) {
-    context.kiwixDataStore.edit { prefs ->
-      prefs[stringPreferencesKey("$EPUB_POSITION_PREFIX$bookId")] = position.encode()
-    }
-  }
-
   /** The Readium locator JSON last stored for [bookId], or null. */
   suspend fun getEpubLocator(bookId: String): String? =
     context.kiwixDataStore.data.first()[stringPreferencesKey("$EPUB_LOCATOR_PREFIX$bookId")]
@@ -738,7 +726,6 @@ class KiwixDataStore @Inject constructor(
   }
 
   companion object {
-    private const val EPUB_POSITION_PREFIX = "epub_position_"
     private const val EPUB_LOCATOR_PREFIX = "epub_locator_"
     private val EPUB_FONT_SCALE_KEY = doublePreferencesKey("epub_font_scale")
     private val EPUB_PAGE_MARGINS_KEY = doublePreferencesKey("epub_page_margins")
