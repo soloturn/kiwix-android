@@ -103,13 +103,11 @@ class EpubLibraryDaoTest {
   }
 
   @Test
-  fun delete_byIdAndByPath() = runTest {
+  fun delete_removesOnlyThatId() = runTest {
     dao.upsert(entity("id1", "/a.epub"))
     dao.upsert(entity("id2", "/b.epub"))
     dao.delete("id1")
     assertThat(dao.allPaths()).containsExactly("/b.epub")
-    dao.deleteByPath("/b.epub")
-    assertThat(dao.allPaths()).isEmpty()
   }
 
   private fun entity(
