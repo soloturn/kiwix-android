@@ -57,7 +57,4 @@ abstract class EpubLibraryDao {
 
   @Query("DELETE FROM EpubBookRoomEntity WHERE id = :id")
   abstract fun delete(id: String)
-
-  @Query("DELETE FROM EpubBookRoomEntity WHERE path = :path")
-  abstract fun deleteByPath(path: String)
 }
