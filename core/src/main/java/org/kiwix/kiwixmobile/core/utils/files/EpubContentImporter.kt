@@ -23,6 +23,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.kiwix.kiwixmobile.core.utils.TAG_KIWIX
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -158,7 +159,17 @@ object EpubContentImporter {
   private const val MAX_BASE_LENGTH = 100
 }
 
-/** Imports [uri] into `filesDir/epub` on the IO dispatcher; the result says why a failure happened. */
+/** Imports [uri] into `filesDir/epub` on the IO dispatcher; null on any failure (logged). */
+suspend fun importEpubContentUri(context: Context, uri: Uri): File? =
+  when (val result = importEpubContentUriResult(context, uri)) {
+    is EpubImportResult.Imported -> result.file
+    else -> {
+      Log.w(TAG_KIWIX, "EPUB import failed: $result")
+      null
+    }
+  }
+
+/** Like [importEpubContentUri] but says why an import failed. */
 suspend fun importEpubContentUriResult(context: Context, uri: Uri): EpubImportResult =
   withContext(Dispatchers.IO) {
     var name: String? = null
