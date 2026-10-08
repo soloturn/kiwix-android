@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.core.data
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
@@ -93,7 +92,6 @@ object RoomDowngradeBackupHelper {
     return version
   }
 
-  @SuppressLint("LogNotTimber")
   private fun backupTable(
     db: SQLiteDatabase,
     tableName: String
@@ -157,7 +155,6 @@ object RoomDowngradeBackupHelper {
     else -> null
   }
 
-  @SuppressLint("LogNotTimber")
   private fun getExistingColumns(
     db: SupportSQLiteDatabase,
     tableName: String

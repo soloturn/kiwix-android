@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.core.utils.dialog
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -71,7 +70,6 @@ class UnsupportedMimeTypeHandler @Inject constructor(
     )
   }
 
-  @SuppressLint("LogNotTimber")
   private fun openOrSaveFile(
     url: String?,
     documentType: String?,
