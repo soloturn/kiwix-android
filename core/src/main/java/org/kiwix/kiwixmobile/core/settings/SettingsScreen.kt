@@ -21,7 +21,6 @@ package org.kiwix.kiwixmobile.core.settings
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.annotation.SuppressLint
 import android.app.Activity.RESULT_OK
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.LocalActivity
@@ -67,8 +66,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -411,7 +411,7 @@ private fun LanguageCategory(
       }
 
     val systemLocale = remember { LocaleHelper.getSystemLocale(context) }
-    val uiLocale = context.resources.configuration.locales.get(0) ?: Locale.getDefault()
+    val uiLocale = LocalConfiguration.current.locales[0]
     val systemLanguageName = systemLocale.getDisplayLanguage(uiLocale).replaceFirstChar {
       if (it.isLowerCase()) it.titlecase(uiLocale) else "$it"
     }
@@ -567,16 +567,11 @@ private fun DisplayCategory(coreSettingsViewModel: CoreSettingsViewModel) {
 
 @Composable
 fun AppThemePreference(
-  context: Context = LocalContext.current,
   themeLabel: String,
   coreSettingsViewModel: CoreSettingsViewModel,
 ) {
-  val entries = remember {
-    context.resources.getStringArray(R.array.pref_themes_entries).toList()
-  }
-  val values = remember {
-    context.resources.getStringArray(R.array.pref_themes_values).toList()
-  }
+  val entries = stringArrayResource(R.array.pref_themes_entries).toList()
+  val values = stringArrayResource(R.array.pref_themes_values).toList()
 
   ListPreference(
     titleId = R.string.pref_theme,

@@ -118,7 +118,6 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -1237,10 +1236,10 @@ fun TabSwitcherView(
       state = state
     ) {
       itemsIndexed(tabsState.webViews, key = { _, item -> item.hashCode() }) { index, webView ->
-        val context = LocalContext.current
+        val homeTitle = stringResource(R.string.menu_home)
         val title = remember(webView, webView.title) {
           webView.title?.fromHtml()?.toString()
-            ?: context.getString(R.string.menu_home)
+            ?: homeTitle
         }
 
         TabItemView(

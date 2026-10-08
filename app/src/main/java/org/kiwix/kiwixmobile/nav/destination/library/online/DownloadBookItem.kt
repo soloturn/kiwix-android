@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -154,7 +155,6 @@ fun PauseStopButtonsRow(
   onPauseResumeClick: (LibraryDownloadItem) -> Unit,
   onStopClick: (LibraryDownloadItem) -> Unit
 ) {
-  val context = LocalContext.current
   val isPaused = item.downloadState == DownloadState.Paused
 
   Row(
@@ -169,8 +169,8 @@ fun PauseStopButtonsRow(
         .minimumInteractiveComponentSize()
         .semantics { testTag = DOWNLOADING_PAUSE_BUTTON_TESTING_TAG }
     ) {
-      val contentDescription = context.getString(string.tts_pause) +
-        "/${context.getString(string.tts_resume)}/${item.hashCode()}"
+      val contentDescription = stringResource(string.tts_pause) +
+        "/${stringResource(string.tts_resume)}/${item.hashCode()}"
       Icon(
         painter = getPauseResumeButtonIcon(isPaused).toPainter(),
         contentDescription = contentDescription,
@@ -193,7 +193,7 @@ fun PauseStopButtonsRow(
     ) {
       Icon(
         painter = painterResource(id = R.drawable.ic_stop_24dp),
-        contentDescription = context.getString(string.stop) + item.hashCode()
+        contentDescription = stringResource(string.stop) + item.hashCode()
       )
     }
   }

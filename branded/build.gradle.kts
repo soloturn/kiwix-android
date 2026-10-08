@@ -73,9 +73,7 @@ androidComponents {
 dependencies {
   // Keep the migration for branded apps, since they are released on playStore.
   implementation(project(":objectboxmigration"))
-  // The Readium-driven dependency uplift makes androidTest (espresso) want a newer
-  // error-prone than the main runtime resolves; pin the main runtime to it so AGP's
-  // consistent resolution between the two stays satisfiable.
+  // Needed: without it AGP's androidTest classpath fails to resolve (espresso wants 2.30.0, main strictly 2.15.0).
   implementation(Libs.ERROR_PRONE_ANNOTATIONS)
 }
 
