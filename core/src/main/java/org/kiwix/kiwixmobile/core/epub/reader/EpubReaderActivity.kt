@@ -83,10 +83,8 @@ class EpubReaderActivity : BaseActivity() {
     // (constant) display cutout and fixed margins are reserved, never the system bars, so the
     // text doesn't re-paginate when the bars or overlay toggle.
     ViewCompat.setOnApplyWindowInsetsListener(navigatorContainer) { view, insets ->
-      val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
       val margin = (READING_MARGIN_DP * resources.displayMetrics.density).toInt()
-      view.setPadding(cutout.left, cutout.top + margin, cutout.right, cutout.bottom + margin)
-      insets
+      applyReadingInsets(view, insets, margin)
     }
     root = FrameLayout(this).apply {
       addView(navigatorContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
@@ -119,8 +117,8 @@ class EpubReaderActivity : BaseActivity() {
     val controller = WindowCompat.getInsetsController(window, root)
     controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     lifecycleScope.launch {
-      combine(viewModel.state, viewModel.chromeVisible) { state, chrome ->
-        chrome || state !is EpubReaderUiState.Ready
+      combine(viewModel.state, viewModel.chromeVisible, pageReady) { state, chrome, shown ->
+        chrome || state !is EpubReaderUiState.Ready || !shown
       }.collect { showBars ->
         if (showBars) {
           controller.show(WindowInsetsCompat.Type.systemBars())
@@ -181,8 +179,7 @@ class EpubReaderActivity : BaseActivity() {
     val fragment = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as? EpubNavigatorFragment
       ?: return
     navigator = fragment
-    // Hidden, not gone, so it still lays out; a failed load must not leave the screen stuck.
-    navigatorContainer.alpha = 0f
+    // The loading screen covers the book; a failed load must not leave it there.
     lifecycleScope.launch {
       delay(REVEAL_TIMEOUT_MS)
       revealBook()
@@ -200,12 +197,13 @@ class EpubReaderActivity : BaseActivity() {
   }
 
   private fun revealBook() {
-    navigatorContainer.alpha = 1f
     pageReady.value = true
   }
 
   /** Links never reach here; Readium follows them itself. Scrolling books have no edge zones. */
   private fun handleTap(fragment: EpubNavigatorFragment, event: TapEvent): Boolean {
+    // Taps reach the book through the loading screen, which must not act on them.
+    if (!pageReady.value) return true
     val overflow = fragment.overflow.value
     val zone = if (overflow.scroll) {
       TapZone.CENTER
@@ -216,11 +214,14 @@ class EpubReaderActivity : BaseActivity() {
         overflow.readingProgression == ReadingProgression.RTL
       )
     }
-    when (EpubTapZones.actionFor(zone, viewModel.chromeVisible.value)) {
+    val overlayVisible = viewModel.chromeVisible.value
+    val action = EpubTapZones.actionFor(zone, overlayVisible)
+    if (EpubTapZones.dismissesOverlay(action, overlayVisible)) viewModel.setChromeVisible(false)
+    when (action) {
       TapAction.PREVIOUS_PAGE -> fragment.goBackward(animated = true)
       TapAction.NEXT_PAGE -> fragment.goForward(animated = true)
       TapAction.SHOW_OVERLAY -> viewModel.setChromeVisible(true)
-      TapAction.HIDE_OVERLAY -> viewModel.setChromeVisible(false)
+      TapAction.HIDE_OVERLAY -> Unit
     }
     return true
   }

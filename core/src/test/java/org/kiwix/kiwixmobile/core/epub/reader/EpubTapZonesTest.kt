@@ -48,9 +48,19 @@ class EpubTapZonesTest {
   }
 
   @Test
-  fun `with the overlay up every tap only hides it`() {
+  fun `with the overlay up the middle hides it and edges still turn pages`() {
+    assertEquals(TapAction.HIDE_OVERLAY, EpubTapZones.actionFor(TapZone.CENTER, true))
+    assertEquals(TapAction.PREVIOUS_PAGE, EpubTapZones.actionFor(TapZone.PREVIOUS_PAGE, true))
+    assertEquals(TapAction.NEXT_PAGE, EpubTapZones.actionFor(TapZone.NEXT_PAGE, true))
+  }
+
+  @Test
+  fun `every tap on the page dismisses a visible overlay, none touches a hidden one`() {
     TapZone.entries.forEach {
-      assertEquals(TapAction.HIDE_OVERLAY, EpubTapZones.actionFor(it, overlayVisible = true))
+      val action = EpubTapZones.actionFor(it, overlayVisible = true)
+      assertEquals(true, EpubTapZones.dismissesOverlay(action, overlayVisible = true))
+      val hiddenAction = EpubTapZones.actionFor(it, overlayVisible = false)
+      assertEquals(false, EpubTapZones.dismissesOverlay(hiddenAction, overlayVisible = false))
     }
   }
 
