@@ -26,5 +26,9 @@ class SearchWrapper : Search() {
   override fun getResults(start: Int, maxResults: Int): SearchIteratorWrapper =
     super.getResults(start, maxResults) as SearchIteratorWrapper
 
+  override fun cancel() = super.cancel()
+
+  override fun isCancelled(): Boolean = super.isCancelled()
+
   override fun dispose() = super.dispose()
 }

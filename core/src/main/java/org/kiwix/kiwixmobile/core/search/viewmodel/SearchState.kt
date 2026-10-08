@@ -82,7 +82,13 @@ data class SearchState(
         }
 
         is ZimSearchResultSet.PageContent -> {
-          val searchIterator = zimSearchResultSet.search.getResults(startIndex, safeEndIndex)
+          val search = zimSearchResultSet.search
+          cancelToken.attach(search::cancel)
+          val searchIterator = try {
+            search.getResults(startIndex, safeEndIndex)
+          } finally {
+            cancelToken.detach()
+          }
           try {
             while (searchIterator.hasNext()) {
               if (cancelToken.isCancelled) break

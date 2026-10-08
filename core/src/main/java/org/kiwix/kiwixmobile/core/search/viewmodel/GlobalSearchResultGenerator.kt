@@ -90,6 +90,47 @@ class GlobalSearchResultGeneratorImpl @Inject constructor(
     }
   }
 
+  // Null when the book has no full-text index — caller falls back to title search.
+  @Suppress("NestedBlockDepth")
+  private suspend fun collectPageContent(
+    reader: ZimFileReader,
+    searchTerm: String,
+    cancelToken: SearchCancelToken,
+    bookTitle: String,
+    sourceDb: String
+  ): List<ZimSearchResultListItem>? {
+    val search = reader.searchFullText(searchTerm) ?: return null
+    val results = mutableListOf<ZimSearchResultListItem>()
+    try {
+      cancelToken.attach(search::cancel)
+      val iterator = search.getResults(0, GLOBAL_SEARCH_MAX_RESULTS_PER_BOOK)
+      try {
+        while (iterator.hasNext()) {
+          if (cancelToken.isCancelled) break
+          yield()
+          // Snippet before next(): afterwards it describes the next hit.
+          val snippet = iterator.snippetOrNull()
+          val entry = iterator.next()
+          results.add(
+            ZimSearchResultListItem(
+              value = entry.title,
+              url = entry.path,
+              snippet = snippet,
+              bookTitle = bookTitle,
+              zimReaderSourceDatabaseValue = sourceDb
+            )
+          )
+        }
+      } finally {
+        runCatching { iterator.dispose() }
+      }
+    } finally {
+      cancelToken.detach()
+      search.dispose()
+    }
+    return results
+  }
+
   @Suppress("NestedBlockDepth", "ReturnCount")
   private suspend fun collectResults(
     reader: ZimFileReader,
@@ -103,34 +144,7 @@ class GlobalSearchResultGeneratorImpl @Inject constructor(
     val results = mutableListOf<ZimSearchResultListItem>()
 
     if (searchMode == SearchMode.PAGE_CONTENT) {
-      val search = reader.searchFullText(searchTerm)
-      if (search != null) {
-        try {
-          val iterator = search.getResults(0, GLOBAL_SEARCH_MAX_RESULTS_PER_BOOK)
-          try {
-            while (iterator.hasNext()) {
-              if (cancelToken.isCancelled) break
-              yield()
-              val entrySnippet = iterator.snippetOrNull()
-              val entry = iterator.next()
-              results.add(
-                ZimSearchResultListItem(
-                  value = entry.title,
-                  url = entry.path,
-                  snippet = entrySnippet,
-                  bookTitle = bookTitle,
-                  zimReaderSourceDatabaseValue = sourceDb
-                )
-              )
-            }
-          } finally {
-            runCatching { iterator.dispose() }
-          }
-        } finally {
-          search.dispose()
-        }
-        return results
-      }
+      collectPageContent(reader, searchTerm, cancelToken, bookTitle, sourceDb)?.let { return it }
     }
 
     // Title search, or the full-text fallback for books without an index.

@@ -19,27 +19,29 @@
 package org.kiwix.kiwixmobile.core.search.viewmodel
 
 /**
- * App-owned cancellation flag for one in-flight search.
- *
- * Today libzim exposes no way to abort a Xapian match mid-flight, so this is only
- * polled between results. When libzim grows one, the seam is a `PostingSource`
- * subclass that reads this flag and throws, combined with the real query via
- * `OP_FILTER` — that stops sooner than an `Enquire`-level cancel (for `OP_PHRASE`
- * subqueries the and-like ops combine and the positional check is hoisted above
- * them). Nothing in the match path may catch that exception; it is the signal.
- *
- * libzim already uses that exact shape for geo filtering — `src/search.cpp` builds
- * `Query(OP_FILTER, xquery, geoQuery)` around a `LatLongDistancePostingSource`.
- *
- * JNI maps `std::exception` to `java.lang.Exception`, not `CancellationException`,
- * so the match path rethrows a `CancellationException` once this flag is set.
+ * Cancellation flag for one in-flight search. `cancel()` also forwards to the
+ * attached native `Search`, aborting a running `get_mset()` mid-match.
  */
 class SearchCancelToken {
   @Volatile
   var isCancelled: Boolean = false
     private set
 
+  @Volatile
+  private var cancelAction: (() -> Unit)? = null
+
+  /** Route `cancel()` to this native search. Fires immediately if already cancelled. */
+  fun attach(cancelAction: () -> Unit) {
+    this.cancelAction = cancelAction
+    if (isCancelled) cancelAction()
+  }
+
+  fun detach() {
+    cancelAction = null
+  }
+
   fun cancel() {
     isCancelled = true
+    cancelAction?.invoke()
   }
 }
