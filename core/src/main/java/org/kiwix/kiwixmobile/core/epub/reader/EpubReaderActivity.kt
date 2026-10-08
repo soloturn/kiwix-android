@@ -43,6 +43,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterIsInstance
@@ -67,6 +68,7 @@ import java.io.File
 class EpubReaderActivity : BaseActivity() {
   private val viewModel: EpubReaderViewModel by viewModels()
   private val darkTheme = MutableStateFlow(false)
+  private val pageReady = MutableStateFlow(false)
   private var navigator: EpubNavigatorFragment? = null
   private lateinit var root: FrameLayout
   private lateinit var navigatorContainer: FragmentContainerView
@@ -135,6 +137,7 @@ class EpubReaderActivity : BaseActivity() {
     val locator by viewModel.currentLocator.collectAsState()
     val chromeVisible by viewModel.chromeVisible.collectAsState()
     val positions by viewModel.positions.collectAsState()
+    val bookShown by pageReady.collectAsState()
     val readingOrder = (state as? EpubReaderUiState.Ready)?.book?.publication?.readingOrder.orEmpty()
     EpubReaderScreen(
       state = state,
@@ -146,6 +149,7 @@ class EpubReaderActivity : BaseActivity() {
         hasNextChapter = locator?.let { adjacentChapter(readingOrder, it, next = true) } != null
       ),
       chromeVisible = chromeVisible,
+      pageReady = bookShown,
       actions = EpubReaderActions(
         onBack = { onBackPressedDispatcher.onBackPressed() },
         onTocItem = { navigator?.go(it.link) },
@@ -162,6 +166,9 @@ class EpubReaderActivity : BaseActivity() {
       initialLocator = book.initialLocator,
       initialPreferences = viewModel.settings.value.toPreferences(darkTheme.value),
       listener = linkListener,
+      paginationListener = object : EpubNavigatorFragment.PaginationListener {
+        override fun onPageLoaded() = revealBook()
+      },
       // The container's padding already keeps the book clear of the cutout.
       configuration = EpubNavigatorFragment.Configuration(shouldApplyInsetsPadding = false)
     )
@@ -172,6 +179,12 @@ class EpubReaderActivity : BaseActivity() {
     val fragment = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as? EpubNavigatorFragment
       ?: return
     navigator = fragment
+    // Hidden, not gone, so it still lays out; a failed load must not leave the screen stuck.
+    navigatorContainer.alpha = 0f
+    lifecycleScope.launch {
+      delay(REVEAL_TIMEOUT_MS)
+      revealBook()
+    }
     fragment.addInputListener(
       object : InputListener {
         override fun onTap(event: TapEvent) = handleTap(fragment, event)
@@ -182,6 +195,11 @@ class EpubReaderActivity : BaseActivity() {
         fragment.currentLocator.collect(viewModel::onLocatorChanged)
       }
     }
+  }
+
+  private fun revealBook() {
+    navigatorContainer.alpha = 1f
+    pageReady.value = true
   }
 
   /** Links never reach here; Readium follows them itself. Scrolling books have no edge zones. */
@@ -232,6 +250,7 @@ class EpubReaderActivity : BaseActivity() {
 
   companion object {
     private const val NAVIGATOR_TAG = "epubNavigator"
+    private const val REVEAL_TIMEOUT_MS = 5_000L
 
     // Constant top and bottom margin around the page, so the overlay toggling never reflows it.
     private const val READING_MARGIN_DP = 32
