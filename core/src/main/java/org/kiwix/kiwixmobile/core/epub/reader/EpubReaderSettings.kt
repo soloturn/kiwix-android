@@ -41,6 +41,9 @@ enum class EpubThemePreset(val readiumTheme: Theme, val pageColor: Int?) {
   val backgroundColor get() = pageColor ?: readiumTheme.backgroundColor
 }
 
+/** ARGB ints: the overlay's [background] and the text and icon colour on it. */
+data class EpubOverlayColors(val background: Int, val content: Int)
+
 /** Only fonts that need no bundled files: the book's own, or the system's generic families. */
 enum class EpubFontChoice { PUBLISHER, SERIF, SANS_SERIF, MONOSPACE }
 
@@ -77,6 +80,12 @@ data class EpubReaderSettings(
     themePreset ?: if (nightMode) EpubThemePreset.DARK else EpubThemePreset.WHITE
 
   fun backgroundColor(nightMode: Boolean) = effectivePreset(nightMode).backgroundColor
+
+  /** Colours for the overlay, so it matches the page instead of the app theme. */
+  fun overlayColors(nightMode: Boolean): EpubOverlayColors {
+    val preset = effectivePreset(nightMode)
+    return EpubOverlayColors(preset.backgroundColor, preset.readiumTheme.contentColor)
+  }
 
   fun toPreferences(nightMode: Boolean): EpubPreferences {
     val preset = effectivePreset(nightMode)
