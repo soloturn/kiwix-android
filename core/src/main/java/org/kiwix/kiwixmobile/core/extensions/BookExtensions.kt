@@ -18,13 +18,11 @@
 
 package org.kiwix.kiwixmobile.core.extensions
 
-import android.annotation.SuppressLint
 import android.util.Base64
 import android.util.Log
 import org.kiwix.kiwixmobile.core.reader.ILLUSTRATION_SIZE
 import org.kiwix.libkiwix.Book
 
-@SuppressLint("LogNotTimber")
 fun Book?.getFavicon(): String? =
   runCatching {
     val illustration = this?.getIllustration(ILLUSTRATION_SIZE)
