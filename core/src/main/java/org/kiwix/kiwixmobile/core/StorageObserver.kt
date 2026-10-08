@@ -19,10 +19,15 @@
 package org.kiwix.kiwixmobile.core
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
@@ -47,18 +52,29 @@ class StorageObserver @Inject constructor(
   private val epubLibraryManager: EpubLibraryManager,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
+  private val importScope = CoroutineScope(SupervisorJob() + ioDispatcher)
+  private val importMutex = Mutex()
+
   fun getBooksOnFileSystem(
     scanningProgressListener: ScanningProgressListener
   ): Flow<List<Book>> = flow {
     val (epubs, zims) = scanFiles(scanningProgressListener).first()
       .partition { isEpubFile(it.absolutePath) }
-    // EPUBs go to their own library table; only ZIMs are returned as libkiwix books.
-    runCatching { epubLibraryManager.importScanned(epubs) }
     val downloads = downloadRoomDao.downloads().first()
     val result = toFilesThatAreNotDownloading(zims, downloads)
       .mapNotNull { convertToLibkiwixBook(it) }
     emit(result)
+    importEpubsInBackground(epubs)
   }.flowOn(ioDispatcher)
+
+  // EPUBs go to their own library table (observed via Room), so the ZIM list must not wait for the
+  // slow parse. Own scope: callers take `first()`, which would cancel work launched in the flow.
+  private fun importEpubsInBackground(epubs: List<File>) {
+    if (epubs.isEmpty()) return
+    importScope.launch {
+      importMutex.withLock { runCatching { epubLibraryManager.importScanned(epubs) } }
+    }
+  }
 
   private fun scanFiles(scanningProgressListener: ScanningProgressListener): Flow<List<File>> =
     fileSearch.scan(scanningProgressListener, includeEpub = true)

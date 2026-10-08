@@ -25,10 +25,13 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -107,8 +110,38 @@ class StorageObserverTest {
       assertThat(awaitItem()).isEmpty()
       awaitComplete()
     }
+    advanceUntilIdle()
     coVerify { epubLibraryManager.importScanned(listOf(epub)) }
     coVerify(exactly = 0) { readerFactory.create(any(), any()) }
+  }
+
+  @Test
+  fun `zim list is emitted before a slow epub import finishes`() = runTest {
+    val epub: File = mockk()
+    every { epub.absolutePath } returns "/books/a.epub"
+    every { downloadModel.fileNameFromUrl } returns "test"
+    val gate = CompletableDeferred<Unit>()
+    coEvery { epubLibraryManager.importScanned(any()) } coAnswers {
+      gate.await()
+      1
+    }
+    files.value = listOf(epub)
+    storageObserver.getBooksOnFileSystem(scanningProgressListener).first()
+    advanceUntilIdle()
+    // The collector took first() and left; the import still runs and is still pending.
+    coVerify { epubLibraryManager.importScanned(listOf(epub)) }
+    assertThat(gate.isCompleted).isFalse()
+    gate.complete(Unit)
+  }
+
+  @Test
+  fun `a failing epub import does not affect the zim list`() = runTest {
+    val epub: File = mockk()
+    every { epub.absolutePath } returns "/books/a.epub"
+    coEvery { epubLibraryManager.importScanned(any()) } throws IllegalStateException("boom")
+    files.value = listOf(epub)
+    assertThat(storageObserver.getBooksOnFileSystem(scanningProgressListener).first()).isEmpty()
+    advanceUntilIdle()
   }
 
   @Test
