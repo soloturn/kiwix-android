@@ -28,7 +28,8 @@ private const val FLOAT_SLACK = 0.001f
 
 /**
  * Where the reader is in the whole book. [position] is a 1-based index into Readium's
- * `positions()` (a stable, device-independent page equivalent); 0 when they are not loaded.
+ * `positions()` (a stable unit of about 1024 characters, not a screen page); 0 when they are
+ * not loaded.
  */
 data class EpubProgress(val fraction: Float, val position: Int, val total: Int) {
   val percent get() = (fraction * PERCENT).roundToInt()
@@ -47,7 +48,13 @@ fun positionForFraction(fraction: Float, total: Int): Int =
 
 fun readingProgress(locator: Locator?, positionCount: Int): EpubProgress {
   val fraction = locator.bookFraction(positionCount)
-  return EpubProgress(fraction, positionForFraction(fraction, positionCount), positionCount)
+  val reported = locator?.locations?.position?.takeIf { positionCount > 0 }
+    ?.coerceIn(1, positionCount)
+  return EpubProgress(
+    fraction,
+    reported ?: positionForFraction(fraction, positionCount),
+    positionCount
+  )
 }
 
 /** The Readium position a scrubber [fraction] points at, or null with no positions. */
