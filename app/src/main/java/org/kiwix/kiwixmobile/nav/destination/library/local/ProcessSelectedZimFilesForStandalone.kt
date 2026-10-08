@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.nav.destination.library.local
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -41,6 +42,7 @@ import javax.inject.Inject
  * Handles the process of validating and opening selected ZIM files
  * for the Standalone (non-Play Store) variant of the app.
  */
+@SuppressLint("LogNotTimber")
 class ProcessSelectedZimFilesForStandalone @Inject constructor(
   private val kiwixDataStore: KiwixDataStore,
   @param:ApplicationContext private val context: Context,
@@ -152,6 +154,7 @@ class ProcessSelectedZimFilesForStandalone @Inject constructor(
   }
 }
 
+@SuppressLint("LogNotTimber")
 interface SelectedZimFileCallback {
   /**
    * A validated EPUB was selected; implementers open it in the native EPUB reader.
