@@ -187,13 +187,20 @@ class EpubReaderViewModelTest {
   }
 
   @Test
-  fun `chrome toggles`() = runTest {
+  fun `the overlay starts hidden and can be shown and hidden`() = runTest {
     val vm = viewModel(book().path)
-    assertTrue(vm.chromeVisible.value)
-    vm.toggleChrome()
     assertFalse(vm.chromeVisible.value)
-    vm.toggleChrome()
+    vm.setChromeVisible(true)
     assertTrue(vm.chromeVisible.value)
+    vm.setChromeVisible(false)
+    assertFalse(vm.chromeVisible.value)
+  }
+
+  @Test
+  fun `positions are loaded once the book is open`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    assertTrue(vm.positions.first { it.isNotEmpty() }.isNotEmpty())
   }
 
   private companion object {

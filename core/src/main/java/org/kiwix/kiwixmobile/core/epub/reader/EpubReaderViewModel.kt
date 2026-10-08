@@ -35,6 +35,7 @@ import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.publication.services.positions
 import java.io.File
 import javax.inject.Inject
 
@@ -70,8 +71,12 @@ class EpubReaderViewModel @Inject constructor(
   private val _currentLocator = MutableStateFlow<Locator?>(null)
   val currentLocator: StateFlow<Locator?> = _currentLocator.asStateFlow()
 
-  private val _chromeVisible = MutableStateFlow(true)
+  // Hidden while reading; the screen shows its own bars until a book is ready.
+  private val _chromeVisible = MutableStateFlow(false)
   val chromeVisible: StateFlow<Boolean> = _chromeVisible.asStateFlow()
+
+  private val _positions = MutableStateFlow<List<Locator>>(emptyList())
+  val positions: StateFlow<List<Locator>> = _positions.asStateFlow()
 
   private var saveJob: Job? = null
 
@@ -99,14 +104,15 @@ class EpubReaderViewModel @Inject constructor(
           _state.value = EpubReaderUiState.Ready(
             OpenEpub(publication, bookId, title, flattenToc(publication.tableOfContents), locator)
           )
+          _positions.value = runCatching { publication.positions() }.getOrDefault(emptyList())
         },
         onFailure = { _state.value = EpubReaderUiState.Failed }
       )
     }
   }
 
-  fun toggleChrome() {
-    _chromeVisible.value = !_chromeVisible.value
+  fun setChromeVisible(visible: Boolean) {
+    _chromeVisible.value = visible
   }
 
   fun changeSettings(transform: (EpubReaderSettings) -> EpubReaderSettings) {

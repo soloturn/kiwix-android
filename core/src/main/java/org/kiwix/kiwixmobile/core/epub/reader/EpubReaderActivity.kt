@@ -21,9 +21,11 @@ package org.kiwix.kiwixmobile.core.epub.reader
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
@@ -32,7 +34,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.Lifecycle
@@ -49,7 +53,7 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
-import org.readium.r2.navigator.util.DirectionalNavigationAdapter
+import org.readium.r2.navigator.preferences.ReadingProgression
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.util.AbsoluteUrl
 import java.io.File
@@ -72,15 +76,13 @@ class EpubReaderActivity : BaseActivity() {
     super.onCreate(null)
     darkTheme.value = isNightMode(resources.configuration)
     navigatorContainer = FragmentContainerView(this).apply { id = View.generateViewId() }
-    // Edge-to-edge: keep the book clear of the system bars.
+    // Immersive: the book fills the screen and the bars and overlay float above it. Only the
+    // (constant) display cutout and fixed margins are reserved, never the system bars, so the
+    // text doesn't re-paginate when the bars or overlay toggle.
     ViewCompat.setOnApplyWindowInsetsListener(navigatorContainer) { view, insets ->
-      val bars = insets.getInsets(
-        WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
-      )
-      // Reserve the top bar's height so text never sits under it; a fixed band avoids
-      // re-paginating when the bar toggles.
-      val barHeight = (APP_BAR_HEIGHT_DP * resources.displayMetrics.density).toInt()
-      view.setPadding(bars.left, bars.top + barHeight, bars.right, bars.bottom)
+      val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+      val margin = (READING_MARGIN_DP * resources.displayMetrics.density).toInt()
+      view.setPadding(cutout.left, cutout.top + margin, cutout.right, cutout.bottom + margin)
       insets
     }
     root = FrameLayout(this).apply {
@@ -91,6 +93,7 @@ class EpubReaderActivity : BaseActivity() {
       )
     }
     setContentView(root)
+    setUpImmersiveMode()
     lifecycleScope.launch {
       val ready = viewModel.state.filterIsInstance<EpubReaderUiState.Ready>().first()
       attachNavigator(ready.book)
@@ -99,6 +102,28 @@ class EpubReaderActivity : BaseActivity() {
       combine(viewModel.settings, darkTheme, ::Pair).collect { (settings, dark) ->
         root.setBackgroundColor(settings.backgroundColor(dark))
         navigator?.submitPreferences(settings.toPreferences(dark))
+      }
+    }
+  }
+
+  /** System bars show with the overlay (and while loading), otherwise a swipe reveals them. */
+  private fun setUpImmersiveMode() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      window.attributes = window.attributes.apply {
+        layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+      }
+    }
+    val controller = WindowCompat.getInsetsController(window, root)
+    controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    lifecycleScope.launch {
+      combine(viewModel.state, viewModel.chromeVisible) { state, chrome ->
+        chrome || state !is EpubReaderUiState.Ready
+      }.collect { showBars ->
+        if (showBars) {
+          controller.show(WindowInsetsCompat.Type.systemBars())
+        } else {
+          controller.hide(WindowInsetsCompat.Type.systemBars())
+        }
       }
     }
   }
@@ -131,7 +156,9 @@ class EpubReaderActivity : BaseActivity() {
     val factory = EpubNavigatorFactory(book.publication).createFragmentFactory(
       initialLocator = book.initialLocator,
       initialPreferences = viewModel.settings.value.toPreferences(darkTheme.value),
-      listener = linkListener
+      listener = linkListener,
+      // The container's padding already keeps the book clear of the cutout.
+      configuration = EpubNavigatorFragment.Configuration(shouldApplyInsetsPadding = false)
     )
     supportFragmentManager.fragmentFactory = factory
     supportFragmentManager.commitNow {
@@ -140,14 +167,9 @@ class EpubReaderActivity : BaseActivity() {
     val fragment = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as? EpubNavigatorFragment
       ?: return
     navigator = fragment
-    fragment.addInputListener(DirectionalNavigationAdapter(fragment))
-    // Taps the page-turn edges don't take show or hide the top bar.
     fragment.addInputListener(
       object : InputListener {
-        override fun onTap(event: TapEvent): Boolean {
-          viewModel.toggleChrome()
-          return true
-        }
+        override fun onTap(event: TapEvent) = handleTap(fragment, event)
       }
     )
     lifecycleScope.launch {
@@ -155,6 +177,27 @@ class EpubReaderActivity : BaseActivity() {
         fragment.currentLocator.collect(viewModel::onLocatorChanged)
       }
     }
+  }
+
+  /** Links never reach here; Readium follows them itself. Scrolling books have no edge zones. */
+  private fun handleTap(fragment: EpubNavigatorFragment, event: TapEvent): Boolean {
+    val overflow = fragment.overflow.value
+    val zone = if (overflow.scroll) {
+      TapZone.CENTER
+    } else {
+      EpubTapZones.classify(
+        event.point.x,
+        fragment.publicationView.width.toFloat(),
+        overflow.readingProgression == ReadingProgression.RTL
+      )
+    }
+    when (EpubTapZones.actionFor(zone, viewModel.chromeVisible.value)) {
+      TapAction.PREVIOUS_PAGE -> fragment.goBackward(animated = true)
+      TapAction.NEXT_PAGE -> fragment.goForward(animated = true)
+      TapAction.SHOW_OVERLAY -> viewModel.setChromeVisible(true)
+      TapAction.HIDE_OVERLAY -> viewModel.setChromeVisible(false)
+    }
+    return true
   }
 
   private fun goToAdjacentChapter(next: Boolean) {
@@ -185,8 +228,8 @@ class EpubReaderActivity : BaseActivity() {
   companion object {
     private const val NAVIGATOR_TAG = "epubNavigator"
 
-    // Material 3 small top app bar height.
-    private const val APP_BAR_HEIGHT_DP = 64
+    // Constant top and bottom margin around the page, so the overlay toggling never reflows it.
+    private const val READING_MARGIN_DP = 32
 
     fun intent(context: Context, file: File) =
       Intent(context, EpubReaderActivity::class.java)
