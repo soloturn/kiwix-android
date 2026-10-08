@@ -78,6 +78,9 @@ class EpubReaderViewModel @Inject constructor(
   private val _positions = MutableStateFlow<List<Locator>>(emptyList())
   val positions: StateFlow<List<Locator>> = _positions.asStateFlow()
 
+  /** Open panels; they survive an activity recreation, which restores no saved state. */
+  val panels = EpubReaderPanels()
+
   private var saveJob: Job? = null
 
   init {
@@ -110,6 +113,9 @@ class EpubReaderViewModel @Inject constructor(
       )
     }
   }
+
+  /** Where a freshly attached navigator starts: the latest position, not where the book opened. */
+  fun startLocator(book: OpenEpub): Locator? = _currentLocator.value ?: book.initialLocator
 
   fun setChromeVisible(visible: Boolean) {
     _chromeVisible.value = visible
