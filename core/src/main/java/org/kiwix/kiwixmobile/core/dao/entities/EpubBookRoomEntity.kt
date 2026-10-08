@@ -37,5 +37,7 @@ data class EpubBookRoomEntity(
   val coverPath: String?,
   val size: Long,
   val addedAt: Long,
-  val lastOpenedAt: Long
+  val lastOpenedAt: Long,
+  /** Readium Locator JSON of the last reading position, or null. */
+  val lastLocator: String? = null
 )

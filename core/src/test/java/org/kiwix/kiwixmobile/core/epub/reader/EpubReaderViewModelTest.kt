@@ -28,7 +28,6 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -59,16 +58,19 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.R])
 class EpubReaderViewModelTest {
+  // One dispatcher for Main, the opener and io: all work runs on virtual time.
+  private val testDispatcher = UnconfinedTestDispatcher()
+
   @get:Rule
   val tmp = TemporaryFolder()
 
   @get:Rule
-  val mainDispatcherRule = MainDispatcherRule(UnconfinedTestDispatcher())
+  val mainDispatcherRule = MainDispatcherRule(testDispatcher)
 
   private val library: EpubLibraryManager = mockk()
   private val store: KiwixDataStore = mockk()
   private val opener =
-    EpubPublicationOpener(ApplicationProvider.getApplicationContext(), Dispatchers.IO)
+    EpubPublicationOpener(ApplicationProvider.getApplicationContext(), testDispatcher)
 
   private fun entity(id: String, path: String) =
     EpubBookRoomEntity(id, path, "t", "a", "en", null, 1L, 0L, 0L)
@@ -81,12 +83,12 @@ class EpubReaderViewModelTest {
     path: String?,
     settings: EpubReaderSettings = EpubReaderSettings(),
     savedLocator: String? = null,
-    io: CoroutineDispatcher = Dispatchers.IO
+    io: CoroutineDispatcher = testDispatcher
   ): EpubReaderViewModel {
-    every { store.epubReaderSettings } returns flowOf(settings)
-    coEvery { store.getEpubLocator(BOOK_ID) } returns savedLocator
-    coEvery { store.setEpubLocator(any(), any()) } just Runs
-    coEvery { store.setEpubReaderSettings(any()) } just Runs
+    every { store.epubReaderSettingsJson } returns flowOf(settings.toJson())
+    coEvery { library.locator(BOOK_ID) } returns savedLocator
+    coEvery { library.saveLocator(any(), any()) } just Runs
+    coEvery { store.setEpubReaderSettingsJson(any()) } just Runs
     coEvery { library.add(any(), any()) } answers {
       entity(BOOK_ID, firstArg<File>().absolutePath)
     }
@@ -166,12 +168,12 @@ class EpubReaderViewModelTest {
     vm.onLocatorChanged(locator("c1.xhtml", 0.2))
     advanceTimeBy(300)
     runCurrent()
-    coVerify(exactly = 0) { store.setEpubLocator(any(), any()) }
+    coVerify(exactly = 0) { library.saveLocator(any(), any()) }
 
     advanceTimeBy(300)
     runCurrent()
     coVerify(exactly = 1) {
-      store.setEpubLocator(BOOK_ID, EpubLocatorCodec.encode(locator("c1.xhtml", 0.2)))
+      library.saveLocator(BOOK_ID, EpubLocatorCodec.encode(locator("c1.xhtml", 0.2)))
     }
   }
 
@@ -185,7 +187,7 @@ class EpubReaderViewModelTest {
     vm.persistPosition()
     runCurrent()
 
-    coVerify(exactly = 1) { store.setEpubLocator(BOOK_ID, EpubLocatorCodec.encode(latest)) }
+    coVerify(exactly = 1) { library.saveLocator(BOOK_ID, EpubLocatorCodec.encode(latest)) }
   }
 
   @Test
@@ -199,8 +201,8 @@ class EpubReaderViewModelTest {
     runCurrent()
 
     assertEquals(1.0, vm.settings.value.fontScale, 0.0)
-    coVerify(exactly = 1) { store.setEpubReaderSettings(EpubReaderSettings(fontScale = 1.1)) }
-    coVerify(exactly = 1) { store.setEpubReaderSettings(EpubReaderSettings(fontScale = 1.0)) }
+    coVerify(exactly = 1) { store.setEpubReaderSettingsJson(EpubReaderSettings(fontScale = 1.1).toJson()) }
+    coVerify(exactly = 1) { store.setEpubReaderSettingsJson(EpubReaderSettings(fontScale = 1.0).toJson()) }
   }
 
   @Test

@@ -110,6 +110,27 @@ class EpubLibraryDaoTest {
     assertThat(dao.allPaths()).containsExactly("/b.epub")
   }
 
+  @Test
+  fun locator_roundTripsPerBookAndDiesWithTheRow() = runTest {
+    dao.upsert(entity("id1", "/a.epub"))
+    dao.upsert(entity("id2", "/b.epub"))
+    assertThat(dao.getLocator("id1")).isNull()
+    dao.setLocator("id1", "{\"href\":\"a\"}")
+    dao.setLocator("id2", "{\"href\":\"b\"}")
+    dao.setLocator("id1", "{\"href\":\"c\"}")
+    assertThat(dao.getLocator("id1")).isEqualTo("{\"href\":\"c\"}")
+    assertThat(dao.getLocator("id2")).isEqualTo("{\"href\":\"b\"}")
+    dao.delete("id1")
+    assertThat(dao.getLocator("id1")).isNull()
+  }
+
+  @Test
+  fun setLocator_unknownId_isNoOp() = runTest {
+    dao.setLocator("missing", "{}")
+    assertThat(dao.getLocator("missing")).isNull()
+    assertThat(dao.allPaths()).isEmpty()
+  }
+
   private fun entity(
     id: String,
     path: String,

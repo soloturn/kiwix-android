@@ -612,11 +612,12 @@ class KiwixRoomDatabaseMigrationTest {
     migrateRange(fromVersion = 10, toVersion = 11)
 
     db.execSQL(
-      "INSERT INTO EpubBookRoomEntity VALUES ('id1', '/a.epub', 'T', 'A', 'en', NULL, 1, 2, 0)"
+      "INSERT INTO EpubBookRoomEntity VALUES ('id1', '/a.epub', 'T', 'A', 'en', NULL, 1, 2, 0, '{\"href\":\"a\"}')"
     )
     val cursor = db.query("SELECT * FROM EpubBookRoomEntity WHERE id = 'id1'")
     cursor.moveToFirst()
     assertEquals("/a.epub", cursor.getString(cursor.getColumnIndexOrThrow("path")))
+    assertEquals("{\"href\":\"a\"}", cursor.getString(cursor.getColumnIndexOrThrow("lastLocator")))
     cursor.close()
     val search = db.query("SELECT searchTerm FROM RecentSearchRoomEntity WHERE id = 1")
     search.moveToFirst()
@@ -624,7 +625,7 @@ class KiwixRoomDatabaseMigrationTest {
     search.close()
     org.junit.Assert.assertThrows(android.database.sqlite.SQLiteConstraintException::class.java) {
       db.execSQL(
-        "INSERT INTO EpubBookRoomEntity VALUES ('id2', '/a.epub', 'T', 'A', 'en', NULL, 1, 2, 0)"
+        "INSERT INTO EpubBookRoomEntity VALUES ('id2', '/a.epub', 'T', 'A', 'en', NULL, 1, 2, 0, NULL)"
       )
     }
   }

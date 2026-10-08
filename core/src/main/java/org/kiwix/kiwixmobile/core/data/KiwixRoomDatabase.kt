@@ -423,6 +423,7 @@ abstract class KiwixRoomDatabase : RoomDatabase() {
                 `size` INTEGER NOT NULL,
                 `addedAt` INTEGER NOT NULL,
                 `lastOpenedAt` INTEGER NOT NULL,
+                `lastLocator` TEXT,
                 PRIMARY KEY(`id`)
             )
             """.trimIndent()

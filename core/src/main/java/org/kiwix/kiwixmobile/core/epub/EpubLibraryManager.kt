@@ -65,11 +65,19 @@ class EpubLibraryManager @Inject constructor(
         size = file.length(),
         coverPath = info.cover?.takeIf { it.size <= MAX_COVER_BYTES }?.let { coverStore.save(id, it) },
         addedAt = existing?.addedAt ?: now,
-        lastOpenedAt = if (markOpened) now else existing?.lastOpenedAt ?: 0L
+        lastOpenedAt = if (markOpened) now else existing?.lastOpenedAt ?: 0L,
+        lastLocator = existing?.lastLocator
       )
       dao.upsert(entity)
       entity
     }
+
+  /** The Readium locator JSON last saved for [id], or null. */
+  suspend fun locator(id: String): String? = withContext(ioDispatcher) { dao.getLocator(id) }
+
+  suspend fun saveLocator(id: String, locatorJson: String) = withContext(ioDispatcher) {
+    dao.setLocator(id, locatorJson)
+  }
 
   /** Adds scanned files not already known by path; returns how many were added. */
   suspend fun importScanned(files: Collection<File>): Int = withContext(ioDispatcher) {
@@ -105,7 +113,8 @@ class EpubLibraryManager @Inject constructor(
     size: Long,
     coverPath: String?,
     addedAt: Long,
-    lastOpenedAt: Long
+    lastOpenedAt: Long,
+    lastLocator: String?
   ) = EpubBookRoomEntity(
     id = id,
     path = path,
@@ -115,7 +124,8 @@ class EpubLibraryManager @Inject constructor(
     coverPath = coverPath,
     size = size,
     addedAt = addedAt,
-    lastOpenedAt = lastOpenedAt
+    lastOpenedAt = lastOpenedAt,
+    lastLocator = lastLocator
   )
 
   private companion object {

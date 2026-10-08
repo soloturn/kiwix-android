@@ -39,7 +39,6 @@ import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ThemeConfig
 import org.kiwix.kiwixmobile.core.ThemeConfig.Theme.Companion.from
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
-import org.kiwix.kiwixmobile.core.epub.reader.EpubReaderSettings
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.core.zim_manager.Category
@@ -703,26 +702,15 @@ class KiwixDataStore @Inject constructor(
     }
   }
 
-  /** The Readium locator JSON last stored for [bookId], or null. */
-  suspend fun getEpubLocator(bookId: String): String? =
-    context.kiwixDataStore.data.first()[stringPreferencesKey("$EPUB_LOCATOR_PREFIX$bookId")]
+  /** EPUB reader settings as opaque JSON, or null when never saved. */
+  val epubReaderSettingsJson: Flow<String?> =
+    context.kiwixDataStore.data.map { prefs -> prefs[EPUB_SETTINGS_KEY] }
 
-  suspend fun setEpubLocator(bookId: String, locatorJson: String) {
-    context.kiwixDataStore.edit { prefs ->
-      prefs[stringPreferencesKey("$EPUB_LOCATOR_PREFIX$bookId")] = locatorJson
-    }
-  }
-
-  val epubReaderSettings: Flow<EpubReaderSettings> = context.kiwixDataStore.data.map { prefs ->
-    EpubReaderSettings.fromJson(prefs[EPUB_SETTINGS_KEY])
-  }
-
-  suspend fun setEpubReaderSettings(settings: EpubReaderSettings) {
-    context.kiwixDataStore.edit { prefs -> prefs[EPUB_SETTINGS_KEY] = settings.toJson() }
+  suspend fun setEpubReaderSettingsJson(json: String) {
+    context.kiwixDataStore.edit { prefs -> prefs[EPUB_SETTINGS_KEY] = json }
   }
 
   companion object {
-    private const val EPUB_LOCATOR_PREFIX = "epub_locator_"
     private val EPUB_SETTINGS_KEY = stringPreferencesKey("epub_reader_settings")
 
     // Prefs

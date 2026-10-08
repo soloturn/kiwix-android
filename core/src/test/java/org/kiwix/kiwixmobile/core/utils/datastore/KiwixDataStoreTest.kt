@@ -93,19 +93,8 @@ class KiwixDataStoreTest {
   }
 
   @Test
-  fun `epub locator is stored per book and null when unset`() = runTest {
-    assertThat(kiwixDataStore.getEpubLocator("book-a")).isNull()
-    kiwixDataStore.setEpubLocator("book-a", """{"href":"a.xhtml"}""")
-    kiwixDataStore.setEpubLocator("book-b", """{"href":"b.xhtml"}""")
-    assertThat(kiwixDataStore.getEpubLocator("book-a")).isEqualTo("""{"href":"a.xhtml"}""")
-    assertThat(kiwixDataStore.getEpubLocator("book-b")).isEqualTo("""{"href":"b.xhtml"}""")
-    kiwixDataStore.setEpubLocator("book-a", """{"href":"c.xhtml"}""")
-    assertThat(kiwixDataStore.getEpubLocator("book-a")).isEqualTo("""{"href":"c.xhtml"}""")
-  }
-
-  @Test
   fun `epub reader settings default then persist`() = runTest {
-    assertThat(kiwixDataStore.epubReaderSettings.first()).isEqualTo(EpubReaderSettings())
+    assertThat(kiwixDataStore.epubReaderSettingsJson.first()).isNull()
     val changed = EpubReaderSettings(
       fontScale = 1.5,
       pageMargins = 0.25,
@@ -113,8 +102,9 @@ class KiwixDataStoreTest {
       themePreset = EpubThemePreset.BLACK,
       scroll = true
     )
-    kiwixDataStore.setEpubReaderSettings(changed)
-    assertThat(kiwixDataStore.epubReaderSettings.first()).isEqualTo(changed)
+    kiwixDataStore.setEpubReaderSettingsJson(changed.toJson())
+    assertThat(EpubReaderSettings.fromJson(kiwixDataStore.epubReaderSettingsJson.first()))
+      .isEqualTo(changed)
   }
 
   @Test

@@ -177,6 +177,38 @@ class EpubLibraryManagerTest {
     assertNotNull(dao.getById("id"))
   }
 
+  @Test
+  fun `locator is saved per book and removed with the entry`() = runTest {
+    dao.rows += entity("a", "/a.epub")
+    dao.rows += entity("b", "/b.epub")
+    assertNull(manager.locator("a"))
+    manager.saveLocator("a", "{\"href\":\"1\"}")
+    manager.saveLocator("b", "{\"href\":\"2\"}")
+    assertEquals("{\"href\":\"1\"}", manager.locator("a"))
+    manager.remove("a")
+    assertNull(manager.locator("a"))
+    assertEquals("{\"href\":\"2\"}", manager.locator("b"))
+  }
+
+  @Test
+  fun `deleteFileAndEntry removes the locator too`() = runTest {
+    val file = epub("a.epub", "id")
+    dao.rows += entity("id", file.absolutePath)
+    manager.saveLocator("id", "{}")
+    manager.deleteFileAndEntry("id", file)
+    assertNull(manager.locator("id"))
+  }
+
+  @Test
+  fun `refreshing a changed file keeps its reading position`() = runTest {
+    val file = epub("a.epub", "id")
+    manager.add(file)
+    manager.saveLocator("id", "{\"href\":\"1\"}")
+    file.appendBytes(byteArrayOf(1, 2, 3))
+    manager.add(file)
+    assertEquals("{\"href\":\"1\"}", manager.locator("id"))
+  }
+
   private fun entity(id: String, path: String, cover: String? = null) = EpubBookRoomEntity(
     id,
     path,
@@ -202,6 +234,12 @@ class EpubLibraryManagerTest {
 
     override fun markOpened(id: String, openedAt: Long) {
       rows.replaceAll { if (it.id == id) it.copy(lastOpenedAt = openedAt) else it }
+    }
+
+    override fun getLocator(id: String) = rows.firstOrNull { it.id == id }?.lastLocator
+
+    override fun setLocator(id: String, locatorJson: String?) {
+      rows.replaceAll { if (it.id == id) it.copy(lastLocator = locatorJson) else it }
     }
 
     override fun delete(id: String) {

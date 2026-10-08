@@ -49,6 +49,12 @@ abstract class EpubLibraryDao {
   @Query("UPDATE EpubBookRoomEntity SET lastOpenedAt = :openedAt WHERE id = :id")
   abstract fun markOpened(id: String, openedAt: Long)
 
+  @Query("SELECT lastLocator FROM EpubBookRoomEntity WHERE id = :id")
+  abstract fun getLocator(id: String): String?
+
+  @Query("UPDATE EpubBookRoomEntity SET lastLocator = :locatorJson WHERE id = :id")
+  abstract fun setLocator(id: String, locatorJson: String?)
+
   @Query("DELETE FROM EpubBookRoomEntity WHERE id = :id")
   abstract fun delete(id: String)
 }
