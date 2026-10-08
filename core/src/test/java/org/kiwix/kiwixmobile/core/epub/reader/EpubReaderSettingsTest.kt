@@ -20,13 +20,23 @@
 
 package org.kiwix.kiwixmobile.core.epub.reader
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import android.os.Build
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.readium.r2.navigator.preferences.Color
+import org.readium.r2.navigator.preferences.FontFamily
+import org.readium.r2.navigator.preferences.TextAlign
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [Build.VERSION_CODES.R])
 class EpubReaderSettingsTest {
   @Test
   fun `font steps are clamped and free of float drift`() {
@@ -55,21 +65,82 @@ class EpubReaderSettingsTest {
 
   @Test
   fun `stored values are clamped and defaulted`() {
-    assertEquals(EpubReaderSettings(), EpubReaderSettings.of(null, null))
-    val wild = EpubReaderSettings.of(fontScale = 99.0, pageMargins = -4.0)
+    assertEquals(EpubReaderSettings(), EpubReaderSettings.fromJson(null))
+    assertEquals(EpubReaderSettings(), EpubReaderSettings.fromJson("{garbage"))
+    val wild = EpubReaderSettings.fromJson(
+      """{"fontScale":99,"pageMargins":-4,"lineSpacing":9,"fontChoice":"COMIC","theme":"NEON"}"""
+    )
     assertEquals(EpubReaderSettings.MAX_FONT_SCALE, wild.fontScale, 0.0)
     assertEquals(EpubReaderSettings.MIN_PAGE_MARGINS, wild.pageMargins, 0.0)
+    assertEquals(EpubReaderSettings.MAX_LINE_SPACING, wild.lineSpacing, 0.0)
+    assertEquals(EpubFontChoice.PUBLISHER, wild.fontChoice)
+    assertNull(wild.themePreset)
   }
 
   @Test
-  fun `preferences are paginated and follow the night mode`() {
-    val settings = EpubReaderSettings(fontScale = 1.4, pageMargins = 0.5)
-    val light = settings.toPreferences(darkTheme = false)
-    val dark = settings.toPreferences(darkTheme = true)
-    assertEquals(Theme.LIGHT, light.theme)
-    assertEquals(Theme.DARK, dark.theme)
-    assertEquals(false, light.scroll)
-    assertEquals(1.4, light.fontSize)
-    assertEquals(0.5, light.pageMargins)
+  fun `settings round-trip through json`() {
+    val settings = EpubReaderSettings(
+      fontScale = 1.4,
+      pageMargins = 0.5,
+      lineSpacing = 1.8,
+      fontChoice = EpubFontChoice.SERIF,
+      alignment = EpubAlignment.JUSTIFY,
+      themePreset = EpubThemePreset.SEPIA,
+      scroll = true,
+      publisherStyles = false
+    )
+    assertEquals(settings, EpubReaderSettings.fromJson(settings.toJson()))
+    assertEquals(EpubReaderSettings(), EpubReaderSettings.fromJson(EpubReaderSettings().toJson()))
+  }
+
+  @Test
+  fun `the theme follows the night mode until a preset is chosen`() {
+    val auto = EpubReaderSettings()
+    assertEquals(Theme.LIGHT, auto.toPreferences(nightMode = false).theme)
+    assertEquals(Theme.DARK, auto.toPreferences(nightMode = true).theme)
+    assertEquals(EpubThemePreset.DARK, auto.effectivePreset(nightMode = true))
+    val sepia = auto.copy(themePreset = EpubThemePreset.SEPIA)
+    assertEquals(Theme.SEPIA, sepia.toPreferences(nightMode = true).theme)
+    val white = auto.copy(themePreset = EpubThemePreset.WHITE)
+    assertEquals(Theme.LIGHT, white.toPreferences(nightMode = true).theme)
+  }
+
+  @Test
+  fun `black is dark on a pure black page and others keep the theme background`() {
+    val black = EpubReaderSettings(themePreset = EpubThemePreset.BLACK)
+    val prefs = black.toPreferences(nightMode = false)
+    assertEquals(Theme.DARK, prefs.theme)
+    assertEquals(Color(0xFF000000.toInt()), prefs.backgroundColor)
+    assertEquals(0xFF000000.toInt(), black.backgroundColor(nightMode = false))
+    assertNull(EpubReaderSettings(themePreset = EpubThemePreset.DARK).toPreferences(true).backgroundColor)
+    assertEquals(Theme.SEPIA.backgroundColor, EpubReaderSettings(themePreset = EpubThemePreset.SEPIA).backgroundColor(false))
+  }
+
+  @Test
+  fun `preferences carry size, margins, scroll and font`() {
+    val prefs = EpubReaderSettings(
+      fontScale = 1.4,
+      pageMargins = 0.5,
+      fontChoice = EpubFontChoice.SANS_SERIF,
+      scroll = true
+    ).toPreferences(nightMode = false)
+    assertEquals(1.4, prefs.fontSize)
+    assertEquals(0.5, prefs.pageMargins)
+    assertEquals(true, prefs.scroll)
+    assertEquals(FontFamily.SANS_SERIF, prefs.fontFamily)
+    assertNull(EpubReaderSettings().toPreferences(false).fontFamily)
+    assertEquals(false, EpubReaderSettings().toPreferences(false).scroll)
+  }
+
+  @Test
+  fun `line spacing and alignment only apply when the book styles are off`() {
+    val on = EpubReaderSettings(lineSpacing = 1.8, alignment = EpubAlignment.JUSTIFY)
+    assertEquals(true, on.toPreferences(false).publisherStyles)
+    assertNull(on.toPreferences(false).lineHeight)
+    assertNull(on.toPreferences(false).textAlign)
+    val off = on.copy(publisherStyles = false).toPreferences(false)
+    assertEquals(false, off.publisherStyles)
+    assertEquals(1.8, off.lineHeight)
+    assertEquals(TextAlign.JUSTIFY, off.textAlign)
   }
 }
