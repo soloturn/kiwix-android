@@ -18,9 +18,11 @@
 
 package org.kiwix.kiwixmobile.core.epub.reader
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -106,6 +108,7 @@ class EpubReaderActivity : BaseActivity() {
     lifecycleScope.launch {
       val ready = viewModel.state.filterIsInstance<EpubReaderUiState.Ready>().first()
       attachNavigator(ready.book)
+      setTaskTitle(ready.book.title)
     }
     lifecycleScope.launch {
       combine(viewModel.settings, darkTheme, ::Pair).collect { (settings, dark) ->
@@ -205,6 +208,16 @@ class EpubReaderActivity : BaseActivity() {
     }
   }
 
+  /** Names the Recents entry after the book. */
+  private fun setTaskTitle(title: String) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      setTaskDescription(ActivityManager.TaskDescription.Builder().setLabel(title).build())
+    } else {
+      @Suppress("DEPRECATION")
+      setTaskDescription(ActivityManager.TaskDescription(title))
+    }
+  }
+
   private fun revealBook() {
     pageReady.value = true
   }
@@ -263,13 +276,21 @@ class EpubReaderActivity : BaseActivity() {
 
   companion object {
     private const val NAVIGATOR_TAG = "epubNavigator"
+    private const val BOOK_SCHEME = "epub"
     private const val REVEAL_TIMEOUT_MS = 5_000L
 
     // Constant top and bottom margin around the page, so the overlay toggling never reflows it.
     private const val READING_MARGIN_DP = 32
 
+    /**
+     * The main activity is singleInstance, so the reader can't share its task. Each book is its
+     * own document task (see the manifest): its own Recents entry, and opening the same book
+     * again, e.g. after the launcher icon returned to the main task, resumes that task. The data
+     * URI is only what tells books apart.
+     */
     fun intent(context: Context, file: File) =
       Intent(context, EpubReaderActivity::class.java)
+        .setData(Uri.fromParts(BOOK_SCHEME, file.path, null))
         .putExtra(EpubReaderViewModel.EXTRA_PATH, file.path)
   }
 }
