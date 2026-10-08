@@ -42,6 +42,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -207,6 +208,23 @@ class EpubReaderScreenTest {
 
     composeTestRule.onNodeWithText("Position 26 of 100").assertIsDisplayed()
     composeTestRule.onNodeWithText("25%").assertIsDisplayed()
+  }
+
+  @Test
+  fun `the chapter buttons and scrubber follow the book's reading direction`() {
+    fun left(tag: String) = composeTestRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.left
+    val rtlBook = EpubReaderUiState.Ready(OpenEpub(mockk(relaxed = true), "id", "A Book", toc, null, rtl = true))
+
+    show(rtlBook)
+    assertTrue(left(EPUB_READER_PREVIOUS_CHAPTER_TESTING_TAG) > left(EPUB_READER_NEXT_CHAPTER_TESTING_TAG))
+  }
+
+  @Test
+  fun `a left to right book keeps previous on the left`() {
+    show()
+    val previous = composeTestRule.onNodeWithTag(EPUB_READER_PREVIOUS_CHAPTER_TESTING_TAG)
+    val next = composeTestRule.onNodeWithTag(EPUB_READER_NEXT_CHAPTER_TESTING_TAG)
+    assertTrue(previous.fetchSemanticsNode().boundsInRoot.left < next.fetchSemanticsNode().boundsInRoot.left)
   }
 
   @Test

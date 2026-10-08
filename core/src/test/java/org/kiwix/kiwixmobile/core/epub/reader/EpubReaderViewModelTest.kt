@@ -115,6 +115,7 @@ class EpubReaderViewModelTest {
     assertEquals(EpubFixture.TITLE, open.title)
     assertEquals(listOf("Chapter One", "Chapter Two"), open.toc.map { it.title })
     assertEquals(null, open.initialLocator)
+    assertFalse(open.rtl)
     assertEquals(1.4, vm.settings.value.fontScale, 0.0)
     coVerify { library.add(file, true) }
   }

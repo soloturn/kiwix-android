@@ -37,6 +37,7 @@ import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.publication.ReadingProgression
 import org.readium.r2.shared.publication.services.positions
 import java.io.File
 import javax.inject.Inject
@@ -47,7 +48,8 @@ class OpenEpub(
   val bookId: String,
   val title: String,
   val toc: List<EpubTocItem>,
-  val initialLocator: Locator?
+  val initialLocator: Locator?,
+  val rtl: Boolean = false
 )
 
 sealed interface EpubReaderUiState {
@@ -108,7 +110,14 @@ class EpubReaderViewModel @Inject constructor(
             ?: file.nameWithoutExtension
           _currentLocator.value = locator
           _state.value = EpubReaderUiState.Ready(
-            OpenEpub(publication, bookId, title, flattenToc(publication.tableOfContents), locator)
+            OpenEpub(
+              publication,
+              bookId,
+              title,
+              flattenToc(publication.tableOfContents),
+              locator,
+              rtl = publication.metadata.readingProgression == ReadingProgression.RTL
+            )
           )
           _positions.value = withContext(ioDispatcher) {
             runCatching { publication.positions() }.getOrDefault(emptyList())
