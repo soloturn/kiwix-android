@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Used from Android 12; fullBackupContent is ignored there. Same policy as backup_rules.xml:
-     internal user data is backed up, external app dirs (ZIM files) are not, since they would
-     exceed the cloud backup quota. Device-to-device transfer has no quota, so it copies all. -->
+<!-- Cloud backup keeps internal user data but excludes external ZIMs and imported EPUB copies. -->
 <data-extraction-rules>
   <cloud-backup>
     <include domain="file" path="." />
     <include domain="database" path="." />
     <include domain="sharedpref" path="." />
+    <exclude domain="external" />
     <exclude domain="file" path="epub/" />
     <exclude domain="file" path="epub_covers/" />
   </cloud-backup>
