@@ -113,7 +113,7 @@ class EpubReaderScreenTest {
   fun `the bottom bar shows the chapter, the page and the percentage`() {
     show()
     composeTestRule.onNodeWithText("Chapter One").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Page 26 of 100").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Position 26 of 100").assertIsDisplayed()
     composeTestRule.onNodeWithText("25%").assertIsDisplayed()
   }
 
@@ -134,13 +134,43 @@ class EpubReaderScreenTest {
       down(Offset(width * 0.25f, centerY))
       moveTo(Offset(width * 0.75f, centerY))
     }
-    composeTestRule.onNodeWithText("Page 26 of 100").assertDoesNotExist()
+    composeTestRule.onNodeWithText("Position 26 of 100").assertDoesNotExist()
     composeTestRule.onNodeWithText("25%").assertDoesNotExist()
     assertEquals(emptyList<Float>(), seeks)
 
     composeTestRule.onNodeWithTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG).performTouchInput { up() }
     assertEquals(1, seeks.size)
     assertEquals(0.75f, seeks.single(), 0.1f)
+  }
+
+  @Test
+  fun `the label shows the position the navigator reports, not one derived from the percentage`() {
+    show(
+      reading = EpubReadingState(
+        locator.copyWithLocations(position = 7, totalProgression = 0.5),
+        positionCount = 100
+      )
+    )
+    composeTestRule.onNodeWithText("Position 7 of 100").assertIsDisplayed()
+    composeTestRule.onNodeWithText("50%").assertIsDisplayed()
+  }
+
+  @Test
+  fun `the preview is dropped after a seek that reports no new locator`() {
+    show()
+    composeTestRule.mainClock.autoAdvance = false
+    composeTestRule.onNodeWithTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG).performTouchInput {
+      down(Offset(width * 0.25f, centerY))
+      moveTo(Offset(width * 0.75f, centerY))
+      up()
+    }
+    composeTestRule.mainClock.advanceTimeBy(100)
+    composeTestRule.onNodeWithText("Position 26 of 100").assertDoesNotExist()
+
+    composeTestRule.mainClock.advanceTimeBy(1_000)
+
+    composeTestRule.onNodeWithText("Position 26 of 100").assertIsDisplayed()
+    composeTestRule.onNodeWithText("25%").assertIsDisplayed()
   }
 
   @Test

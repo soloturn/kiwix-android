@@ -50,6 +50,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,6 +64,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
 import org.kiwix.kiwixmobile.core.ui.components.NavigationIcon
@@ -86,6 +88,7 @@ const val EPUB_READER_PAGE_LABEL_TESTING_TAG = "epubReaderPageLabelTestingTag"
 
 private const val PERCENT = 100
 private const val TRACK_ALPHA = 0.24f
+private const val SEEK_SETTLE_MS = 800L
 
 /** What the reader chrome can ask of its host. */
 data class EpubReaderActions(
@@ -220,7 +223,29 @@ private fun TopBar(title: String, showSettings: Boolean, onBack: () -> Unit, onS
   }
 }
 
-/** Footer: chapter and table of contents, a seekable progress bar, page label. */
+/**
+ * The scrubber preview. It survives release until the navigator reports the new locator, or a
+ * short time passes: a seek onto the current locator reports nothing new.
+ */
+private class SeekPreview {
+  var drag by mutableStateOf<Float?>(null)
+  var released by mutableStateOf(false)
+}
+
+@Composable
+private fun rememberSeekPreview(locator: Locator?): SeekPreview {
+  val preview = remember(locator) { SeekPreview() }
+  LaunchedEffect(preview.released) {
+    if (preview.released) {
+      delay(SEEK_SETTLE_MS)
+      preview.drag = null
+      preview.released = false
+    }
+  }
+  return preview
+}
+
+/** Footer: chapter and table of contents, a seekable progress bar, position label. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BottomBar(
@@ -230,9 +255,10 @@ private fun BottomBar(
   onToc: () -> Unit
 ) {
   val progress = readingProgress(reading.locator, reading.positionCount)
-  // The preview survives release until the navigator reports the new locator.
-  var drag by remember(reading.locator) { mutableStateOf<Float?>(null) }
-  val shown = drag ?: progress.fraction
+  val preview = rememberSeekPreview(reading.locator)
+  val shown = preview.drag ?: progress.fraction
+  val position =
+    preview.drag?.let { positionForFraction(it, reading.positionCount) } ?: progress.position
   Surface(
     color = MaterialTheme.colorScheme.onPrimary,
     contentColor = MaterialTheme.colorScheme.onSurface
@@ -244,48 +270,63 @@ private fun BottomBar(
         .padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP)
     ) {
       ChapterRow(chapterTitle(book.toc, reading.locator).orEmpty(), onToc)
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(
-          onClick = actions.onPreviousChapter,
-          enabled = reading.hasPreviousChapter,
-          modifier = Modifier.testTag(EPUB_READER_PREVIOUS_CHAPTER_TESTING_TAG)
-        ) {
-          Icon(
-            painterResource(R.drawable.ic_skip_previous_24dp),
-            stringResource(R.string.go_to_previous_chapter)
-          )
-        }
-        Slider(
-          value = shown,
-          onValueChange = { drag = it },
-          onValueChangeFinished = { drag?.let(actions.onSeek) },
-          enabled = reading.positionCount > 0,
-          modifier = Modifier
-            .weight(1f)
-            .testTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG)
-        )
-        IconButton(
-          onClick = actions.onNextChapter,
-          enabled = reading.hasNextChapter,
-          modifier = Modifier.testTag(EPUB_READER_NEXT_CHAPTER_TESTING_TAG)
-        ) {
-          Icon(
-            painterResource(R.drawable.ic_skip_next_24dp),
-            stringResource(R.string.go_to_next_chapter)
-          )
-        }
-      }
-      PageLabels(shown, reading.positionCount)
+      SeekRow(shown, preview, reading, actions)
+      PositionLabels(shown, position, reading.positionCount)
     }
   }
 }
 
 @Composable
-private fun PageLabels(fraction: Float, positionCount: Int) {
+private fun SeekRow(
+  shown: Float,
+  preview: SeekPreview,
+  reading: EpubReadingState,
+  actions: EpubReaderActions
+) {
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    IconButton(
+      onClick = actions.onPreviousChapter,
+      enabled = reading.hasPreviousChapter,
+      modifier = Modifier.testTag(EPUB_READER_PREVIOUS_CHAPTER_TESTING_TAG)
+    ) {
+      Icon(
+        painterResource(R.drawable.ic_skip_previous_24dp),
+        stringResource(R.string.go_to_previous_chapter)
+      )
+    }
+    Slider(
+      value = shown,
+      onValueChange = {
+        preview.drag = it
+        preview.released = false
+      },
+      onValueChangeFinished = {
+        preview.drag?.let(actions.onSeek)
+        preview.released = true
+      },
+      enabled = reading.positionCount > 0,
+      modifier = Modifier
+        .weight(1f)
+        .testTag(EPUB_READER_PROGRESS_SLIDER_TESTING_TAG)
+    )
+    IconButton(
+      onClick = actions.onNextChapter,
+      enabled = reading.hasNextChapter,
+      modifier = Modifier.testTag(EPUB_READER_NEXT_CHAPTER_TESTING_TAG)
+    ) {
+      Icon(
+        painterResource(R.drawable.ic_skip_next_24dp),
+        stringResource(R.string.go_to_next_chapter)
+      )
+    }
+  }
+}
+
+@Composable
+private fun PositionLabels(fraction: Float, position: Int, positionCount: Int) {
   Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-    val page = positionForFraction(fraction, positionCount)
     Text(
-      text = if (page > 0) stringResource(R.string.epub_page_of, page, positionCount) else "",
+      text = if (position > 0) stringResource(R.string.epub_position_of, position, positionCount) else "",
       style = MaterialTheme.typography.labelMedium,
       modifier = Modifier.testTag(EPUB_READER_PAGE_LABEL_TESTING_TAG)
     )

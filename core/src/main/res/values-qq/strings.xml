@@ -222,7 +222,7 @@
   <string name="epub_reading_settings">* Title of the EPUB reader dialog where text size and page margins are changed, and content description of the button that opens it.</string>
   <string name="epub_text_size">* Label of the text size setting in the EPUB reader.</string>
   <string name="epub_page_margins">* Label of the page margins setting in the EPUB reader.</string>
-  <string name="epub_page_of">* Reading position label in the EPUB reader. %1$d is the current page, %2$d the page count.</string>
+  <string name="epub_position_of">* Reading position label in the EPUB reader. %1$d is the current position (about 1000 characters of text, not a screen page), %2$d the number of positions.</string>
   <string name="epub_percent_read">* Share of the EPUB read so far. %1$d is a percentage; %% prints a percent sign.</string>
   <string name="epub_theme_auto">* Reading theme that follows the app\'s light or dark mode.</string>
   <string name="epub_theme_white">* Name of the white reading theme in the EPUB reader.</string>

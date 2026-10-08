@@ -54,6 +54,14 @@ class EpubReaderProgressTest {
   }
 
   @Test
+  fun `the reported position wins over the one derived from the fraction`() {
+    val progress = readingProgress(locator("c.xhtml", total = 0.5, position = 7), 100)
+    assertEquals(7, progress.position)
+    assertEquals(0.5f, progress.fraction, 0f)
+    assertEquals(100, readingProgress(locator("c.xhtml", position = 500), 100).position)
+  }
+
+  @Test
   fun `progress falls back to the position, then to the start`() {
     assertEquals(0.09f, readingProgress(locator("c.xhtml", position = 10), 100).fraction, 0.0001f)
     assertEquals(0f, readingProgress(locator("c.xhtml"), 100).fraction, 0f)
