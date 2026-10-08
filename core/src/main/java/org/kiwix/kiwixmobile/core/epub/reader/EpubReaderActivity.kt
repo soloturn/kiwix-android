@@ -32,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
-import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -50,6 +49,9 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.base.BaseActivity
+import org.kiwix.kiwixmobile.core.utils.ExternalLinkOpener
+import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
+import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.input.InputListener
@@ -58,6 +60,7 @@ import org.readium.r2.navigator.preferences.ReadingProgression
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.util.AbsoluteUrl
 import java.io.File
+import javax.inject.Inject
 
 /**
  * Reads one EPUB with Readium's paginated navigator. Launch it with [intent]; the book's
@@ -66,6 +69,10 @@ import java.io.File
 @AndroidEntryPoint
 @OptIn(ExperimentalReadiumApi::class)
 class EpubReaderActivity : BaseActivity() {
+  @Inject lateinit var externalLinkOpener: ExternalLinkOpener
+
+  @Inject lateinit var alertDialogShower: AlertDialogShower
+
   private val viewModel: EpubReaderViewModel by viewModels()
   private val darkTheme = MutableStateFlow(false)
   private val pageReady = MutableStateFlow(false)
@@ -77,6 +84,7 @@ class EpubReaderActivity : BaseActivity() {
     // The navigator fragment needs a factory built from the opened book, so it can't be restored;
     // the position and open panels live in the view model instead.
     super.onCreate(null)
+    externalLinkOpener.initialize(this, alertDialogShower)
     darkTheme.value = isNightMode(resources.configuration)
     navigatorContainer = FragmentContainerView(this).apply { id = View.generateViewId() }
     // Immersive: the book fills the screen and the bars and overlay float above it. Only the
@@ -138,6 +146,7 @@ class EpubReaderActivity : BaseActivity() {
     val positions by viewModel.positions.collectAsState()
     val bookShown by pageReady.collectAsState()
     val readingOrder = (state as? EpubReaderUiState.Ready)?.book?.publication?.readingOrder.orEmpty()
+    DialogHost(alertDialogShower)
     EpubReaderScreen(
       state = state,
       settings = settings,
@@ -234,7 +243,8 @@ class EpubReaderActivity : BaseActivity() {
 
   private val linkListener = object : EpubNavigatorFragment.Listener {
     override fun onExternalLinkActivated(url: AbsoluteUrl) {
-      runCatching { startActivity(Intent(Intent.ACTION_VIEW, url.toString().toUri())) }
+      val intent = EpubExternalLinks.intentFor(url.toString()) ?: return
+      lifecycleScope.launch { externalLinkOpener.openExternalUrl(intent) }
     }
   }
 
