@@ -18,13 +18,11 @@
 
 package org.kiwix.kiwixmobile.core.utils.files
 
-import android.annotation.SuppressLint
 import org.kiwix.kiwixmobile.core.BuildConfig
 
 /**
  * Helper class for logging that provides conditional logging for the debug variant.
  */
-@SuppressLint("LogNotTimber")
 object Log {
   /**
    * Logs an error message with an optional throwable, but only in debug builds.
