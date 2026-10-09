@@ -20,7 +20,6 @@ package org.kiwix.kiwixmobile.core.epub.reader
 
 import android.os.Build
 import org.junit.Assert.assertNotSame
-import org.junit.Assert.assertSame
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.readium.r2.shared.publication.Layout
@@ -41,18 +40,8 @@ class EpubInjectLayoutTest {
   )
 
   @Test
-  fun `a fixed-layout book keeps its original container`() {
-    val builder = builder(Layout.FIXED)
-    val original = builder.container
-
-    builder.injectContentCss()
-
-    assertSame(original, builder.container)
-  }
-
-  @Test
-  fun `reflowable and unspecified layouts get the rules`() {
-    listOf(Layout.REFLOWABLE, Layout.SCROLLED, null).forEach { layout ->
+  fun `every layout, fixed included, gets the connection policy`() {
+    listOf(Layout.FIXED, Layout.REFLOWABLE, Layout.SCROLLED, null).forEach { layout ->
       val builder = builder(layout)
       val original = builder.container
 
