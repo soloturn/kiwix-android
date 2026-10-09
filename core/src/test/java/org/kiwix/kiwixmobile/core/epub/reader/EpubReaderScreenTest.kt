@@ -26,6 +26,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
@@ -40,12 +41,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.kiwix.kiwixmobile.core.ui.components.TOOLBAR_TITLE_TESTING_TAG
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.util.Url
@@ -346,6 +349,29 @@ class EpubReaderScreenTest {
     composeTestRule.onNodeWithTag(EPUB_READER_SETTINGS_TESTING_TAG).performClick()
     composeTestRule.onNodeWithTag(EPUB_SETTINGS_LINE_SPACING_TESTING_TAG).assertIsNotEnabled()
     composeTestRule.onNodeWithTag("${EPUB_SETTINGS_ALIGN_TESTING_TAG_PREFIX}JUSTIFY").assertIsNotEnabled()
+  }
+
+  @Test
+  fun `the top bar follows each reading theme instead of the app theme`() {
+    val preset = mutableStateOf<EpubThemePreset?>(null)
+    composeTestRule.setContent {
+      EpubReaderScreen(
+        ready,
+        EpubReaderSettings(themePreset = preset.value),
+        EpubReadingState(),
+        true,
+        EpubReaderActions()
+      )
+    }
+    listOf(null, *EpubThemePreset.entries.toTypedArray()).forEach { choice ->
+      preset.value = choice
+      composeTestRule.waitForIdle()
+      val colors = EpubReaderSettings(themePreset = choice).overlayColors(false)
+      val results = mutableListOf<TextLayoutResult>()
+      composeTestRule.onNodeWithTag(TOOLBAR_TITLE_TESTING_TAG)
+        .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+      assertEquals("$choice title", colors.content, results.single().layoutInput.style.color.toArgb())
+    }
   }
 
   private fun setSlider(tag: String, value: Float) {
