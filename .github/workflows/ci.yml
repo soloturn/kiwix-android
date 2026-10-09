@@ -156,6 +156,7 @@ jobs:
           target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_2
+          ram-size: 3072M
           cores: 4
           heap-size: 1024M
           gradle-opts: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"

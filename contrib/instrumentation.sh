@@ -18,6 +18,13 @@
 #
 #
 
+# Marks that this script actually started running, i.e. the emulator finished
+# booting and reactivecircus/android-emulator-runner handed control to us.
+# .github/actions/android-emulator-runner checks for this file to tell an
+# emulator boot-time crash (e.g. kiwix/kiwix-android#5047) apart from a
+# genuine test failure, and only retries the whole step for the former.
+touch /tmp/emulator_script_started
+
 # The emulator's crashpad_handler subprocess can survive `adb emu kill` and
 # hang the android-emulator-runner action's teardown
 # (https://github.com/ReactiveCircus/android-emulator-runner/issues/385).
@@ -32,7 +39,7 @@ if adb shell settings list secure | grep -q "stylus_handwriting_enabled"; then
   adb shell settings put secure stylus_handwriting_enabled 0
 fi
 # shellcheck disable=SC2035
-adb logcat TestRunner:I AndroidRuntime:E ActivityManager:W *:E -v color &
+adb logcat *:E -v color &
 
 PACKAGE_NAME="org.kiwix.kiwixmobile"
 TEST_PACKAGE_NAME="${PACKAGE_NAME}.test"
@@ -70,9 +77,45 @@ if [ "${NUM_SHARDS:-1}" -gt 1 ]; then
 fi
 task="${INSTRUMENTATION_GRADLE_TASK:-jacocoInstrumentationTestReport}"
 
-if ./gradlew "$task" "${shard_args[@]}"; then
-  echo "$task succeeded" >&2
-else
-  adb exec-out screencap -p >screencap.png
-  exit 1
-fi
+retry=0
+while [ $retry -le 4 ]; do
+  if ./gradlew "$task" "${shard_args[@]}"; then
+    echo "$task succeeded" >&2
+    break
+  else
+    adb kill-server
+    adb start-server
+    # Enable Wi-Fi on the emulator
+    adb shell svc wifi enable
+    adb logcat -c
+    # Check if the stylus_handwriting_enabled setting exists before disabling
+    if adb shell settings list secure | grep -q "stylus_handwriting_enabled"; then
+      adb shell settings put secure stylus_handwriting_enabled 0
+    fi
+    # shellcheck disable=SC2035
+    adb logcat *:E -v color &
+
+    if is_app_installed "$PACKAGE_NAME"; then
+      # Delete the application to properly run the test cases.
+      adb uninstall "${PACKAGE_NAME}"
+    fi
+    if is_app_installed "$TEST_PACKAGE_NAME"; then
+      # Delete the test application to properly run the test cases.
+      adb uninstall "${TEST_PACKAGE_NAME}"
+    fi
+    if is_app_installed "$TEST_SERVICES_PACKAGE"; then
+      adb uninstall "${TEST_SERVICES_PACKAGE}"
+    fi
+    if is_app_installed "$TEST_ORCHESTRATOR_PACKAGE"; then
+      adb uninstall "${TEST_ORCHESTRATOR_PACKAGE}"
+    fi
+    ./gradlew --stop
+    retry=$(( retry + 1 ))
+    if [ $retry -eq 4 ]; then
+      adb exec-out screencap -p >screencap.png
+      exit 1
+    fi
+    # Give a transient outage (e.g. a Maven Central 403) time to clear: 5s, 20s, 80s.
+    sleep $(( 5 * 4 ** (retry - 1) ))
+  fi
+done

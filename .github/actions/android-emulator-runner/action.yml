@@ -24,17 +24,19 @@ inputs:
     default: echo "Generated AVD snapshot for caching."
 
   ram-size:
-    description: Emulator RAM size. Leave unset to use the device profile's own default.
+    description: Emulator RAM size
     required: false
+    default: 4096M
 
   cores:
     description: Number of emulator CPU cores
     required: false
-    default: "2"
+    default: "4"
 
   heap-size:
-    description: Emulator heap size. Leave unset to use the device profile's own default.
+    description: Emulator heap size
     required: false
+    default: 1024M
 
   sdcard-path-or-size:
     description: Emulator sdcard path or size
@@ -44,7 +46,7 @@ inputs:
   gradle-opts:
     description: Value for the GRADLE_OPTS environment variable during the script
     required: false
-    default: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
+    default: ""
 
   max-attempts:
     description: Number of boot attempts before giving up
@@ -110,8 +112,8 @@ runs:
             fi
             {
               echo "hw.cpu.ncore=${{ inputs.cores }}"
-              [ -n '${{ inputs.ram-size }}' ] && echo "hw.ramSize=${{ inputs.ram-size }}"
-              [ -n '${{ inputs.heap-size }}' ] && echo "hw.heapSize=${{ inputs.heap-size }}"
+              echo "hw.ramSize=${{ inputs.ram-size }}"
+              echo "hw.heapSize=${{ inputs.heap-size }}"
             } >> "$ANDROID_AVD_HOME/${AVD_NAME}.avd/config.ini"
             snapshot_flag=-no-snapshot
           else
