@@ -32,6 +32,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
 import io.mockk.verify
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.After
@@ -41,6 +42,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
+import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -90,6 +92,13 @@ class FileUtilsSaveMediaTest {
   @After
   fun tearDown() {
     unmockkAll()
+  }
+
+  /** Points the container at a real zim file so saves land beside it. */
+  private fun stubFileBackedZim(dir: File, zimName: String = "book.zim"): File {
+    val zimFile = File(dir, zimName).apply { writeBytes(byteArrayOf(1)) }
+    every { mockZimReaderContainer.zimReaderSource } returns ZimReaderSource(zimFile)
+    return zimFile
   }
 
   // ===== decodeBase64DataUri Success =====
@@ -203,8 +212,7 @@ class FileUtilsSaveMediaTest {
       every { mockZimReaderContainer.load(any(), any()) } returns response
 
       val context = mockk<Context>(relaxed = true)
-      val subTempDir = File(tempFolder.root, "media").apply { mkdirs() }
-      every { context.externalMediaDirs } returns arrayOf(subTempDir)
+      stubFileBackedZim(File(tempFolder.root, "media").apply { mkdirs() })
 
       val result = FileUtils.downloadFileFromUrl(
         context = context,
@@ -322,8 +330,7 @@ class FileUtilsSaveMediaTest {
       every { mockZimReaderContainer.load(any(), any()) } throws IOException("load failed")
 
       val localMockContext = mockk<Context>(relaxed = true)
-      val subTempDir = File(tempFolder.root, "media_error").apply { mkdirs() }
-      every { localMockContext.externalMediaDirs } returns arrayOf(subTempDir)
+      stubFileBackedZim(File(tempFolder.root, "media_error").apply { mkdirs() })
       val result = FileUtils.downloadFileFromUrl(
         context = localMockContext,
         url = "https://kiwix.org/files/document.pdf",
@@ -397,8 +404,8 @@ class FileUtilsSaveMediaTest {
       every { mockZimReaderContainer.load(any(), any()) } returns response
 
       val localMockContext = mockk<Context>(relaxed = true)
-      val subTempDir = File(tempFolder.root, "pdf_save").apply { mkdirs() }
-      every { localMockContext.externalMediaDirs } returns arrayOf(subTempDir)
+      val libraryDir = File(tempFolder.root, "library").apply { mkdirs() }
+      stubFileBackedZim(libraryDir)
 
       val result = FileUtils.downloadFileFromUrl(
         context = localMockContext,
@@ -408,10 +415,36 @@ class FileUtilsSaveMediaTest {
       )
       assertThat(result).isInstanceOf(SaveResult.FileSaved::class.java)
       val saved = result as SaveResult.FileSaved
-      assertThat(saved.file).isNotNull
       assertThat(saved.file.name).isEqualTo("document.pdf")
+      assertThat(saved.file.parentFile?.name).isEqualTo("book")
+      assertThat(saved.file.parentFile?.parentFile).isEqualTo(libraryDir)
       assertThat(saved.file.exists()).isTrue()
       assertThat(saved.file.length()).isGreaterThan(0L)
+    }
+  }
+
+  @Test
+  fun downloadsDirName_stripsTheZimExtension() {
+    assertThat(FileUtils.downloadsDirName("wikipedia.zim")).isEqualTo("wikipedia")
+    assertThat(FileUtils.downloadsDirName("wikipedia.zimaa")).isEqualTo("wikipedia")
+    assertThat(FileUtils.downloadsDirName("WIKIPEDIA.ZIM")).isEqualTo("WIKIPEDIA")
+  }
+
+  @Test
+  fun deleteZimDownloads_removesTheFolderBesideTheZim() {
+    runTest {
+      val libraryDir = File(tempFolder.root, "library_delete").apply { mkdirs() }
+      val zimFile = stubFileBackedZim(libraryDir)
+      val downloads = File(libraryDir, "book").apply { mkdirs() }
+      File(downloads, "saved.epub").writeText("epub")
+
+      FileUtils.deleteZimDownloads(
+        ZimReaderSource(zimFile),
+        Dispatchers.Unconfined
+      )
+
+      assertThat(downloads.exists()).isFalse()
+      assertThat(zimFile.exists()).isTrue()
     }
   }
 
