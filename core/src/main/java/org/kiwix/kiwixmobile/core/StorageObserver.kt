@@ -60,11 +60,12 @@ class StorageObserver @Inject constructor(
   ): Flow<List<Book>> = flow {
     val (epubs, zims) = scanFiles(scanningProgressListener).first()
       .partition { isEpubFile(it.absolutePath) }
+    // Start before emit: callers take first(), so nothing after emit would ever run.
+    importEpubsInBackground(epubs)
     val downloads = downloadRoomDao.downloads().first()
     val result = toFilesThatAreNotDownloading(zims, downloads)
       .mapNotNull { convertToLibkiwixBook(it) }
     emit(result)
-    importEpubsInBackground(epubs)
   }.flowOn(ioDispatcher)
 
   // EPUBs go to their own library table (observed via Room), so the ZIM list must not wait for the
