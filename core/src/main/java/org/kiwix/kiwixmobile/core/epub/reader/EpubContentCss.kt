@@ -40,6 +40,10 @@ object EpubContentCss {
   private val HEAD_END = Regex("</head\\s*>", RegexOption.IGNORE_CASE)
   private val HEAD_START = Regex("<head(\\s[^>]*)?>", RegexOption.IGNORE_CASE)
   private val HTML_EXTENSIONS = setOf("xhtml", "html", "htm")
+
+  /** Readium serves every page request in-process; this stops WebSockets, which bypass that. */
+  const val CONNECT_POLICY =
+    "<meta http-equiv=\"Content-Security-Policy\" content=\"connect-src 'none'\"/>"
   private const val STYLE_OPEN = "<style id=\"kiwix-epub-fit\">"
   private const val PROBE_BYTES = 1024
   private val UTF8_NAMES = setOf("utf-8", "utf8")
@@ -52,22 +56,39 @@ object EpubContentCss {
     url.path?.substringAfterLast('.', "")?.lowercase() in HTML_EXTENSIONS
 
   /**
-   * [bytes] with the rules added; returned untouched unless they are strictly valid UTF-8 with
-   * no other declared encoding, as re-encoding as UTF-8 would corrupt them.
+   * [bytes] with the policy and, if [withCss], the rules added. The rules are only added to
+   * strictly valid UTF-8 with no other declared encoding, as re-encoding would corrupt the rest;
+   * the policy is ASCII, so it is added to any ASCII-compatible encoding. UTF-16 is untouched.
    */
-  fun transform(bytes: ByteArray): ByteArray {
-    val html = decodeUtf8(bytes) ?: return bytes
-    return inject(html).toByteArray(Charsets.UTF_8)
+  fun transform(bytes: ByteArray, withCss: Boolean = true): ByteArray {
+    val styled = if (withCss) {
+      decodeUtf8(bytes)?.let { inject(it).toByteArray(Charsets.UTF_8) } ?: bytes
+    } else {
+      bytes
+    }
+    if (isUtf16(styled)) return styled
+    return injectPolicy(String(styled, Charsets.ISO_8859_1)).toByteArray(Charsets.ISO_8859_1)
   }
 
+  /**
+   * Adds [CONNECT_POLICY] as the first child of `<head>`, before any script; returns [html]
+   * unchanged if it has no head.
+   */
+  fun injectPolicy(html: String): String {
+    val start = HEAD_START.find(html) ?: return html
+    return html.replaceRange(start.range, start.value + CONNECT_POLICY)
+  }
+
+  private fun isUtf16(bytes: ByteArray) = bytes.size >= 2 &&
+    (
+      bytes[0] == 0.toByte() ||
+        bytes[1] == 0.toByte() ||
+        (bytes[0] == 0xFE.toByte() && bytes[1] == 0xFF.toByte()) ||
+        (bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte())
+    )
+
   private fun decodeUtf8(bytes: ByteArray): String? {
-    val utf16 = bytes.size >= 2 &&
-      (
-        bytes[0] == 0.toByte() ||
-          bytes[1] == 0.toByte() ||
-          (bytes[0] == 0xFE.toByte() && bytes[1] == 0xFF.toByte()) ||
-          (bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte())
-      )
+    val utf16 = isUtf16(bytes)
     val probe = String(bytes, 0, minOf(bytes.size, PROBE_BYTES), Charsets.ISO_8859_1)
     val declared = DECLARED_ENCODING.firstNotNullOfOrNull { it.find(probe)?.groupValues?.get(1) }
     if (utf16 || (declared != null && declared.lowercase() !in UTF8_NAMES)) return null
@@ -96,14 +117,16 @@ object EpubContentCss {
 }
 
 /**
- * Wraps the container so every HTML resource carries [EpubContentCss.CSS]. Fixed-layout books
- * position everything exactly, so they are left alone.
+ * Wraps the container so every HTML resource carries the connection policy and, except in
+ * fixed-layout books, which position everything exactly, [EpubContentCss.CSS].
  */
 fun Publication.Builder.injectContentCss() {
-  if (manifest.metadata.layout == Layout.FIXED) return
+  val withCss = manifest.metadata.layout != Layout.FIXED
   container = TransformingContainer(container) { url: Url, resource: Resource ->
     if (EpubContentCss.isHtml(url)) {
-      TransformingResource(resource) { bytes -> Try.success(EpubContentCss.transform(bytes)) }
+      TransformingResource(resource) { bytes ->
+        Try.success(EpubContentCss.transform(bytes, withCss))
+      }
     } else {
       resource
     }
