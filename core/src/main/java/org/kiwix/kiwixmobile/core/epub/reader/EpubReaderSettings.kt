@@ -44,8 +44,16 @@ enum class EpubThemePreset(val readiumTheme: Theme, val pageColor: Int?) {
 /** ARGB ints: the overlay's [background] and the text and icon colour on it. */
 data class EpubOverlayColors(val background: Int, val content: Int)
 
-/** Only fonts that need no bundled files: the book's own, or the system's generic families. */
-enum class EpubFontChoice { PUBLISHER, SERIF, SANS_SERIF, MONOSPACE }
+/** The book's own font, generic system families, and the three faces Readium bundles. */
+enum class EpubFontChoice {
+  PUBLISHER,
+  SERIF,
+  SANS_SERIF,
+  MONOSPACE,
+  OPEN_DYSLEXIC,
+  ACCESSIBLE_DFA,
+  IA_WRITER_DUOSPACE
+}
 
 enum class EpubAlignment { LEFT, JUSTIFY }
 
@@ -120,6 +128,9 @@ data class EpubReaderSettings(
     EpubFontChoice.SERIF -> FontFamily.SERIF
     EpubFontChoice.SANS_SERIF -> FontFamily.SANS_SERIF
     EpubFontChoice.MONOSPACE -> FontFamily.MONOSPACE
+    EpubFontChoice.OPEN_DYSLEXIC -> FontFamily.OPEN_DYSLEXIC
+    EpubFontChoice.ACCESSIBLE_DFA -> FontFamily.ACCESSIBLE_DFA
+    EpubFontChoice.IA_WRITER_DUOSPACE -> FontFamily.IA_WRITER_DUOSPACE
   }
 
   private fun EpubAlignment.readiumAlign() = when (this) {
