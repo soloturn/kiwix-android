@@ -73,6 +73,10 @@ class DeleteFilesUseCaseTest {
       FileUtils.deleteZimFile(file1.path, testDispatcher)
     } just Runs
 
+    coEvery {
+      FileUtils.deleteZimDownloads(any(), testDispatcher)
+    } just Runs
+
     val libkiwixBook =
       LibkiwixBook(_id = "book-id-1", file = file1)
 
@@ -113,6 +117,18 @@ class DeleteFilesUseCaseTest {
     }
     coVerify(exactly = 0) {
       libkiwixBookOnDisk.delete(book.book.id)
+    }
+    coVerify(exactly = 0) {
+      FileUtils.deleteZimDownloads(any(), testDispatcher)
+    }
+  }
+
+  @Test
+  fun invoke_whenFileDeleted_deletesTheDownloadsFolderToo() = runTest {
+    deleteFilesUseCase(listOf(book))
+
+    coVerify(exactly = 1) {
+      FileUtils.deleteZimDownloads(book.zimReaderSource, testDispatcher)
     }
   }
 

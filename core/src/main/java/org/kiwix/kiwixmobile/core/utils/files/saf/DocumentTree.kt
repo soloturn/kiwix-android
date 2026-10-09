@@ -123,6 +123,29 @@ class DocumentTree(private val contentResolver: ContentResolver) {
   fun splitZimParts(firstPart: Uri): List<Uri> =
     splitZimSiblings(firstPart)?.takeIf(List<Uri>::isNotEmpty) ?: listOf(firstPart)
 
+  /** Folder beside [zimUri] for files saved from inside that zim; created when [create] and absent. */
+  @Suppress("ReturnCount")
+  fun downloadsDirectory(zimUri: Uri, name: String, create: Boolean = false): DocumentEntry? {
+    if (!isDocumentInTree(zimUri)) return null
+    val treeUri = treeUriOf(zimUri)
+    val zimDocumentId = DocumentsContract.getDocumentId(zimUri)
+    val parentId = parentDocumentId(treeUri, zimUri, zimDocumentId) ?: return null
+    findChild(treeUri, parentId, name)?.takeIf { it.isDirectory }?.let { return it }
+    if (!create) return null
+    val uri = createDocument(treeUri, name, Document.MIME_TYPE_DIR, parentId) ?: return null
+    return DocumentEntry(
+      uri = uri,
+      documentId = DocumentsContract.getDocumentId(uri),
+      parentDocumentId = parentId,
+      name = name,
+      mimeType = Document.MIME_TYPE_DIR,
+      size = 0L
+    )
+  }
+
+  fun deleteDownloadsDirectory(zimUri: Uri, name: String): Boolean =
+    downloadsDirectory(zimUri, name)?.let { delete(it.uri) } ?: true
+
   private fun splitZimSiblings(firstPart: Uri): List<Uri>? {
     if (!isDocumentInTree(firstPart)) return null
     val treeUri = treeUriOf(firstPart)
