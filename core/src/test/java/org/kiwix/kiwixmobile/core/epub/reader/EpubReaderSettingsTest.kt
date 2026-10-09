@@ -131,6 +131,16 @@ class EpubReaderSettingsTest {
   }
 
   @Test
+  fun `bundled reader faces reach the navigator`() {
+    val families = EpubFontChoice.entries.associateWith {
+      EpubReaderSettings(fontChoice = it).toPreferences(false).fontFamily
+    }
+    assertEquals(FontFamily.OPEN_DYSLEXIC, families[EpubFontChoice.OPEN_DYSLEXIC])
+    assertEquals(FontFamily.ACCESSIBLE_DFA, families[EpubFontChoice.ACCESSIBLE_DFA])
+    assertEquals(FontFamily.IA_WRITER_DUOSPACE, families[EpubFontChoice.IA_WRITER_DUOSPACE])
+  }
+
+  @Test
   fun `line spacing and alignment only apply when the book styles are off`() {
     val on = EpubReaderSettings(lineSpacing = 1.8, alignment = EpubAlignment.JUSTIFY)
     assertEquals(true, on.toPreferences(false).publisherStyles)
