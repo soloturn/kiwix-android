@@ -37,10 +37,16 @@ class AppConfigurer {
     target.configureExtension<ApplicationExtension> {
       signingConfigs {
         create("releaseSigningConfig") {
-          storeFile = File(target.rootDir, "kiwix-android.keystore")
-          storePassword = System.getenv("KEY_STORE_PASSWORD") ?: "000000"
-          keyAlias = System.getenv("KEY_ALIAS") ?: "keystore"
-          keyPassword = System.getenv("KEY_PASSWORD") ?: "000000"
+          // KEY_STORE_FILE selects a personal key; without it the checked-in
+          // dummy signs, so upstream CI keeps working untouched.
+          val setting = { name: String ->
+            System.getenv(name) ?: target.findProperty(name)?.toString()
+          }
+          storeFile = setting("KEY_STORE_FILE")?.let(::File)
+            ?: File(target.rootDir, "kiwix-android.keystore")
+          storePassword = setting("KEY_STORE_PASSWORD") ?: "000000"
+          keyAlias = setting("KEY_ALIAS") ?: "keystore"
+          keyPassword = setting("KEY_PASSWORD") ?: "000000"
         }
       }
       buildTypes {
