@@ -20,8 +20,10 @@ package org.kiwix.kiwixmobile.core.epub.reader
 
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.nio.charset.Charset
 
 class EpubContentCssTest {
   @Test
@@ -44,7 +46,8 @@ class EpubContentCssTest {
     assertEquals("<p>x</p>", EpubContentCss.inject("<p>x</p>"))
   }
 
-  private fun transform(bytes: ByteArray) = String(EpubContentCss.transform(bytes), Charsets.UTF_8)
+  private fun transform(bytes: ByteArray, withCss: Boolean = true) =
+    String(EpubContentCss.transform(bytes, withCss), Charsets.UTF_8)
 
   @Test
   fun `utf-8 content, with or without a declaration or BOM, gets the rules and keeps its text`() {
@@ -55,26 +58,52 @@ class EpubContentCssTest {
     assertTrue(transform(bom).contains(EpubContentCss.CSS))
   }
 
+  private fun withPolicy(html: String, charset: Charset) =
+    html.replaceFirst("<head>", "<head>${EpubContentCss.CONNECT_POLICY}").toByteArray(charset)
+
   @Test
-  fun `content in another encoding passes through byte for byte`() {
+  fun `content in another encoding gets only the policy, other bytes unchanged`() {
     val latin1 = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><html><head></head><body>caf\u00e9</body></html>"
-      .toByteArray(Charsets.ISO_8859_1)
-    assertArrayEquals(latin1, EpubContentCss.transform(latin1))
+    assertArrayEquals(
+      withPolicy(latin1, Charsets.ISO_8859_1),
+      EpubContentCss.transform(latin1.toByteArray(Charsets.ISO_8859_1))
+    )
 
     val meta = "<html><head><meta charset=\"windows-1252\"></head><body>caf\u00e9</body></html>"
-      .toByteArray(Charsets.ISO_8859_1)
-    assertArrayEquals(meta, EpubContentCss.transform(meta))
+    assertArrayEquals(
+      withPolicy(meta, Charsets.ISO_8859_1),
+      EpubContentCss.transform(meta.toByteArray(Charsets.ISO_8859_1))
+    )
   }
 
   @Test
-  fun `utf-16 and invalid utf-8 pass through untouched`() {
+  fun `utf-16 passes through untouched, invalid utf-8 gets only the policy`() {
     val utf16 = "<html><head></head><body>x</body></html>".toByteArray(Charsets.UTF_16)
     assertArrayEquals(utf16, EpubContentCss.transform(utf16))
     val utf16le = "<html><head></head></html>".toByteArray(Charsets.UTF_16LE)
     assertArrayEquals(utf16le, EpubContentCss.transform(utf16le))
 
     val invalid = "<html><head></head><body>".toByteArray() + byteArrayOf(0xE9.toByte()) + "</body></html>".toByteArray()
-    assertArrayEquals(invalid, EpubContentCss.transform(invalid))
+    val expected = "<html><head>${EpubContentCss.CONNECT_POLICY}</head><body>".toByteArray() +
+      byteArrayOf(0xE9.toByte()) + "</body></html>".toByteArray()
+    assertArrayEquals(expected, EpubContentCss.transform(invalid))
+  }
+
+  @Test
+  fun `the policy is the first head child and forbids connections`() {
+    val out = EpubContentCss.injectPolicy("<html><head lang=\"en\"><script>x()</script></head></html>")
+
+    assertTrue(out.startsWith("<html><head lang=\"en\"><meta http-equiv=\"Content-Security-Policy\""))
+    assertTrue(out.indexOf("connect-src 'none'") < out.indexOf("<script>"))
+    assertEquals("<p>x</p>", EpubContentCss.injectPolicy("<p>x</p>"))
+  }
+
+  @Test
+  fun `without the rules only the policy is added`() {
+    val out = transform("<html><head></head></html>".toByteArray(), withCss = false)
+
+    assertTrue(out.contains(EpubContentCss.CONNECT_POLICY))
+    assertFalse(out.contains("<style"))
   }
 
   @Test
