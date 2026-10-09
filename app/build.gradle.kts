@@ -67,6 +67,7 @@ android {
   // required (the plugin checks both).
   experimentalProperties["android.experimental.enableScreenshotTest"] = true
   defaultConfig {
+    applicationId = "com.github.soloturn.kiwix"
     resValue("string", "app_name", "Kiwix")
     resValue("string", "app_search_string", "Search Kiwix")
     versionCode = generateVersionCode()
@@ -83,6 +84,7 @@ android {
       multiDexKeepProguard = file("multidex-instrumentation-config.pro")
       buildConfigField("boolean", "KIWIX_ERROR_ACTIVITY", "false")
       buildConfigField("boolean", "IS_PLAYSTORE", "false")
+      applicationIdSuffix = ".epub_readium"
     }
 
     getByName("release") {
@@ -99,7 +101,7 @@ android {
       buildConfigField("boolean", "IS_PLAYSTORE", "true")
       manifestPlaceholders["permission"] = "android.permission.placeholder"
       // Branch-named suffix lets every personal build install side by side.
-      applicationIdSuffix = ".develop"
+      applicationIdSuffix = ".epub_readium"
     }
     create("standalone") {
       initWith(getByName("release"))
