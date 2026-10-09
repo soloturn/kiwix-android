@@ -320,6 +320,9 @@ private fun EpubFontChoice.labelRes() = when (this) {
   EpubFontChoice.SERIF -> R.string.epub_font_serif
   EpubFontChoice.SANS_SERIF -> R.string.epub_font_sans_serif
   EpubFontChoice.MONOSPACE -> R.string.epub_font_monospace
+  EpubFontChoice.OPEN_DYSLEXIC -> R.string.epub_font_opendyslexic
+  EpubFontChoice.ACCESSIBLE_DFA -> R.string.epub_font_accessible_dfa
+  EpubFontChoice.IA_WRITER_DUOSPACE -> R.string.epub_font_ia_writer
 }
 
 @StringRes

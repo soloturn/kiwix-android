@@ -256,6 +256,9 @@
   <string name="epub_font_serif">Serif</string>
   <string name="epub_font_sans_serif">Sans-serif</string>
   <string name="epub_font_monospace">Monospace</string>
+  <string name="epub_font_opendyslexic">OpenDyslexic</string>
+  <string name="epub_font_accessible_dfa">Accessible-DfA</string>
+  <string name="epub_font_ia_writer">iA Writer Duospace</string>
   <string name="epub_layout">Layout</string>
   <string name="epub_paginated">Paginated</string>
   <string name="epub_scroll">Scroll</string>
