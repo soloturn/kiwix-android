@@ -24,7 +24,6 @@ import android.annotation.SuppressLint
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
-import android.content.ContextWrapper
 import android.content.res.AssetFileDescriptor
 import android.database.Cursor
 import android.net.Uri
@@ -46,18 +45,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.kiwix.kiwixmobile.core.CoreApp
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.downloader.ChunkUtils
 import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.kiwixmobile.core.extensions.deleteFile
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
+import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.TAG_KIWIX
+import org.kiwix.kiwixmobile.core.utils.files.saf.DocumentTree
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileDescriptor
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStream
 
 object FileUtils {
   private val fileOperationMutex = Mutex()
@@ -740,24 +743,33 @@ object FileUtils {
     return fileNameAndSource
   }
 
-  @Suppress("ReturnCount")
-  private fun getKiwixFileDir(context: Context): File? {
-    val mediaDir = ContextWrapper(context)
-      .externalMediaDirs
-      .firstOrNull()
-      ?: return null
+  /** Folder beside a zim holding files saved from inside it: "wikipedia.zim" -> "wikipedia". */
+  @JvmStatic
+  fun downloadsDirName(zimFileName: String): String {
+    val stem = zimFileName.lastIndexOf(".zim", ignoreCase = true)
+    return if (stem < 0) zimFileName else zimFileName.substring(0, stem)
+  }
 
-    val kiwixDir = File(mediaDir, "Kiwix")
-
-    if (!kiwixDir.exists()) {
-      val created = kiwixDir.mkdirs()
-      if (!created) {
-        Log.e("MEDIA_SAVE", "Failed to create Kiwix directory: ${kiwixDir.absolutePath}")
-        return null
-      }
+  /** Removes the folder beside the zim that held files saved from inside it. */
+  suspend fun deleteZimDownloads(
+    zimReaderSource: ZimReaderSource,
+    ioDispatcher: CoroutineDispatcher
+  ) {
+    withContext(ioDispatcher) {
+      fileOperationMutex.withLock { deleteDownloads(zimReaderSource) }
     }
+  }
 
-    return kiwixDir
+  @Suppress("ReturnCount")
+  private fun deleteDownloads(zimReaderSource: ZimReaderSource) {
+    zimReaderSource.file?.let { zimFile ->
+      File(zimFile.parentFile, downloadsDirName(zimFile.name)).deleteRecursively()
+      return
+    }
+    val zimUri = zimReaderSource.uri ?: return
+    val tree = DocumentTree(CoreApp.instance.contentResolver)
+    val name = tree.stat(zimUri)?.name ?: return
+    tree.deleteDownloadsDirectory(zimUri, downloadsDirName(name))
   }
 
   @Suppress("ReturnCount")
@@ -824,17 +836,11 @@ object FileUtils {
     zimReaderContainer: ZimReaderContainer
   ): SaveResult = runCatching {
     Log.d("MEDIA_SAVE", "Saving non-image file: $fileName")
-
-    val file = saveFileFromUrl(
-      context,
-      source,
-      fileName,
-      zimReaderContainer
-    ) ?: return@handleFile SaveResult.InvalidSource
-
-    Log.d("MEDIA_SAVE", "File saved: ${file.absolutePath}")
-
-    SaveResult.FileSaved(file)
+    val zimReaderSource = zimReaderContainer.zimReaderSource
+      ?: return@handleFile SaveResult.InvalidSource
+    zimReaderContainer.load(source, emptyMap()).data.use { input ->
+      saveBesideZim(context, zimReaderSource, fileName, source, input)
+    }
   }.getOrElse {
     Log.d("MEDIA_SAVE", "Error saving file", it)
     SaveResult.Error("File save error", it)
@@ -947,30 +953,49 @@ object FileUtils {
     return uri
   }
 
+  /** Writes [input] into the folder that sits next to the zim, named after it. */
   @Suppress("ReturnCount")
-  private suspend fun saveFileFromUrl(
+  private fun saveBesideZim(
     context: Context,
-    source: String,
+    zimReaderSource: ZimReaderSource,
     fileName: String,
-    zimReaderContainer: ZimReaderContainer
-  ): File? {
-    val root = getKiwixFileDir(context)
-      ?: return null
-
-    val file = File(root, fileName)
-
-    zimReaderContainer.load(source, emptyMap()).data.use { input ->
-      file.outputStream().use { output ->
-        input.copyTo(output)
+    source: String,
+    input: InputStream
+  ): SaveResult {
+    zimReaderSource.file?.let { zimFile ->
+      val dir = File(zimFile.parentFile, downloadsDirName(zimFile.name))
+      if (!dir.isDirectory && !dir.mkdirs()) {
+        return SaveResult.Error("Cannot create ${dir.path}")
       }
+      val file = File(dir, fileName)
+      file.outputStream().use { input.copyTo(it) }
+      if (file.length() == 0L) {
+        file.delete()
+        return SaveResult.InvalidSource
+      }
+      Log.d("MEDIA_SAVE", "File saved: ${file.absolutePath}")
+      return SaveResult.FileSaved(file)
     }
 
-    if (!file.exists() || file.length() == 0L) {
-      Log.e("MEDIA_SAVE", "Saved file is empty or missing: ${file.absolutePath}")
-      file.delete()
-      return null
+    val zimUri = zimReaderSource.uri ?: return SaveResult.InvalidSource
+    val tree = DocumentTree(context.contentResolver)
+    val zimName = tree.stat(zimUri)?.name ?: return SaveResult.InvalidSource
+    val dir = tree.downloadsDirectory(zimUri, downloadsDirName(zimName), create = true)
+      ?: return SaveResult.Error("Cannot create downloads folder beside $zimName")
+    val uri = tree.createDocument(
+      DocumentTree.treeUriOf(zimUri),
+      fileName,
+      resolveMimeType(source) ?: DocumentTree.ZIM_MIME_TYPE,
+      dir.documentId
+    ) ?: return SaveResult.Error("Cannot create $fileName in ${dir.name}")
+    runCatching {
+      context.contentResolver.openOutputStream(uri)?.use { input.copyTo(it) }
+    }.onFailure {
+      context.contentResolver.delete(uri, null, null)
+      return SaveResult.Error("File save error", it)
     }
-    return file
+    Log.d("MEDIA_SAVE", "File saved: $uri")
+    return SaveResult.MediaSaved(uri, fileName)
   }
 
   @JvmStatic

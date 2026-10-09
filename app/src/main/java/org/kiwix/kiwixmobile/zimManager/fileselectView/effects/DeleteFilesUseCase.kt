@@ -25,6 +25,7 @@ import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem
+import java.io.File
 import javax.inject.Inject
 
 data class DeleteFilesUseCase @Inject constructor(
@@ -48,10 +49,19 @@ data class DeleteFilesUseCase @Inject constructor(
   private suspend fun deleteBook(
     book: BooksOnDiskListItem.BookOnDisk
   ): Boolean {
-    val file = book.zimReaderSource.file
-      ?: return book.zimReaderSource.uri
-        ?.let { libkiwixBookOnDisk.deleteUriBook(book.book.id, it) } == true
+    val source = book.zimReaderSource
+    val deleted = source.file?.let { deleteFileBook(book, it) } ?: deleteUriBook(book)
+    if (deleted) {
+      // Files saved from inside the book live in a folder beside it; take those too.
+      FileUtils.deleteZimDownloads(source, ioDispatcher)
+    }
+    return deleted
+  }
 
+  private suspend fun deleteFileBook(
+    book: BooksOnDiskListItem.BookOnDisk,
+    file: File
+  ): Boolean {
     FileUtils.deleteZimFile(file.path, ioDispatcher)
 
     if (file.isFileExist(ioDispatcher)) {
@@ -61,4 +71,8 @@ data class DeleteFilesUseCase @Inject constructor(
     libkiwixBookOnDisk.delete(book.book.id)
     return true
   }
+
+  private suspend fun deleteUriBook(book: BooksOnDiskListItem.BookOnDisk): Boolean =
+    book.zimReaderSource.uri
+      ?.let { libkiwixBookOnDisk.deleteUriBook(book.book.id, it) } == true
 }
