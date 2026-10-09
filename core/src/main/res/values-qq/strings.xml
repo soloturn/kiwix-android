@@ -234,6 +234,9 @@
   <string name="epub_font_serif">* Font choice: a serif font.</string>
   <string name="epub_font_sans_serif">* Font choice: a sans-serif font.</string>
   <string name="epub_font_monospace">* Font choice: a monospace font.</string>
+  <string name="epub_font_opendyslexic">* Font choice: the OpenDyslexic font.</string>
+  <string name="epub_font_accessible_dfa">* Font choice: the Accessible-DfA font.</string>
+  <string name="epub_font_ia_writer">* Font choice: the iA Writer Duospace font.</string>
   <string name="epub_layout">* Label of the setting that chooses between turning pages and scrolling.</string>
   <string name="epub_paginated">* Layout choice: the book is read page by page.</string>
   <string name="epub_scroll">* Layout choice: the book is read by scrolling.</string>
