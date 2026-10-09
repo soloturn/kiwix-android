@@ -209,6 +209,7 @@ private fun TopBar(title: String, showSettings: Boolean, onBack: () -> Unit, onS
       .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
   ) {
     KiwixAppBar(
+      useAppTheme = false,
       title = title,
       navigationIcon = { NavigationIcon(onClick = onBack) },
       actionMenuItems = if (showSettings) {
