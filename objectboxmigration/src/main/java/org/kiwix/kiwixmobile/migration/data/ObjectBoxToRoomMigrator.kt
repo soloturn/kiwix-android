@@ -22,6 +22,8 @@ import io.objectbox.Box
 import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.kiwix.kiwixmobile.core.dao.HistoryRoomDao
 import org.kiwix.kiwixmobile.core.dao.NotesRoomDao
 import org.kiwix.kiwixmobile.core.dao.RecentSearchRoomDao
@@ -41,7 +43,8 @@ class ObjectBoxToRoomMigrator @Inject constructor(
   private val boxStore: BoxStore,
   private val kiwixDataStore: KiwixDataStore
 ) {
-  suspend fun migrateObjectBoxDataToRoom() {
+  // Serializes concurrent runs so the flag check and the later flag set can't interleave.
+  suspend fun migrateObjectBoxDataToRoom() = migrationLock.withLock {
     if (!kiwixDataStore.isRecentSearchMigrated.first()) {
       migrateRecentSearch(boxStore.boxFor())
     }
@@ -122,5 +125,10 @@ class ObjectBoxToRoomMigrator @Inject constructor(
       box.remove(notesEntity.id)
     }
     kiwixDataStore.setNotesMigrated(true)
+  }
+
+  private companion object {
+    // Process-wide: every injected instance must share the same lock.
+    val migrationLock = Mutex()
   }
 }

@@ -45,7 +45,6 @@ import org.kiwix.kiwixmobile.migration.entities.HistoryEntity
 import org.kiwix.kiwixmobile.migration.entities.MyObjectBox
 import org.kiwix.kiwixmobile.migration.entities.NotesEntity
 import org.kiwix.kiwixmobile.migration.entities.RecentSearchEntity
-import org.kiwix.kiwixmobile.ui.KiwixDestination
 import java.io.File
 
 @HiltAndroidTest
@@ -63,9 +62,6 @@ class ObjectBoxToRoomMigratorTest : BaseActivityTest() {
   override fun waitForIdle() {
     hiltRule.injectOnce()
     super.waitForIdle()
-    launchMainActivity {
-      it.navigate(KiwixDestination.Library.route)
-    }
     kiwixRoomDatabase =
       Room
         .inMemoryDatabaseBuilder(context, KiwixRoomDatabase::class.java)
