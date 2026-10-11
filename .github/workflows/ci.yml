@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -26,7 +26,12 @@ jobs:
       matrix:
         api-level: [ 25, 30, 33, 34, 35, 36 ]
         target: [ default ]
-      fail-fast: true
+        # Splits the ~124-test suite via AndroidJUnitRunner's numShards/shardIndex.
+        # Each shard boots its own emulator (60s+ just for AVD setup), so more
+        # shards isn't free - 6 balances parallelism against that fixed cost.
+        shard: [ 0, 1, 2, 3, 4, 5 ]
+      # Each shard is short; one shard failing shouldn't cancel the other 5.
+      fail-fast: false
     runs-on: ubuntu-24.04
     steps:
       - name: Free Disk Space (Ubuntu)
@@ -85,48 +90,71 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Create unit test coverage
-        if: ${{ matrix.api-level==30 }}
+        if: ${{ matrix.api-level==30 && matrix.shard==0 }}
         run: ./gradlew testDebugUnitTest testCustomexampleDebugUnitTest
 
       - name: Create AVD and generate snapshot
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
-          force-avd-creation: false
-          sdcard-path-or-size: 1024M
           heap-size: 1024M
           ram-size: 4096M
           cores: 4
-          disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           script: |
             trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
             echo "Generated AVD snapshot for caching."
 
       - name: Create instrumentation coverage
         uses: ./.github/actions/android-emulator-runner
+        # A green API 30 shard once needed 29 minutes; keep a few minutes spare.
+        timeout-minutes: 35
+        env:
+          # api-level 30's report is merged later in automated-tests-coverage-report.
+          # Both scoped to :app - the bare names also match core,
+          # defaultmigration and objectboxmigration, none of which have
+          # any tests.
+          INSTRUMENTATION_GRADLE_TASK: ${{ matrix.api-level == 30 && ':app:createDebugCoverageReport' || ':app:connectedDebugAndroidTest' }}
+          NUM_SHARDS: 6
+          SHARD_INDEX: ${{ matrix.shard }}
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
+          cores: 4
           script: bash contrib/instrumentation.sh
 
       - name: Upload screenshot result
         uses: actions/upload-artifact@v6
         if: failure()
         with:
-          name: ${{ matrix.api-level }}
+          name: ${{ matrix.api-level }}-${{ matrix.shard }}
           path: screencap.png
 
-      - name: Run benchmarks
+      # All shards' emulators share the same device serial - prefix avoids collision.
+      - name: Prepare shard coverage data for merging
         if: ${{ matrix.api-level==30 }}
-        uses: reactivecircus/android-emulator-runner@v2
-        env:
-          GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
+        run: |
+          mkdir -p coverage-ec-shard-${{ matrix.shard }}
+          while IFS= read -r f; do
+            cp "$f" "coverage-ec-shard-${{ matrix.shard }}/shard-${{ matrix.shard }}-$(basename "$f")"
+          done < <(find app/build/outputs/code_coverage -name '*.ec')
+
+      - name: Upload shard coverage data
+        uses: actions/upload-artifact@v6
+        if: ${{ matrix.api-level==30 }}
+        with:
+          name: coverage-ec-shard-${{ matrix.shard }}
+          path: coverage-ec-shard-${{ matrix.shard }}/
+
+      - name: Run benchmarks
+        if: ${{ matrix.api-level==30 && matrix.shard==0 }}
+        uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 10
         with:
           api-level: 30
           target: ${{ matrix.target }}
@@ -135,22 +163,67 @@ jobs:
           ram-size: 3072M
           heap-size: 1024M
           cores: 4
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
-          disable-animations: true
-          force-avd-creation: false
-          script: |
-            trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
-            ./gradlew :benchmark:connectedBenchmarkAndroidTest
+          script: ./gradlew :benchmark:connectedBenchmarkAndroidTest
+
+  # Merges api-level 30's shards' .ec files into one coverage report.
+  automated-tests-coverage-report:
+    name: Automated tests coverage report
+    needs: automated-tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Code checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Restore Gradle dependency cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            !~/.gradle/caches/build-cache-1
+          # Exact key rarely hits (save computes the same hashFiles() post-build,
+          # so it differs) - fall back to the latest entry instead of going cold.
+          key: setup-java-Linux-x64-gradle-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties', 'buildSrc/**/Versions.kt', 'buildSrc/**/Dependencies.kt', 'gradle/*.versions.toml', '**/versions.properties') }}
+          restore-keys: |
+            setup-java-Linux-x64-gradle-
+
+      - name: Restore Gradle wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/wrapper
+          key: setup-java-Linux-x64-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
+
+      - name: Restore shared Gradle build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.gradle/caches/build-cache-1
+          key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
+
+      - name: Download all shards' coverage data
+        uses: actions/download-artifact@v7
+        with:
+          pattern: coverage-ec-shard-*
+          path: app/build/outputs/code_coverage/debugAndroidTest/connected/
+          merge-multiple: true
+
+      # createDebugCoverageReport needs a connected device; skip it, .ec files are already here.
+      - name: Generate merged coverage report
+        run: ./gradlew :app:jacocoInstrumentationTestReport -x createDebugCoverageReport
 
       - name: Upload coverage to Codecov
-        if: ${{ matrix.api-level==30 }}
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload Coverage to GH-Actions
         uses: actions/upload-artifact@v6
-        if: ${{ matrix.api-level==30 }}
         with:
           name: Tests Coverage Report
           path: |
@@ -219,30 +292,29 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Create AVD and generate snapshot
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
-          force-avd-creation: false
-          sdcard-path-or-size: 1024M
           heap-size: 1024M
           ram-size: 4096M
           cores: 4
-          disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           script: |
             trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
             echo "Generated AVD snapshot for caching."
 
       - name: Create instrumentation coverage for PlayStore variant
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 25
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
+          cores: 4
           script: bash contrib/instrumentation-release.sh
 
   automated-tests-branded-apps:
@@ -308,30 +380,29 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Create AVD and generate snapshot
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
-          force-avd-creation: false
-          sdcard-path-or-size: 1024M
           heap-size: 1024M
           ram-size: 4096M
           cores: 4
-          disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           script: |
             trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
             echo "Generated AVD snapshot for caching."
 
       - name: Test branded app
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 15
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_2
+          cores: 4
           script: bash contrib/instrumentation-brandedapps.sh
 
   automated-tests-on-tablet:
@@ -397,30 +468,29 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Create AVD and generate snapshot
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_c
-          force-avd-creation: false
-          sdcard-path-or-size: 1024M
           heap-size: 1024M
           ram-size: 4096M
           cores: 4
-          disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-metrics
           script: |
             trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
             echo "Generated AVD snapshot for caching."
 
       - name: File Opening test on Tablet
         uses: ./.github/actions/android-emulator-runner
+        timeout-minutes: 10
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: ${{ (matrix.api-level >= 30) && 'x86_64' || 'x86' }}
           profile: pixel_c
+          cores: 4
           script: bash contrib/instrumentation-file-opening-on-tablet.sh
 
   code-formatting-job:
@@ -644,10 +714,8 @@ jobs:
     permissions:
       contents: read
       actions: write
-    # job-level timeout-minutes can't read the env context (only step-level
-    # can), so this can't reference EMULATOR_STEP_TIMEOUT_MINUTES - keep the
-    # literal in sync with it by hand.
-    timeout-minutes: 180
+    # This multi-variant build usually takes 11-13 minutes; allow cache misses.
+    timeout-minutes: 45
     continue-on-error: true
 
     steps:
