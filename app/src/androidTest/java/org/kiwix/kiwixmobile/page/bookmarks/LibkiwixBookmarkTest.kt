@@ -87,7 +87,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
     }
   }
 
-  @Test
+  @Test(timeout = 240_000)
   fun testSavedBookmarksShowingOnBookmarkScreen() {
     openZimFileInReader()
     bookmarks {

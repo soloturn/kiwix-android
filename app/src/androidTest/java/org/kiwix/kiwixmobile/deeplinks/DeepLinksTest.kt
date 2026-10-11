@@ -116,7 +116,7 @@ class DeepLinksTest : BaseActivityTest() {
     }
   }
 
-  @Test
+  @Test(timeout = 120_000)
   fun contentTypeDeepLinkTest() {
     loadZimFileInApplicationAndReturnSchemeTypeUri("content")?.let {
       // Launch the activity to test the deep link
