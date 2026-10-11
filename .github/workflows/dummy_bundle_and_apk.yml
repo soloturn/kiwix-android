@@ -35,7 +35,7 @@ jobs:
         id: git_head_revision_date
         run: |
           DATE=$(git log -1 --format=%cd --date=format:%Y-%m-%d)
-          echo "KIWIX_ANDROID_RELEASE_DATE=$DATE" >> $GITHUB_ENV
+          echo "KIWIX_ANDROID_RELEASE_DATE=$DATE" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Generate dummy Bundle
@@ -63,10 +63,10 @@ jobs:
         run: |
           BUNDLE_PATH="app/build/outputs/bundle/playStore/app-playStore.aab"
           BUNDLE_NAME="PlayStoreDummyBundle.aab"
-          echo "bundle_path=$BUNDLE_PATH" >> $GITHUB_ENV
-          echo "bundle_name=$BUNDLE_NAME" >> $GITHUB_ENV
+          echo "bundle_path=$BUNDLE_PATH" >> "$GITHUB_ENV"
+          echo "bundle_name=$BUNDLE_NAME" >> "$GITHUB_ENV"
           APK_DIR="app/build/outputs/apk/release/"
-          echo "apk_dir=$APK_DIR" >> $GITHUB_ENV
+          echo "apk_dir=$APK_DIR" >> "$GITHUB_ENV"
 
       - name: Upload Bundle as an artifact
         uses: actions/upload-artifact@v6
