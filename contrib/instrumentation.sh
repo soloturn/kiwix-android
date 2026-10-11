@@ -115,7 +115,6 @@ while [ $retry -le 4 ]; do
   # A retry must classify only this attempt's results, never stale XML from a
   # previous infrastructure failure.
   find "$test_results_dir" -name 'TEST-*.xml' -type f -delete 2>/dev/null || true
-
   # Slower tests can override this default with @Test(timeout).
   if ./gradlew "$task" "${shard_args[@]}" \
     -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000; then
