@@ -104,6 +104,22 @@ class FileSearchTest {
     }
 
     @Test
+    fun `scan finds epub only when includeEpub is set`() = runTest {
+      val zimFile = File(tempDir, "a.zim").apply { createNewFile() }
+      val epubFile = File(tempDir, "b.epub").apply { createNewFile() }
+      every { contentResolver.query(any(), any(), any(), any(), any()) } returns null
+      every { storageDevice.name } returns tempDir.absolutePath
+      fileSearch.scan(scanningProgressListener).test {
+        assertThat(awaitItem()).containsExactly(zimFile)
+        awaitComplete()
+      }
+      fileSearch.scan(scanningProgressListener, includeEpub = true).test {
+        assertThat(awaitItem()).containsExactlyInAnyOrder(zimFile, epubFile)
+        awaitComplete()
+      }
+    }
+
+    @Test
     fun `scan of directory recursively traverses filesystem`() = runTest {
       val subDir = File(tempDir, "dir").apply { mkdirs() }
       val zimFile = File(subDir, "fileToFind.zim").apply { createNewFile() }

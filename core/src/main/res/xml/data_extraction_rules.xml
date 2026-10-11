@@ -7,5 +7,7 @@
     <include domain="file" path="." />
     <include domain="database" path="." />
     <include domain="sharedpref" path="." />
+    <exclude domain="file" path="epub/" />
+    <exclude domain="file" path="epub_covers/" />
   </cloud-backup>
 </data-extraction-rules>

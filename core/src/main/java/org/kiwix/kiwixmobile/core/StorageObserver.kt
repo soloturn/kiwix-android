@@ -19,20 +19,27 @@
 package org.kiwix.kiwixmobile.core
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadModel
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
 import org.kiwix.kiwixmobile.core.utils.files.FileSearch
 import org.kiwix.kiwixmobile.core.utils.files.ScanningProgressListener
+import org.kiwix.kiwixmobile.core.utils.files.isEpubFile
 import org.kiwix.kiwixmobile.core.utils.files.saf.LibraryFolder
 import org.kiwix.libkiwix.Book
 import java.io.File
@@ -45,10 +52,14 @@ class StorageObserver @Inject constructor(
   private val zimReaderFactory: ZimFileReader.Factory,
   private val libkiwixBookmarks: LibkiwixBookmarks,
   private val libkiwixBookFactory: LibkiwixBookFactory,
+  private val epubLibraryManager: EpubLibraryManager,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
   private val libraryFolder: LibraryFolder,
   private val libkiwixBookOnDisk: LibkiwixBookOnDisk
 ) {
+  private val importScope = CoroutineScope(SupervisorJob() + ioDispatcher)
+  private val importMutex = Mutex()
+
   /**
    * Adds the ZIM files of the user's SAF library folder that are not in the library yet.
    * Tree books have no file path, so they go straight into the book store instead of being
@@ -67,15 +78,27 @@ class StorageObserver @Inject constructor(
   fun getBooksOnFileSystem(
     scanningProgressListener: ScanningProgressListener
   ): Flow<List<Book>> = flow {
-    val files = scanFiles(scanningProgressListener).first()
+    val (epubs, zims) = scanFiles(scanningProgressListener).first()
+      .partition { isEpubFile(it.absolutePath) }
+    // Start before emit: callers take first(), so nothing after emit would ever run.
+    importEpubsInBackground(epubs)
     val downloads = downloadRoomDao.downloads().first()
-    val result = toFilesThatAreNotDownloading(files, downloads)
+    val result = toFilesThatAreNotDownloading(zims, downloads)
       .mapNotNull { convertToLibkiwixBook(it) }
     emit(result)
   }.flowOn(ioDispatcher)
 
+  // EPUBs go to their own library table (observed via Room), so the ZIM list must not wait for the
+  // slow parse. Own scope: callers take `first()`, which would cancel work launched in the flow.
+  private fun importEpubsInBackground(epubs: List<File>) {
+    if (epubs.isEmpty()) return
+    importScope.launch {
+      importMutex.withLock { runCatching { epubLibraryManager.importScanned(epubs) } }
+    }
+  }
+
   private fun scanFiles(scanningProgressListener: ScanningProgressListener): Flow<List<File>> =
-    fileSearch.scan(scanningProgressListener)
+    fileSearch.scan(scanningProgressListener, includeEpub = true)
 
   private fun toFilesThatAreNotDownloading(files: List<File>, downloads: List<DownloadModel>) =
     files.filter { fileHasNoMatchingDownload(downloads, it) }
