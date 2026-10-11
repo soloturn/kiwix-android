@@ -25,6 +25,7 @@ import android.Manifest.permission.READ_EXTERNAL_STORAGE
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
@@ -42,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.hamcrest.Matchers.anyOf
 import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
@@ -188,12 +190,42 @@ abstract class BaseActivityTest {
         }
       }
 
+  private var hangWatchdog: Thread? = null
+
+  /**
+   * Logs every thread's stack (at error level, so CI's logcat filter keeps it) if a test is
+   * still running after [HANG_DUMP_AFTER_MS], to show what a hung test is blocked on.
+   */
+  @Before
+  fun startHangWatchdog() {
+    hangWatchdog = Thread {
+      try {
+        Thread.sleep(HANG_DUMP_AFTER_MS)
+      } catch (_: InterruptedException) {
+        return@Thread
+      }
+      Thread.getAllStackTraces().forEach { (thread, trace) ->
+        Log.e(HANG_DUMP_TAG, "${thread.name} ${thread.state}\n" + trace.joinToString("\n") { "  at $it" })
+      }
+    }.apply {
+      name = "hang-watchdog"
+      isDaemon = true
+      start()
+    }
+  }
+
   @After
   fun tearDown() {
+    hangWatchdog?.interrupt()
     if (::activityScenario.isInitialized) {
       runCatching {
         activityScenario.close()
       }
     }
+  }
+
+  private companion object {
+    const val HANG_DUMP_TAG = "HANG_DUMP"
+    const val HANG_DUMP_AFTER_MS = 6 * 60_000L
   }
 }
