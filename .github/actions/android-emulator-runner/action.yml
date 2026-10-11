@@ -40,7 +40,7 @@ inputs:
   gradle-opts:
     description: Value for the GRADLE_OPTS environment variable during the emulator script
     required: false
-    default: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.network.retry.max.attempts=6 -Dorg.gradle.internal.network.retry.initial.backOff=2000"
+    default: "-Dorg.gradle.internal.http.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000"
 
 runs:
   using: composite
@@ -54,6 +54,7 @@ runs:
       env:
         GRADLE_OPTS: ${{ inputs.gradle-opts }}
         ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL: 60
+        ANDROID_EMULATOR_SCRIPT: ${{ inputs.script }}
       with:
         api-level: ${{ inputs.api-level }}
         target: ${{ inputs.target }}
@@ -71,9 +72,10 @@ runs:
           # The emulator's crashpad_handler subprocess can survive `adb emu kill` and
           # hang the android-emulator-runner action's teardown
           # (https://github.com/ReactiveCircus/android-emulator-runner/issues/385).
-          # Kill it once this script exits, regardless of the test outcome.
-          trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
-          bash -c '${{ inputs.script }}'
+          # Kill it after the emulator shutdown starts; it can otherwise keep
+          # the runner action waiting for the emulator process indefinitely.
+          trap '(sleep 30; while pgrep -x crashpad_handler >/dev/null 2>&1; do echo "crashpad_handler: still running, killing"; pkill -9 crashpad_handler || true; sleep 5; done; echo "crashpad_handler: gone") &' EXIT
+          bash -c "$ANDROID_EMULATOR_SCRIPT"
 
     - name: Emulator test - attempt 2
       id: attempt-2
@@ -83,6 +85,7 @@ runs:
       env:
         GRADLE_OPTS: ${{ inputs.gradle-opts }}
         ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL: 60
+        ANDROID_EMULATOR_SCRIPT: ${{ inputs.script }}
       with:
         api-level: ${{ inputs.api-level }}
         target: ${{ inputs.target }}
@@ -97,8 +100,8 @@ runs:
         force-avd-creation: true
         emulator-boot-timeout: 1200
         script: |
-          trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
-          bash -c '${{ inputs.script }}'
+          trap '(sleep 30; while pgrep -x crashpad_handler >/dev/null 2>&1; do echo "crashpad_handler: still running, killing"; pkill -9 crashpad_handler || true; sleep 5; done; echo "crashpad_handler: gone") &' EXIT
+          bash -c "$ANDROID_EMULATOR_SCRIPT"
 
     - name: Emulator test - attempt 3
       id: attempt-3
@@ -107,6 +110,7 @@ runs:
       env:
         GRADLE_OPTS: ${{ inputs.gradle-opts }}
         ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL: 60
+        ANDROID_EMULATOR_SCRIPT: ${{ inputs.script }}
       with:
         api-level: ${{ inputs.api-level }}
         target: ${{ inputs.target }}
@@ -121,8 +125,8 @@ runs:
         force-avd-creation: true
         emulator-boot-timeout: 1200
         script: |
-          trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
-          bash -c '${{ inputs.script }}'
+          trap '(sleep 30; while pgrep -x crashpad_handler >/dev/null 2>&1; do echo "crashpad_handler: still running, killing"; pkill -9 crashpad_handler || true; sleep 5; done; echo "crashpad_handler: gone") &' EXIT
+          bash -c "$ANDROID_EMULATOR_SCRIPT"
 
     # ---------------------------------------------------------
     # Final result
