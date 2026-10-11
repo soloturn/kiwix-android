@@ -23,6 +23,10 @@ plugins {
 plugins.apply(KiwixConfigurationPlugin::class)
 
 android {
+  lint {
+    disable += "LogNotTimber"
+  }
+
   defaultConfig {
     applicationId = "org.kiwix"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
