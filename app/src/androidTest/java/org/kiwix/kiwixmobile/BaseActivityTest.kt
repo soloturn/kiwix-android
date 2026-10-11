@@ -233,6 +233,8 @@ abstract class BaseActivityTest {
 
   private companion object {
     const val HANG_DUMP_TAG = "HANG_DUMP"
-    const val HANG_DUMP_AFTER_MS = 6 * 60_000L
+
+    // Capture the blocked threads before CI's two-minute per-test timeout interrupts them.
+    const val HANG_DUMP_AFTER_MS = 90_000L
   }
 }
