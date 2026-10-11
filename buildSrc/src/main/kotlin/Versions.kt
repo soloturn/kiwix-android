@@ -120,6 +120,9 @@ object Versions {
   const val PLAYSTORE_REVIEW: String = "2.0.2"
   const val KOTLIN_KSP: String = "2.3.4"
   const val ANDROIDX_MEDIA3: String = "1.11.0"
+  // 3.1.x keeps the metadata parser compatible with the existing Kotlin toolchain.
+  const val READIUM: String = "3.1.2"
+  const val DESUGAR_JDK_LIBS: String = "2.1.5"
 }
 
 /**

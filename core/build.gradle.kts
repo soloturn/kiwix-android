@@ -56,4 +56,7 @@ dependencies {
   implementation(Libs.PLAYSTORE_REVIEW_KTX)
   api(Libs.MEDIA3_SESSION)
   api(Libs.MEDIA3_COMMON)
+
+  implementation(Libs.READIUM_SHARED)
+  implementation(Libs.READIUM_STREAMER)
 }
