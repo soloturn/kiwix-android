@@ -46,6 +46,39 @@ class BackupRulesTest {
     assertEquals(expectedIncludes, includedDomains(R.xml.data_extraction_rules, "cloud-backup"))
   }
 
+  @Test
+  fun legacyBackupExcludesImportedBooksAndCoverCache() {
+    assertEquals(setOf("epub/", "epub_covers/"), excludedFilePaths(R.xml.backup_rules, null))
+  }
+
+  @Test
+  fun cloudBackupExcludesImportedBooksAndCoverCache() {
+    assertEquals(
+      setOf("epub/", "epub_covers/"),
+      excludedFilePaths(R.xml.data_extraction_rules, "cloud-backup")
+    )
+    assertEquals(emptySet<String>(), excludedFilePaths(R.xml.data_extraction_rules, "device-transfer"))
+  }
+
+  private fun excludedFilePaths(xmlRes: Int, section: String?): Set<String> {
+    val parser = context.resources.getXml(xmlRes)
+    val paths = mutableSetOf<String>()
+    var inSection = section == null
+    while (parser.next() != XmlPullParser.END_DOCUMENT) {
+      when {
+        parser.eventType == XmlPullParser.START_TAG && parser.name == section -> inSection = true
+        parser.eventType == XmlPullParser.END_TAG && parser.name == section -> inSection = false
+        parser.eventType == XmlPullParser.START_TAG &&
+          parser.name == "exclude" &&
+          inSection &&
+          parser.getAttributeValue(null, "domain") == "file" ->
+          paths += parser.getAttributeValue(null, "path")
+      }
+    }
+    parser.close()
+    return paths
+  }
+
   private fun includedDomains(xmlRes: Int, section: String?): Set<String> {
     val parser = context.resources.getXml(xmlRes)
     val domains = mutableSetOf<String>()
