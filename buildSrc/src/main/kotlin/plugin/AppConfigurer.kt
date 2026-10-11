@@ -125,6 +125,13 @@ class AppConfigurer {
           // this is for issue https://github.com/kiwix/kiwix-android/issues/3103
           renameNightlyUniversalApk(target, variant)
         }
+        // Only debug's outputs are ever restored by CI - keep the shared build cache to that.
+        if (variant.buildType != "debug") {
+          val variantTaskSuffix = variant.name.replaceFirstChar(Char::uppercase)
+          target.tasks.configureEach {
+            if (name.contains(variantTaskSuffix)) outputs.cacheIf { false }
+          }
+        }
       }
       sourceSets.getByName("androidTest") {
         java.directories.add("${target.rootDir}/core/src/sharedTestFunctions/java")
