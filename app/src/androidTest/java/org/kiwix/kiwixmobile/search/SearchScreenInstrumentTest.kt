@@ -82,7 +82,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
     composeTestRule.enableAccessibilityChecks(createAccessibilityValidator())
   }
 
-  @Test
+  @Test(timeout = 240_000)
   fun searchScreenSimple() {
     Assume.assumeTrue(Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA)
     activityScenario.onActivity {
