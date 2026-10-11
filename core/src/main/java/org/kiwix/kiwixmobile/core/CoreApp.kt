@@ -23,8 +23,12 @@ import android.os.StrictMode
 import android.os.StrictMode.VmPolicy
 import com.jakewharton.threetenabp.AndroidThreeTen
 import dagger.hilt.android.EarlyEntryPoints
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.di.CoreAppEntryPoint
 import org.kiwix.kiwixmobile.core.utils.files.FileLogger
+import org.kiwix.kiwixmobile.core.utils.files.deleteStaleEpubParts
 
 @Suppress("UnnecessaryAbstractClass")
 abstract class CoreApp : Application() {
@@ -57,6 +61,7 @@ abstract class CoreApp : Application() {
     themeConfig.init()
     fileLogger.writeLogFile(this)
     configureStrictMode()
+    CoroutineScope(Dispatchers.IO).launch { deleteStaleEpubParts(this@CoreApp) }
   }
 
   private fun configureStrictMode() {

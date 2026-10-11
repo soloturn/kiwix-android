@@ -111,6 +111,7 @@ android {
   }
   lint {
     checkDependencies = true
+    disable += "LogNotTimber"
   }
 
   buildTypes {
