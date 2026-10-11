@@ -18,17 +18,12 @@
 
 package org.kiwix.kiwixmobile.page.bookmarks
 
-import android.accessibilityservice.AccessibilityService
-import android.content.Context
-import android.content.Intent
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.core.os.LocaleListCompat
-import androidx.test.core.app.ApplicationProvider
-import androidx.test.platform.app.InstrumentationRegistry
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
@@ -46,10 +41,7 @@ import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.main.topLevel
 import org.kiwix.kiwixmobile.testutils.RetryRule
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
-import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SNACKBAR
 import org.kiwix.kiwixmobile.testutils.TestUtils.getZimFileFromResourceFolder
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.libkiwix.Book
 import org.kiwix.libkiwix.Bookmark
 
@@ -81,10 +73,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
   }
 
   private fun waitComposeToSettleViews() {
-    composeTestRule.apply {
-      waitForIdle()
-      waitUntilTimeout()
-    }
+    composeTestRule.waitForIdle()
   }
 
   @Test(timeout = 240_000)
@@ -166,9 +155,9 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
 
       // Remove the bookmark and verify it is removed from the reader and the bookmark list.
       clickOnSaveBookmarkImage(composeTestRule)
-      composeTestRule.waitUntilTimeout(TEST_PAUSE_MS_FOR_SNACKBAR)
+      waitForBookmarkSnackbarToDisappear(composeTestRule)
       assertBookmarkButtonShowNotBookmarked(composeTestRule)
-      longClickOnSaveBookmarkImage(composeTestRule, TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
+      longClickOnSaveBookmarkImage(composeTestRule)
       assertNoBookMarkTextDisplayed(composeTestRule)
       pressBack()
       waitComposeToSettleViews()
@@ -192,7 +181,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
 
       // Verify saved bookmark properly opened in reader(If some other article is opened in reader).
       clickOnSaveBookmarkImage(composeTestRule)
-      composeTestRule.waitUntilTimeout(TEST_PAUSE_MS_FOR_SNACKBAR)
+      waitForBookmarkSnackbarToDisappear(composeTestRule)
       assertZimFileLoadedIntoTheReader(composeTestRule)
       clickOnAndroidArticle(composeTestRule)
       waitComposeToSettleViews()
@@ -206,24 +195,14 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
       assertAndroidArticleLoadedInReader(composeTestRule)
       assertBookmarkButtonShowBookmarked(composeTestRule)
       clickOnSaveBookmarkImage(composeTestRule)
-      composeTestRule.waitUntilTimeout(TEST_PAUSE_MS_FOR_SNACKBAR)
+      waitForBookmarkSnackbarToDisappear(composeTestRule)
 
-      // Save again and verify bookmark persistence after app restart.
+      // Save again and verify bookmark persistence after the activity is recreated.
       clickOnHomeButton(composeTestRule)
       waitComposeToSettleViews()
       clickOnSaveBookmarkImage(composeTestRule)
       waitComposeToSettleViews()
-      InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(
-        AccessibilityService.GLOBAL_ACTION_HOME
-      )
-      waitComposeToSettleViews()
-
-      val context = ApplicationProvider.getApplicationContext<Context>()
-      val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-      intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-      context.startActivity(intent)
-      InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-      waitComposeToSettleViews()
+      composeTestRule.activityRule.scenario.recreate()
       assertZimFileLoadedIntoTheReader(composeTestRule)
       assertBookmarkButtonShowBookmarked(composeTestRule)
       topLevel {
