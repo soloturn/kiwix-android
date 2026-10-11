@@ -54,6 +54,10 @@ open class DatabaseModule {
   @Singleton
   fun provideWebViewHistoryRoomDao(db: KiwixRoomDatabase) = db.webViewHistoryRoomDao()
 
+  @Provides
+  @Singleton
+  fun provideEpubLibraryDao(db: KiwixRoomDatabase) = db.epubLibraryDao()
+
   @Singleton
   @Provides
   fun provideNoteRoomDao(db: KiwixRoomDatabase) = db.notesRoomDao()
