@@ -37,7 +37,6 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import leakcanary.LeakAssertions
 import org.junit.After
-import org.junit.Assert
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Rule
@@ -57,7 +56,7 @@ import org.kiwix.kiwixmobile.ui.KiwixDestination
 import org.kiwix.kiwixmobile.utils.KiwixIdlingResource.Companion.getInstance
 import java.util.concurrent.TimeUnit
 
-const val TWO_MINUTES_IN_MILLISECONDS = 2 * 60 * 1000
+private const val BACKGROUND_DOWNLOAD_OBSERVE_MS = 15_000L
 
 @LargeTest
 @HiltAndroidTest
@@ -116,10 +115,6 @@ class DownloadTest : BaseActivityTest() {
           assertDownloadPaused(composeTestRule, kiwixMainActivity)
           resumeDownload(composeTestRule)
           assertDownloadResumed(composeTestRule, kiwixMainActivity)
-          waitUntilDownloadComplete(
-            composeTestRule = composeTestRule,
-            kiwixMainActivity = kiwixMainActivity
-          )
         }.onFailure {
           // do nothing as ZIM file already downloaded, since we are downloading the smallest file
           // so it can be downloaded immediately after starting.
@@ -128,17 +123,23 @@ class DownloadTest : BaseActivityTest() {
             "Could not pause download. Original exception = $it"
           )
         }
+        // Missing a pause button can mean the download finished, but does not prove it did.
+        waitUntilDownloadComplete(
+          composeTestRule = composeTestRule,
+          kiwixMainActivity = kiwixMainActivity
+        )
         UiThreadStatement.runOnUiThread {
           kiwixMainActivity.navigate(KiwixDestination.Library.route)
         }
         // refresh the local library list to show the downloaded zim file
-        library { refreshList(composeTestRule) }
+        library {
+          refreshList(composeTestRule)
+          waitUntilZimFilesRefreshing(composeTestRule)
+        }
         checkIfZimFileDownloaded(composeTestRule)
       }
     } catch (e: Exception) {
-      Assert.fail(
-        "Couldn't find downloaded file\n Original Exception: ${e.message}"
-      )
+      throw AssertionError("Download test failed before the downloaded file was verified", e)
     }
     if (Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1) {
       LeakAssertions.assertNoLeaks()
@@ -269,12 +270,12 @@ class DownloadTest : BaseActivityTest() {
 
       // Restart the application
       val context = ApplicationProvider.getApplicationContext<Context>()
-      val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-      intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-      context.startActivity(intent)
-      InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+      val intent =
+        requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
+          .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+      activityScenario.close()
 
-      activityScenario = ActivityScenario.launch(KiwixMainActivity::class.java).apply {
+      activityScenario = ActivityScenario.launch<KiwixMainActivity>(intent).apply {
         moveToState(Lifecycle.State.RESUMED)
         onActivity {
           kiwixMainActivity = it
@@ -313,34 +314,44 @@ class DownloadTest : BaseActivityTest() {
         waitUntilZimFilesRefreshing(composeTestRule)
         deleteZimIfExists(composeTestRule)
       }
+      activityScenario.onActivity {
+        it.navigate(KiwixDestination.Explore.route)
+      }
       downloadRobot {
-        clickDownloadOnBottomNav(composeTestRule)
         waitForDataToLoad(composeTestRule = composeTestRule)
         stopDownloadIfAlreadyStarted(composeTestRule, kiwixMainActivity)
         searchD3JsDocsFile(composeTestRule)
         downloadZimFile(composeTestRule)
         assertDownloadStart(composeTestRule)
       }
+      val backgroundWaitStartedAt = android.os.SystemClock.elapsedRealtime()
+      Log.i(KIWIX_DOWNLOAD_TEST, "Background download test: app sent to background")
       // press the home button so that application goes into background
       InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(
         AccessibilityService.GLOBAL_ACTION_HOME
       )
-      // wait for 2 minutes to download the ZIM file in background.
-      composeTestRule.waitUntilTimeout(TWO_MINUTES_IN_MILLISECONDS.toLong())
+      // Give the background service time to continue before checking its state after relaunch.
+      composeTestRule.waitUntilTimeout(BACKGROUND_DOWNLOAD_OBSERVE_MS)
+      Log.i(
+        KIWIX_DOWNLOAD_TEST,
+        "Background download wait finished after " +
+          "${android.os.SystemClock.elapsedRealtime() - backgroundWaitStartedAt}ms"
+      )
       // relaunch the application.
       val context = ApplicationProvider.getApplicationContext<Context>()
-      val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-      intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-      context.startActivity(intent)
-      InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+      val intent =
+        requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
+          .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+      activityScenario.close()
 
-      activityScenario = ActivityScenario.launch(KiwixMainActivity::class.java).apply {
+      activityScenario = ActivityScenario.launch<KiwixMainActivity>(intent).apply {
         moveToState(Lifecycle.State.RESUMED)
         onActivity {
           kiwixMainActivity = it
           it.navigate(KiwixDestination.Library.route)
         }
       }
+      Log.i(KIWIX_DOWNLOAD_TEST, "Background download test: app relaunched; checking file state")
       library {
         refreshList(composeTestRule)
         waitUntilZimFilesRefreshing(composeTestRule)
@@ -348,10 +359,14 @@ class DownloadTest : BaseActivityTest() {
           runCatching {
             checkIfZimFileDownloaded(composeTestRule)
           }.onFailure {
-            // if currently downloading check.
+            // If the file is not ready, verify that its download continued in the background.
             clickDownloadOnBottomNav(composeTestRule)
             waitForDataToLoad(composeTestRule = composeTestRule)
+            assertDownloadStart(composeTestRule)
+            Log.i(KIWIX_DOWNLOAD_TEST, "Download remained active after backgrounding and relaunch")
             stopDownloadIfAlreadyStarted(composeTestRule, kiwixMainActivity)
+          }.onSuccess {
+            Log.i(KIWIX_DOWNLOAD_TEST, "Download completed while the app was in the background")
           }
         }
       }

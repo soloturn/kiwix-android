@@ -32,6 +32,7 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.swipeDown
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.canTakeScreenshot
@@ -323,8 +324,14 @@ object TestUtils {
       .build()
 
   fun ComposeContentTestRule.refresh() {
-    onNodeWithTag(SWIPE_REFRESH_TESTING_TAG)
-      .performTouchInput { swipeDown() }
+    try {
+      onNodeWithTag(SWIPE_REFRESH_TESTING_TAG)
+        .performTouchInput { swipeDown() }
+    } catch (failure: AssertionError) {
+      Log.e("TEST_REFRESH", "Swipe refresh node was unavailable; current semantics tree follows")
+      onRoot(useUnmergedTree = true).printToLog("TEST_REFRESH")
+      throw failure
+    }
   }
 
   /**

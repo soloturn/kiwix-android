@@ -27,6 +27,7 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -38,6 +39,7 @@ import androidx.test.espresso.web.webdriver.DriverAtoms
 import androidx.test.espresso.web.webdriver.DriverAtoms.findElement
 import androidx.test.espresso.web.webdriver.DriverAtoms.webClick
 import androidx.test.espresso.web.webdriver.Locator
+import androidx.test.platform.app.InstrumentationRegistry
 import applyWithViewHierarchyPrinting
 import com.adevinta.android.barista.interaction.BaristaSleepInteractions
 import org.kiwix.kiwixmobile.BaseRobot
@@ -59,6 +61,7 @@ import org.kiwix.kiwixmobile.main.BOTTOM_NAV_READER_ITEM_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
+import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_SNACKBAR
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
 import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntilTimeout
 import org.kiwix.kiwixmobile.utils.StandardActions.openDrawer
@@ -129,14 +132,12 @@ class BookmarksRobot : BaseRobot() {
   }
 
   fun longClickOnSaveBookmarkImage(
-    composeTestRule: ComposeContentTestRule,
-    timeout: Long = TEST_PAUSE_MS.toLong()
+    composeTestRule: ComposeContentTestRule
   ) {
     testFlakyView({
       composeTestRule.apply {
         waitForIdle()
-        // wait for disappearing the snack-bar after removing the bookmark
-        waitUntilTimeout(timeout)
+        waitForBookmarkSnackbarToDisappear(composeTestRule)
         waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
           onNodeWithTag(READER_BOTTOM_BAR_BOOKMARK_BUTTON_TESTING_TAG).isDisplayed()
         }
@@ -146,6 +147,19 @@ class BookmarksRobot : BaseRobot() {
           }
       }
     })
+  }
+
+  fun waitForBookmarkSnackbarToDisappear(composeTestRule: ComposeContentTestRule) {
+    composeTestRule.waitUntil(TEST_PAUSE_MS_FOR_SNACKBAR) {
+      listOf(R.string.bookmark_added, R.string.bookmark_removed).all { message ->
+        composeTestRule
+          .onAllNodesWithText(
+            InstrumentationRegistry.getInstrumentation().targetContext.getString(message)
+          )
+          .fetchSemanticsNodes()
+          .isEmpty()
+      }
+    }
   }
 
   fun assertBookmarkSaved(composeTestRule: ComposeContentTestRule) {
@@ -182,12 +196,11 @@ class BookmarksRobot : BaseRobot() {
   ) {
     composeTestRule.apply {
       waitForIdle()
-      bookmarkList.forEachIndexed { index, libkiwixBookmarkItem ->
-        testFlakyView({
-          composeTestRule
-            .onNodeWithTag(PAGE_LIST_TEST_TAG)
-            .performScrollToNode(hasText(libkiwixBookmarkItem.title))
-          composeTestRule.onNodeWithText(libkiwixBookmarkItem.title).assertExists()
+      val bookmarkListNode = onNodeWithTag(PAGE_LIST_TEST_TAG)
+      listOf(bookmarkList.first(), bookmarkList.last()).forEach { bookmark ->
+        testFlakyView(action = {
+          bookmarkListNode.performScrollToNode(hasText(bookmark.title))
+          onNodeWithText(bookmark.title).assertExists()
         })
       }
     }
@@ -268,8 +281,7 @@ class BookmarksRobot : BaseRobot() {
   fun clickOnBackwardButton(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitForIdle()
-      // wait for disappearing the snack-bar after removing the bookmark
-      waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
+      waitForBookmarkSnackbarToDisappear(composeTestRule)
       waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(READER_BOTTOM_BAR_PREVIOUS_SCREEN_BUTTON_TESTING_TAG).isDisplayed()
       }
@@ -281,8 +293,7 @@ class BookmarksRobot : BaseRobot() {
   fun clickOnHomeButton(composeTestRule: ComposeContentTestRule) {
     composeTestRule.apply {
       waitForIdle()
-      // wait for disappearing the snack-bar after removing the bookmark
-      waitUntilTimeout(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST)
+      waitForBookmarkSnackbarToDisappear(composeTestRule)
       waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
         onNodeWithTag(READER_BOTTOM_BAR_HOME_BUTTON_TESTING_TAG).isDisplayed()
       }

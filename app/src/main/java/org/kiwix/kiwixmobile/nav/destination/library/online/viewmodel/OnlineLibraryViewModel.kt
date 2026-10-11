@@ -445,8 +445,8 @@ class OnlineLibraryViewModel @Inject constructor(
 
   private fun updateNetworkStates() =
     observeNetworkState(connectivityObserver.networkStates)
-      .onEach { handleNetworkState(it) }
       .flowOn(ioDispatcher)
+      .onEach { handleNetworkState(it) }
       .launchIn(viewModelScope)
 
   internal suspend fun handleNetworkState(state: ObserveNetworkState.Result) {
@@ -504,8 +504,8 @@ class OnlineLibraryViewModel @Inject constructor(
 
   private fun observeLibrary() =
     observeOnlineLibrary(onlineLibraryRequest)
-      .onEach { state -> handleLibraryState(state) }
       .flowOn(ioDispatcher)
+      .onEach { state -> handleLibraryState(state) }
       .launchIn(viewModelScope)
 
   @Suppress("CyclomaticComplexMethod")

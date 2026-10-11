@@ -196,6 +196,7 @@ class OnlineLibraryViewModelTest {
     @Test
     fun `given proceed action when refreshScreen then show scanning`() = runTest {
       coEvery { refreshAction.invoke(any()) } returns Proceed
+      advanceUntilIdle()
 
       viewModel.refreshScreen(isExplicitRefresh = true)
 
