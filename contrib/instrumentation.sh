@@ -81,7 +81,9 @@ task="${INSTRUMENTATION_GRADLE_TASK:-:app:connectedDebugAndroidTest}"
 
 retry=0
 while [ $retry -le 4 ]; do
-  if ./gradlew "$task" "${shard_args[@]}"; then
+  # This shard's slowest completed test took 79s; allow headroom without hiding an idle-wait hang.
+  if ./gradlew "$task" "${shard_args[@]}" \
+    -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000; then
     echo "$task succeeded" >&2
     break
   else
