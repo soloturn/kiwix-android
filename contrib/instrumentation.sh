@@ -100,14 +100,55 @@ fi
 # and objectboxmigration, none of which have any tests.
 task="${INSTRUMENTATION_GRADLE_TASK:-:app:connectedDebugAndroidTest}"
 
+test_results_dir="app/build/outputs/androidTest-results/connected"
+has_test_failures() {
+  local junit_xmls=()
+  mapfile -t junit_xmls < <(find "$test_results_dir" -name 'TEST-*.xml' -type f 2>/dev/null)
+  [ "${#junit_xmls[@]}" -gt 0 ] || return 1
+  python3 - "${junit_xmls[@]}" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+for path in sys.argv[1:]:
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError):
+        continue
+    if any(case.find("failure") is not None or case.find("error") is not None
+           for case in root.iter("testcase")):
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
 retry=0
 while [ $retry -le 4 ]; do
   # Bound each test invocation so a stalled instrumentation run fails in finite time.
+  # A retry must classify only this attempt's results, never stale XML from a
+  # previous infrastructure failure.
+  find "$test_results_dir" -name 'TEST-*.xml' -type f -delete 2>/dev/null || true
+
+  # Slower tests can override this default with @Test(timeout).
   if ./gradlew "$task" "${shard_args[@]}" \
     -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000; then
     echo "$task succeeded" >&2
     break
   else
+    if has_test_failures; then
+      echo "$task reported failed tests; classifying now instead of rerunning the whole suite" >&2
+      mapfile -t junit_xmls < <(find "$test_results_dir" -name 'TEST-*.xml' -type f 2>/dev/null)
+      if python3 contrib/classify_flaky_failures.py \
+        --junit-xml "${junit_xmls[@]}" \
+        --resource-diag /tmp/resource-diag.log \
+        --dmesg /tmp/dmesg.log \
+        --stall-capture /tmp/stall-capture.log \
+        --apply --in-place; then
+        echo "All failures were CI-runner overload with supporting evidence - not failing the build" >&2
+        break
+      fi
+      echo "$task has genuine test failures; not retrying the full suite" >&2
+      exit 1
+    fi
     stop_logcat
     adb kill-server
     adb start-server
@@ -139,7 +180,7 @@ while [ $retry -le 4 ]; do
     if [ $retry -eq 4 ]; then
       adb exec-out screencap -p >screencap.png
       echo "$task failed after $retry attempts - checking whether every failure is CI-runner overload" >&2
-      mapfile -t junit_xmls < <(find app/build/outputs/androidTest-results/connected -name 'TEST-*.xml' 2>/dev/null)
+      mapfile -t junit_xmls < <(find "$test_results_dir" -name 'TEST-*.xml' -type f 2>/dev/null)
       if [ "${#junit_xmls[@]}" -eq 0 ] || ! python3 contrib/classify_flaky_failures.py \
         --junit-xml "${junit_xmls[@]}" \
         --resource-diag /tmp/resource-diag.log \
