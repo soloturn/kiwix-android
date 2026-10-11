@@ -26,10 +26,13 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -39,6 +42,7 @@ import org.kiwix.kiwixmobile.core.dao.DownloadRoomDao
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookOnDisk
 import org.kiwix.kiwixmobile.core.dao.LibkiwixBookmarks
 import org.kiwix.kiwixmobile.core.downloader.model.DownloadModel
+import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Factory
 import org.kiwix.kiwixmobile.core.reader.ZimReaderSource
@@ -67,6 +71,7 @@ class StorageObserverTest {
   private val scanningProgressListener: ScanningProgressListener = mockk()
   private val libraryFolder: LibraryFolder = mockk()
   private val libkiwixBookOnDisk: LibkiwixBookOnDisk = mockk()
+  private val epubLibraryManager: EpubLibraryManager = mockk(relaxed = true)
 
   private val files = MutableStateFlow<List<File>>(emptyList())
   private val downloads = MutableStateFlow<List<DownloadModel>>(emptyList())
@@ -82,7 +87,7 @@ class StorageObserverTest {
   @BeforeEach fun init() {
     clearAllMocks()
     coEvery { kiwixDataStore.selectedStorage } returns flowOf("a")
-    every { fileSearch.scan(scanningProgressListener) } returns files
+    every { fileSearch.scan(scanningProgressListener, includeEpub = true) } returns files
     every { downloadRoomDao.downloads() } returns downloads
     coEvery { libkiwixBookmarks.addBookToLibrary(any()) } returns Unit
     every { zimFileReader.jniKiwixReader } returns mockk()
@@ -94,10 +99,57 @@ class StorageObserverTest {
       readerFactory,
       libkiwixBookmarks,
       libkiwixBookFactory,
+      epubLibraryManager,
       mainDispatcherRule.dispatcher,
       libraryFolder,
       libkiwixBookOnDisk
     )
+  }
+
+  @Test
+  fun `epub files are imported to the epub library and not read as zims`() = runTest {
+    val epub: File = mockk()
+    every { epub.absolutePath } returns "/books/a.epub"
+    every { downloadModel.fileNameFromUrl } returns "test"
+    coEvery { epubLibraryManager.importScanned(any()) } returns 1
+    downloads.value = listOf(downloadModel)
+    files.value = listOf(epub)
+    storageObserver.getBooksOnFileSystem(scanningProgressListener).test {
+      assertThat(awaitItem()).isEmpty()
+      awaitComplete()
+    }
+    advanceUntilIdle()
+    coVerify { epubLibraryManager.importScanned(listOf(epub)) }
+    coVerify(exactly = 0) { readerFactory.create(any(), any()) }
+  }
+
+  @Test
+  fun `zim list is emitted before a slow epub import finishes`() = runTest {
+    val epub: File = mockk()
+    every { epub.absolutePath } returns "/books/a.epub"
+    every { downloadModel.fileNameFromUrl } returns "test"
+    val gate = CompletableDeferred<Unit>()
+    coEvery { epubLibraryManager.importScanned(any()) } coAnswers {
+      gate.await()
+      1
+    }
+    files.value = listOf(epub)
+    storageObserver.getBooksOnFileSystem(scanningProgressListener).first()
+    advanceUntilIdle()
+    // The collector took first() and left; the import still runs and is still pending.
+    coVerify { epubLibraryManager.importScanned(listOf(epub)) }
+    assertThat(gate.isCompleted).isFalse()
+    gate.complete(Unit)
+  }
+
+  @Test
+  fun `a failing epub import does not affect the zim list`() = runTest {
+    val epub: File = mockk()
+    every { epub.absolutePath } returns "/books/a.epub"
+    coEvery { epubLibraryManager.importScanned(any()) } throws IllegalStateException("boom")
+    files.value = listOf(epub)
+    assertThat(storageObserver.getBooksOnFileSystem(scanningProgressListener).first()).isEmpty()
+    advanceUntilIdle()
   }
 
   @Test

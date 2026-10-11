@@ -125,6 +125,10 @@ object Versions {
    * https://developer.android.com/studio/preview/compose-screenshot-testing-release-notes
    */
   const val COMPOSE_SCREENSHOT_TEST: String = "0.0.1-alpha16"
+
+  // 3.1.x keeps the metadata parser compatible with the existing Kotlin toolchain.
+  const val READIUM: String = "3.1.2"
+  const val DESUGAR_JDK_LIBS: String = "2.1.5"
 }
 
 /**

@@ -364,6 +364,8 @@ class KiwixRoomDatabaseMigrationSchemaValidationTest {
     KiwixRoomDatabase.MIGRATION_7_8.migrate(db)
     KiwixRoomDatabase.MIGRATION_8_9.migrate(db)
     KiwixRoomDatabase.MIGRATION_9_10.migrate(db)
+    KiwixRoomDatabase.MIGRATION_10_11.migrate(db)
+    assertTrue(tableExists("EpubBookRoomEntity"))
     assertTrue(tableExists("RecentSearchRoomEntity"))
     assertTrue(tableExists("HistoryRoomEntity"))
     assertTrue(tableExists("NotesRoomEntity"))
