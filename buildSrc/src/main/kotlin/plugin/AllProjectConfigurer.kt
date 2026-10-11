@@ -108,7 +108,10 @@ class AllProjectConfigurer {
         encoding = "UTF-8"
         sourceCompatibility = Config.javaVersion
         targetCompatibility = Config.javaVersion
+        // Readium requires desugaring in core and its consuming applications.
+        isCoreLibraryDesugaringEnabled = true
       }
+      target.dependencies.add("coreLibraryDesugaring", Libs.DESUGAR_JDK_LIBS)
       target.extensions.configure<KotlinAndroidExtension> {
         compilerOptions {
           freeCompilerArgs.add("-Xjvm-default=all-compatibility")
