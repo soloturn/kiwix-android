@@ -80,7 +80,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
     composeTestRule.enableAccessibilityChecks(createAccessibilityValidator())
   }
 
-  @Test
+  @Test(timeout = 240_000)
   fun searchScreenSimple() {
     activityScenario.onActivity {
       kiwixMainActivity = it
