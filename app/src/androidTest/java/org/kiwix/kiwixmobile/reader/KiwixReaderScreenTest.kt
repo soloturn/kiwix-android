@@ -194,7 +194,7 @@ class KiwixReaderScreenTest : BaseActivityTest() {
     openKiwixReaderScreenWithFile(getZimFileFromResourceFolder(context, "testzim.zim"))
     composeTestRule.waitForIdle()
     reader {
-      checkZimFileLoadedSuccessful(composeTestRule)
+      checkZimFileLoadedSuccessful(composeTestRule, "Android_(operating_system)")
       clickOnTabIcon(composeTestRule)
       clickOnClosedAllTabsButton(composeTestRule)
       clickOnUndoButton(composeTestRule)

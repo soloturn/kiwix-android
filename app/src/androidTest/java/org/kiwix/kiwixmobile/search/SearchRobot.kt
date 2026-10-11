@@ -18,10 +18,13 @@
 
 package org.kiwix.kiwixmobile.search
 
+import android.os.SystemClock
 import android.view.KeyEvent
-import androidx.compose.ui.test.assert
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -34,7 +37,6 @@ import androidx.test.espresso.web.webdriver.DriverAtoms.findElement
 import androidx.test.espresso.web.webdriver.Locator
 import androidx.test.uiautomator.UiDevice
 import applyWithViewHierarchyPrinting
-import com.adevinta.android.barista.interaction.BaristaSleepInteractions
 import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.page.SEARCH_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.SEARCH_FIELD_TESTING_TAG
@@ -87,37 +89,48 @@ class SearchRobot : BaseRobot() {
     wait: Long = 0L,
     composeTestRule: ComposeContentTestRule
   ) {
-    testFlakyView({
-      composeTestRule.apply {
-        waitUntilTimeout()
-        val searchView = onNodeWithTag(SEARCH_FIELD_TESTING_TAG)
-        searchView.performTextInput("")
-        for (char in query) {
-          searchView.performTextInput(char.toString())
-          if (wait != 0L) {
-            waitUntilTimeout(wait)
-          }
+    composeTestRule.apply {
+      waitUntil(FIVE_SECOND_DELAY) {
+        onNodeWithTag(SEARCH_FIELD_TESTING_TAG).isDisplayed()
+      }
+      val searchView = onNodeWithTag(SEARCH_FIELD_TESTING_TAG)
+      searchView.performTextClearance()
+      for (char in query) {
+        searchView.performTextInput(char.toString())
+        if (wait != 0L) {
+          SystemClock.sleep(wait)
         }
       }
-    })
+      searchView.assertTextEquals(query)
+    }
   }
 
   fun assertSearchSuccessful(searchResult: String, composeTestRule: ComposeContentTestRule) {
     testFlakyView({
-      composeTestRule.apply {
-        waitUntil(
-          timeoutMillis = TEST_PAUSE_MS.toLong(),
-          condition = {
-            onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)
-              .fetchSemanticsNodes()
-              .isNotEmpty()
-          }
+      var resultTitles = emptyList<String>()
+      try {
+        composeTestRule.waitUntil(timeoutMillis = TEST_PAUSE_MS.toLong()) {
+          resultTitles = searchResultTitles(composeTestRule)
+          resultTitles.firstOrNull()?.contains(searchResult) == true
+        }
+      } catch (timeout: ComposeTimeoutException) {
+        resultTitles = searchResultTitles(composeTestRule)
+        throw AssertionError(
+          "Search did not show '$searchResult' as the first result. " +
+            "Visible results: ${resultTitles.take(5)}",
+          timeout
         )
-        onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0]
-          .assert(hasText(searchResult))
       }
     })
   }
+
+  private fun searchResultTitles(composeTestRule: ComposeContentTestRule): List<String> =
+    composeTestRule
+      .onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)
+      .fetchSemanticsNodes()
+      .mapNotNull { node ->
+        node.config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text
+      }
 
   fun deleteSearchedQueryFrequently(
     textToDelete: String,
@@ -125,15 +138,17 @@ class SearchRobot : BaseRobot() {
     wait: Long = 0L,
     composeTestRule: ComposeContentTestRule
   ) {
+    val searchField = composeTestRule.onNodeWithTag(SEARCH_FIELD_TESTING_TAG)
     repeat(textToDelete.length) {
       uiDevice.pressKeyCode(KeyEvent.KEYCODE_DEL)
       if (wait != 0L) {
-        BaristaSleepInteractions.sleep(wait)
+        // Pacing keystrokes must not enter Espresso while Compose is processing the edit.
+        SystemClock.sleep(wait)
       }
     }
 
     // clear search query if any remains due to any condition not to affect any other test scenario
-    composeTestRule.onNodeWithTag(SEARCH_FIELD_TESTING_TAG).performTextClearance()
+    searchField.performTextClearance()
   }
 
   fun clickOnNavigationIcon(composeTestRule: ComposeContentTestRule) {

@@ -39,6 +39,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -70,6 +73,20 @@ fun KiwixWebViewWithAppBarScrolling(
   var accumulatedScroll by remember { mutableFloatStateOf(0f) }
   val scope = rememberCoroutineScope()
   val settleJob = remember { mutableStateOf<Job?>(null) }
+  val lifecycleOwner = LocalLifecycleOwner.current
+
+  DisposableEffect(lifecycleOwner) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME) {
+        kiwixWebView.post {
+          topAppBarScrollBehavior.state.heightOffset = HEIGHT_OFFSET_EXPANDED
+          bottomAppBarScrollBehavior.state.heightOffset = HEIGHT_OFFSET_EXPANDED
+        }
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+  }
 
   key(kiwixWebView) {
     DisposableEffect(Unit) {

@@ -28,9 +28,11 @@ import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -273,6 +275,33 @@ internal class SearchViewModelTest {
 
   @Nested
   inner class LoadSearch {
+    @Test
+    fun loadMoreSearchResults_whenTypingDuringLoad_preservesNewSearchText() = runTest {
+      val ioScheduler = TestCoroutineScheduler()
+      val pagingViewModel = SearchViewModel(
+        recentSearchRoomDao,
+        zimReaderContainer,
+        searchResultGenerator,
+        Mutex(),
+        StandardTestDispatcher(ioScheduler)
+      )
+      val existingItem = RecentSearchListItem("Android", ZimFileReader.CONTENT_PREFIX)
+      recentsFromDb.tryEmit(listOf(existingItem))
+      advanceUntilIdle()
+      ioScheduler.runCurrent()
+      runCurrent()
+      assertThat(pagingViewModel.uiState.value.searchList).containsExactly(existingItem)
+
+      pagingViewModel.loadMoreSearchResults()
+      runCurrent()
+      assertThat(pagingViewModel.uiState.value.isLoadingMore).isTrue()
+      pagingViewModel.onSearchValueChanged("Unit testi")
+      ioScheduler.runCurrent()
+      runCurrent()
+
+      assertThat(pagingViewModel.uiState.value.searchText).isEqualTo("Unit testi")
+    }
+
     @Test
     fun loadMoreSearchResults_whenSameDataReturned_doesNotUpdateSearchList() = runTest {
       val existingItem = RecentSearchListItem("kiwix", ZimFileReader.CONTENT_PREFIX)
