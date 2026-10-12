@@ -90,8 +90,8 @@ class LocalFileTransferTest : BaseActivityTest() {
   @Test
   fun showCaseFeature() {
     shouldShowShowCaseFeatureToUser(true)
-    launchMainActivity {
-      kiwixMainActivity = it
+    launchMainActivity { kiwixMainActivity = it }
+    activityScenario.onActivity {
       it.navigate(KiwixDestination.Library.route)
     }
     StandardActions.closeDrawer(kiwixMainActivity as CoreMainActivity)
