@@ -105,6 +105,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       assertSearchSuccessful(searchUnitTestResult, composeTestRule)
       deleteSearchedQueryFrequently(
         searchUnitTestingQuery,
+        uiDevice,
         composeTestRule = composeTestRule
       )
 
@@ -112,13 +113,13 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       // properly test the cancelling of previously searching task
       searchWithFrequentlyTypedWords(searchUnitTestingQuery, 50, composeTestRule)
       assertSearchSuccessful(searchUnitTestResult, composeTestRule)
-      deleteSearchedQueryFrequently(searchUnitTestingQuery, 50, composeTestRule)
+      deleteSearchedQueryFrequently(searchUnitTestingQuery, uiDevice, 50, composeTestRule)
 
       // test with a long delay typing/deleting to
       // properly execute the search query letter by letter
       searchWithFrequentlyTypedWords(searchUnitTestingQuery, 300, composeTestRule)
       assertSearchSuccessful(searchUnitTestResult, composeTestRule)
-      deleteSearchedQueryFrequently(searchUnitTestingQuery, 300, composeTestRule)
+      deleteSearchedQueryFrequently(searchUnitTestingQuery, uiDevice, 300, composeTestRule)
       // to close the keyboard
       kiwixMainActivity.currentFocus?.closeKeyboard()
       // go to reader screen
@@ -154,6 +155,7 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       assertSearchSuccessful(searchResultForDownloadedZimFile, composeTestRule)
       deleteSearchedQueryFrequently(
         searchQueryForDownloadedZimFile,
+        uiDevice,
         composeTestRule = composeTestRule
       )
 
@@ -161,13 +163,13 @@ class SearchScreenInstrumentTest : BaseActivityTest() {
       // properly test the cancelling of previously searching task
       searchWithFrequentlyTypedWords(searchQueryForDownloadedZimFile, 50, composeTestRule)
       assertSearchSuccessful(searchResultForDownloadedZimFile, composeTestRule)
-      deleteSearchedQueryFrequently(searchQueryForDownloadedZimFile, 50, composeTestRule)
+      deleteSearchedQueryFrequently(searchQueryForDownloadedZimFile, uiDevice, 50, composeTestRule)
 
       // test with a long delay typing/deleting to
       // properly execute the search query letter by letter
       searchWithFrequentlyTypedWords(searchQueryForDownloadedZimFile, 300, composeTestRule)
       assertSearchSuccessful(searchResultForDownloadedZimFile, composeTestRule)
-      deleteSearchedQueryFrequently(searchQueryForDownloadedZimFile, 300, composeTestRule)
+      deleteSearchedQueryFrequently(searchQueryForDownloadedZimFile, uiDevice, 300, composeTestRule)
       // open the reader screen for next test case.
       clickOnNavigationIcon(composeTestRule)
     }
