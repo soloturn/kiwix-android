@@ -19,6 +19,7 @@
 package org.kiwix.kiwixmobile.note
 
 import android.os.Build
+import android.util.Log
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.internal.runner.junit4.statement.UiThreadStatement
@@ -81,7 +82,9 @@ class NoteScreenTest : BaseActivityTest() {
 
   @Test
   fun testUserCanSeeNotesForDeletedFiles() {
+    Log.i(TAG, "Deleting old notes")
     deletePreviouslySavedNotes()
+    Log.i(TAG, "Opening test ZIM and saving a note")
     loadZimFileInReader("testzim.zim")
     StandardActions.closeDrawer(kiwixMainActivity as CoreMainActivity) // close the drawer if open before running the test cases.
     note {
@@ -99,6 +102,7 @@ class NoteScreenTest : BaseActivityTest() {
     }
 
     // goto local library fragment to delete the ZIM file
+    Log.i(TAG, "Navigating to local library to delete the test ZIM")
     UiThreadStatement.runOnUiThread {
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
     }
@@ -109,6 +113,7 @@ class NoteScreenTest : BaseActivityTest() {
       deleteZimIfExists(composeTestRule)
     }
 
+    Log.i(TAG, "Reopening the saved note after deleting its ZIM")
     note {
       openNoteScreen(kiwixMainActivity as CoreMainActivity, composeTestRule)
       assertToolbarExist(composeTestRule)
@@ -223,6 +228,7 @@ class NoteScreenTest : BaseActivityTest() {
 
   private fun loadZimFileInReader(zimFileName: String) {
     val zimFile = getZimFileFromResourceFolder(context, zimFileName)
+    Log.i(TAG, "Copied $zimFileName to ${zimFile.absolutePath}")
     activityScenario.onActivity {
       kiwixMainActivity = it
       kiwixMainActivity.navigate(KiwixDestination.Library.route)
@@ -243,11 +249,16 @@ class NoteScreenTest : BaseActivityTest() {
       waitUntil(TEST_PAUSE_MS.toLong()) {
         kiwixMainActivity.zimReaderContainer.hasReader
       }
+      Log.i(TAG, "Native reader opened $zimFileName")
     }
   }
 
   @After
   fun finish() {
     TestUtils.deleteTemporaryFilesOfTestCases(context)
+  }
+
+  private companion object {
+    const val TAG = "NoteScreenTest"
   }
 }
