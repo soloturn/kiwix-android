@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.testutils
 
+import android.os.SystemClock
 import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
@@ -33,12 +34,18 @@ class RetryRule : TestRule {
       @Throws(Throwable::class) override fun evaluate() {
         var caughtThrowable: Throwable? = null
         for (i in 0 until RETRY_COUNT_FOR_FLAKY_TEST) {
+          val startedAt = SystemClock.elapsedRealtime()
           try {
             base.evaluate()
             return
           } catch (t: Throwable) {
             caughtThrowable = t
-            System.err.println(description.displayName + ": run " + (i + 1) + " failed.")
+            val message = t.message?.lineSequence()?.firstOrNull()?.take(240) ?: "no message"
+            System.err.println(
+              "[test-retry] ${description.displayName} attempt ${i + 1}/$RETRY_COUNT_FOR_FLAKY_TEST " +
+                "failed after ${SystemClock.elapsedRealtime() - startedAt}ms: " +
+                "${t.javaClass.name}: $message"
+            )
           }
         }
         System.err.println(

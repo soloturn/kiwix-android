@@ -19,9 +19,10 @@
 package org.kiwix.kiwixmobile.search
 
 import android.view.KeyEvent
-import androidx.compose.ui.test.assert
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -104,20 +105,30 @@ class SearchRobot : BaseRobot() {
 
   fun assertSearchSuccessful(searchResult: String, composeTestRule: ComposeContentTestRule) {
     testFlakyView({
-      composeTestRule.apply {
-        waitUntil(
-          timeoutMillis = TEST_PAUSE_MS.toLong(),
-          condition = {
-            onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)
-              .fetchSemanticsNodes()
-              .isNotEmpty()
-          }
+      var resultTitles = emptyList<String>()
+      try {
+        composeTestRule.waitUntil(timeoutMillis = TEST_PAUSE_MS.toLong()) {
+          resultTitles = searchResultTitles(composeTestRule)
+          resultTitles.firstOrNull()?.contains(searchResult) == true
+        }
+      } catch (timeout: ComposeTimeoutException) {
+        resultTitles = searchResultTitles(composeTestRule)
+        throw AssertionError(
+          "Search did not show '$searchResult' as the first result. " +
+            "Visible results: ${resultTitles.take(5)}",
+          timeout
         )
-        onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)[0]
-          .assert(hasText(searchResult))
       }
     })
   }
+
+  private fun searchResultTitles(composeTestRule: ComposeContentTestRule): List<String> =
+    composeTestRule
+      .onAllNodesWithTag(SEARCH_ITEM_TESTING_TAG)
+      .fetchSemanticsNodes()
+      .mapNotNull { node ->
+        node.config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text
+      }
 
   fun deleteSearchedQueryFrequently(
     textToDelete: String,
