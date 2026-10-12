@@ -18,8 +18,7 @@
 
 package org.kiwix.kiwixmobile.search
 
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.test.ExperimentalTestApi
+import android.view.KeyEvent
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
@@ -28,13 +27,12 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.pressKey
 import androidx.test.espresso.web.sugar.Web.onWebView
 import androidx.test.espresso.web.webdriver.DriverAtoms.findElement
 import androidx.test.espresso.web.webdriver.Locator
+import androidx.test.uiautomator.UiDevice
 import applyWithViewHierarchyPrinting
 import com.adevinta.android.barista.interaction.BaristaSleepInteractions
 import org.kiwix.kiwixmobile.BaseRobot
@@ -121,15 +119,15 @@ class SearchRobot : BaseRobot() {
     })
   }
 
-  @OptIn(ExperimentalTestApi::class)
   fun deleteSearchedQueryFrequently(
     textToDelete: String,
+    uiDevice: UiDevice,
     wait: Long = 0L,
     composeTestRule: ComposeContentTestRule
   ) {
     val searchField = composeTestRule.onNodeWithTag(SEARCH_FIELD_TESTING_TAG)
     repeat(textToDelete.length) {
-      searchField.performKeyInput { pressKey(Key.Backspace) }
+      uiDevice.pressKeyCode(KeyEvent.KEYCODE_DEL)
       if (wait != 0L) {
         BaristaSleepInteractions.sleep(wait)
       }
