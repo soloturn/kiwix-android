@@ -311,20 +311,15 @@ class SearchViewModel @Inject constructor(
       uiState.searchState.getVisibleResults(startIndex, ioDispatcher = ioDispatcher)
     }
 
-    val current = uiState.searchList
-    val newItems = moreResults?.filter { newItem ->
-      current.none { it == newItem }
+    updateUiState { current ->
+      // A new query can finish while this page is loading. Never restore its predecessor.
+      if (current.searchState != uiState.searchState) return@updateUiState current
+      val newItems = moreResults?.filter { it !in current.searchList }.orEmpty()
+      current.copy(
+        searchList = current.searchList + newItems,
+        isLoadingMore = moreResults == null
+      )
     }
-    val updatedState = when {
-      // When there are no more items available in libkiwix to show.
-      // We should keep the isLoadingMore = true so that it can not ask again for more results.
-      moreResults == null -> uiState.copy(isLoadingMore = true)
-      // Set the load more false because some duplicate items comes
-      // from libkiwix that are already showing.
-      newItems.isNullOrEmpty() -> uiState.copy(isLoadingMore = false)
-      else -> uiState.copy(searchList = current + newItems, isLoadingMore = false)
-    }
-    updateUiState { updatedState }
   }
 
   fun onItemClick(it: SearchListItem) {

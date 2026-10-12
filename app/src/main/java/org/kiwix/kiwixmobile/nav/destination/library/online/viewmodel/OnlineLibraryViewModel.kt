@@ -331,8 +331,8 @@ class OnlineLibraryViewModel @Inject constructor(
       uiState.map { it.searchQuery }.distinctUntilChanged().debounce(500.milliseconds)
     ) { category, language, searchQuery ->
       OnlineLibraryRequest(searchQuery, category, language, false, ZERO)
-    }.onEach { updateOnlineLibraryFilters(it) }
-      .flowOn(ioDispatcher)
+    }.flowOn(ioDispatcher)
+      .onEach { updateOnlineLibraryFilters(it) }
       .launchIn(viewModelScope)
 
   internal fun updateOnlineLibraryFilters(newRequest: OnlineLibraryRequest) {
@@ -350,8 +350,8 @@ class OnlineLibraryViewModel @Inject constructor(
 
   private fun updateNetworkStates() =
     observeNetworkState(connectivityObserver.networkStates)
-      .onEach { handleNetworkState(it) }
       .flowOn(ioDispatcher)
+      .onEach { handleNetworkState(it) }
       .launchIn(viewModelScope)
 
   internal suspend fun handleNetworkState(state: ObserveNetworkState.Result) {
@@ -404,8 +404,8 @@ class OnlineLibraryViewModel @Inject constructor(
 
   private fun observeLibrary() =
     observeOnlineLibrary(onlineLibraryRequest)
-      .onEach { state -> handleLibraryState(state) }
       .flowOn(ioDispatcher)
+      .onEach { state -> handleLibraryState(state) }
       .launchIn(viewModelScope)
 
   @Suppress("CyclomaticComplexMethod")
