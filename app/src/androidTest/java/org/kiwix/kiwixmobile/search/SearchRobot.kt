@@ -18,11 +18,13 @@
 
 package org.kiwix.kiwixmobile.search
 
+import android.os.SystemClock
 import android.view.KeyEvent
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -35,7 +37,6 @@ import androidx.test.espresso.web.webdriver.DriverAtoms.findElement
 import androidx.test.espresso.web.webdriver.Locator
 import androidx.test.uiautomator.UiDevice
 import applyWithViewHierarchyPrinting
-import com.adevinta.android.barista.interaction.BaristaSleepInteractions
 import org.kiwix.kiwixmobile.BaseRobot
 import org.kiwix.kiwixmobile.core.page.SEARCH_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.search.SEARCH_FIELD_TESTING_TAG
@@ -88,19 +89,20 @@ class SearchRobot : BaseRobot() {
     wait: Long = 0L,
     composeTestRule: ComposeContentTestRule
   ) {
-    testFlakyView({
-      composeTestRule.apply {
-        waitUntilTimeout()
-        val searchView = onNodeWithTag(SEARCH_FIELD_TESTING_TAG)
-        searchView.performTextInput("")
-        for (char in query) {
-          searchView.performTextInput(char.toString())
-          if (wait != 0L) {
-            waitUntilTimeout(wait)
-          }
+    composeTestRule.apply {
+      waitUntil(FIVE_SECOND_DELAY) {
+        onNodeWithTag(SEARCH_FIELD_TESTING_TAG).isDisplayed()
+      }
+      val searchView = onNodeWithTag(SEARCH_FIELD_TESTING_TAG)
+      searchView.performTextClearance()
+      for (char in query) {
+        searchView.performTextInput(char.toString())
+        if (wait != 0L) {
+          SystemClock.sleep(wait)
         }
       }
-    })
+      searchView.assertTextEquals(query)
+    }
   }
 
   fun assertSearchSuccessful(searchResult: String, composeTestRule: ComposeContentTestRule) {
@@ -140,7 +142,8 @@ class SearchRobot : BaseRobot() {
     repeat(textToDelete.length) {
       uiDevice.pressKeyCode(KeyEvent.KEYCODE_DEL)
       if (wait != 0L) {
-        BaristaSleepInteractions.sleep(wait)
+        // Pacing keystrokes must not enter Espresso while Compose is processing the edit.
+        SystemClock.sleep(wait)
       }
     }
 
