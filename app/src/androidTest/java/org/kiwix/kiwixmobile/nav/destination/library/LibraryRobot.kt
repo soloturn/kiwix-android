@@ -27,9 +27,11 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.swipeDown
 import applyWithViewHierarchyPrinting
 import org.kiwix.kiwixmobile.BaseRobot
@@ -65,15 +67,20 @@ class LibraryRobot : BaseRobot() {
   private val zimFileTitle = "Test_Zim"
 
   fun assertGetZimNearbyDeviceDisplayed(composeTestRule: ComposeContentTestRule) {
-    testFlakyView({
-      composeTestRule.apply {
-        waitForIdle()
-        waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
-          onNodeWithTag(LOCAL_FILE_TRANSFER_MENU_BUTTON_TESTING_TAG).isDisplayed()
+    try {
+      testFlakyView({
+        composeTestRule.apply {
+          waitForIdle()
+          waitUntil(TEST_PAUSE_MS_FOR_DOWNLOAD_TEST) {
+            onNodeWithTag(LOCAL_FILE_TRANSFER_MENU_BUTTON_TESTING_TAG).isDisplayed()
+          }
+          onNodeWithTag(LOCAL_FILE_TRANSFER_MENU_BUTTON_TESTING_TAG).assertIsDisplayed()
         }
-        onNodeWithTag(LOCAL_FILE_TRANSFER_MENU_BUTTON_TESTING_TAG).assertIsDisplayed()
-      }
-    })
+      })
+    } catch (failure: Throwable) {
+      composeTestRule.onRoot(useUnmergedTree = true).printToLog("LOCAL_LIBRARY_FAILURE")
+      throw failure
+    }
   }
 
   fun clickFileTransferIcon(
