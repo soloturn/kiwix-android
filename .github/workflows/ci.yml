@@ -201,7 +201,7 @@ jobs:
           key: gradle-build-cache-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties', 'buildSrc/src/main/kotlin/Versions.kt') }}-${{ github.run_id }}
 
       - name: Download all shards' coverage data
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: coverage-ec-shard-*
           path: app/build/outputs/code_coverage/debugAndroidTest/connected/
