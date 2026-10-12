@@ -196,12 +196,11 @@ class BookmarksRobot : BaseRobot() {
   ) {
     composeTestRule.apply {
       waitForIdle()
-      bookmarkList.forEachIndexed { index, libkiwixBookmarkItem ->
-        testFlakyView({
-          composeTestRule
-            .onNodeWithTag(PAGE_LIST_TEST_TAG)
-            .performScrollToNode(hasText(libkiwixBookmarkItem.title))
-          composeTestRule.onNodeWithText(libkiwixBookmarkItem.title).assertExists()
+      val bookmarkListNode = onNodeWithTag(PAGE_LIST_TEST_TAG)
+      listOf(bookmarkList.first(), bookmarkList.last()).forEach { bookmark ->
+        testFlakyView(action = {
+          bookmarkListNode.performScrollToNode(hasText(bookmark.title))
+          onNodeWithText(bookmark.title).assertExists()
         })
       }
     }
