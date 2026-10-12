@@ -19,6 +19,7 @@ package org.kiwix.kiwixmobile.core.main
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.os.Build
 import android.webkit.MimeTypeMap
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceError
@@ -137,7 +138,15 @@ open class CoreWebViewClient(
   }
 
   override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-    Log.e(TAG_KIWIX, "There is an error in rendering the webView: $detail")
+    val didCrash =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) detail?.didCrash() else null
+    val rendererPriority =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) detail?.rendererPriorityAtExit() else null
+    Log.e(
+      TAG_KIWIX,
+      "WebView renderer exited: didCrash=$didCrash, " +
+        "priorityAtExit=$rendererPriority, api=${Build.VERSION.SDK_INT}"
+    )
     view?.destroy()
     return true
   }
