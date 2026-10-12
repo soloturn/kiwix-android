@@ -17,7 +17,6 @@
  */
 package org.kiwix.kiwixmobile.search
 
-import android.os.Build
 import androidx.compose.ui.test.junit4.accessibility.enableAccessibilityChecks
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.hilt.navigation.HiltViewModelFactory
