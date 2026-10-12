@@ -76,7 +76,7 @@ class LibkiwixBookmarkTest : BaseActivityTest() {
     composeTestRule.waitForIdle()
   }
 
-  @Test(timeout = 240_000)
+  @Test(timeout = 120_000)
   fun testSavedBookmarksShowingOnBookmarkScreen() {
     openZimFileInReader()
     bookmarks {
