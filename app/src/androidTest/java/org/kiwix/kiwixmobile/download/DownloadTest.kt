@@ -37,7 +37,6 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import leakcanary.LeakAssertions
 import org.junit.After
-import org.junit.Assert
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Rule
@@ -116,10 +115,6 @@ class DownloadTest : BaseActivityTest() {
           assertDownloadPaused(composeTestRule, kiwixMainActivity)
           resumeDownload(composeTestRule)
           assertDownloadResumed(composeTestRule, kiwixMainActivity)
-          waitUntilDownloadComplete(
-            composeTestRule = composeTestRule,
-            kiwixMainActivity = kiwixMainActivity
-          )
         }.onFailure {
           // do nothing as ZIM file already downloaded, since we are downloading the smallest file
           // so it can be downloaded immediately after starting.
@@ -128,17 +123,23 @@ class DownloadTest : BaseActivityTest() {
             "Could not pause download. Original exception = $it"
           )
         }
+        // Missing a pause button can mean the download finished, but does not prove it did.
+        waitUntilDownloadComplete(
+          composeTestRule = composeTestRule,
+          kiwixMainActivity = kiwixMainActivity
+        )
         UiThreadStatement.runOnUiThread {
           kiwixMainActivity.navigate(KiwixDestination.Library.route)
         }
         // refresh the local library list to show the downloaded zim file
-        library { refreshList(composeTestRule) }
+        library {
+          refreshList(composeTestRule)
+          waitUntilZimFilesRefreshing(composeTestRule)
+        }
         checkIfZimFileDownloaded(composeTestRule)
       }
     } catch (e: Exception) {
-      Assert.fail(
-        "Couldn't find downloaded file\n Original Exception: ${e.message}"
-      )
+      throw AssertionError("Download test failed before the downloaded file was verified", e)
     }
     if (Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1) {
       LeakAssertions.assertNoLeaks()
