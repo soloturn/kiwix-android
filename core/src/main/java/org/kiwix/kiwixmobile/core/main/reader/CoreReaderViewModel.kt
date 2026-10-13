@@ -1319,7 +1319,6 @@ abstract class CoreReaderViewModel(
     }
   }
 
-
   /**
    * Sets the title for toolbar, controlling the title of toolbar.
    * Subclasses like BrandedViewModel override this method to provide custom
