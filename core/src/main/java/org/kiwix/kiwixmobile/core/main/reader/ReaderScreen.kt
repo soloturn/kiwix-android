@@ -100,7 +100,6 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -109,6 +108,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -138,6 +138,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
@@ -179,7 +180,7 @@ import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
 import org.kiwix.kiwixmobile.core.ui.components.KiwixButton
 import org.kiwix.kiwixmobile.core.ui.components.KiwixFloatingActionButton
 import org.kiwix.kiwixmobile.core.ui.components.KiwixSnackbarHost
-import org.kiwix.kiwixmobile.core.ui.components.KiwixWebViewWithAppBarScrolling
+import org.kiwix.kiwixmobile.core.ui.components.KiwixWebViewWithAppBarTapToggle
 import org.kiwix.kiwixmobile.core.ui.components.ONE
 import org.kiwix.kiwixmobile.core.ui.components.ProgressBarStyle
 import org.kiwix.kiwixmobile.core.ui.components.TWELVE
@@ -243,6 +244,7 @@ const val TTS_CONTROL_SLIDER_TESTING_TAG = "ttsControlSliderTestingTag"
 const val TTS_VOICE_SELECTION_DIALOG_TESTING_TAG = "ttsVoiceSelectionDialogTestingTag"
 const val TTS_FLOATING_SPEAKER_BUTTON_TESTING_TAG = "ttsFloatingSpeakerButtonTestingTag"
 const val TTS_CONTROLS_OVERLAY_DISMISS_TESTING_TAG = "ttsControlsOverlayDismissTestingTag"
+private const val UNINITIALIZED_HEIGHT_OFFSET_LIMIT = -Float.MAX_VALUE
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("ComposableLambdaParameterNaming", "LongMethod", "LongParameterList")
@@ -257,10 +259,35 @@ fun ReaderScreen(
   mainActivityBottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
   navigationIcon: @Composable () -> Unit
 ) {
-  // For managing the scroll event handling of webView.
-  val shouldUpdateTopAppBarAndBottomAppBarOnScrolling = rememberSaveable { mutableStateOf(true) }
   val topAppBarScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
   val bottomAppBarScrollBehavior = BottomAppBarDefaults.exitAlwaysScrollBehavior()
+  LaunchedEffect(state.showNoBookOpenInReader, state.tabsState.currentWebView) {
+    if (!state.showNoBookOpenInReader && state.tabsState.currentWebView != null) {
+      snapshotFlow {
+        topAppBarScrollBehavior.state.heightOffsetLimit to
+          bottomAppBarScrollBehavior.state.heightOffsetLimit
+      }.first { (topLimit, bottomLimit) ->
+        topLimit != UNINITIALIZED_HEIGHT_OFFSET_LIMIT &&
+          bottomLimit != UNINITIALIZED_HEIGHT_OFFSET_LIMIT
+      }
+      topAppBarScrollBehavior.state.heightOffset = topAppBarScrollBehavior.state.heightOffsetLimit
+      bottomAppBarScrollBehavior.state.heightOffset =
+        bottomAppBarScrollBehavior.state.heightOffsetLimit
+    }
+  }
+  val toggleReaderBars = {
+    val barsAreVisible =
+      topAppBarScrollBehavior.state.heightOffset == 0f ||
+        bottomAppBarScrollBehavior.state.heightOffset == 0f
+    val topOffset = if (barsAreVisible) topAppBarScrollBehavior.state.heightOffsetLimit else 0f
+    val bottomOffset = if (barsAreVisible) {
+      bottomAppBarScrollBehavior.state.heightOffsetLimit
+    } else {
+      0f
+    }
+    topAppBarScrollBehavior.state.heightOffset = topOffset
+    bottomAppBarScrollBehavior.state.heightOffset = bottomOffset
+  }
   LaunchedEffect(bottomAppBarScrollBehavior.state.heightOffset) {
     mainActivityBottomAppBarScrollBehaviour?.state?.heightOffset =
       bottomAppBarScrollBehavior.state.heightOffset
@@ -313,14 +340,9 @@ fun ReaderScreen(
           state,
           onReaderAction,
           Modifier.padding(paddingValues),
-          bottomAppBarScrollBehavior,
-          topAppBarScrollBehavior,
-          shouldUpdateTopAppBarAndBottomAppBarOnScrolling,
+          toggleReaderBars,
           onTtsPlayerHeightChanged = { ttsPlayerHeightPx = it }
         )
-      }
-      LaunchedEffect(state.showTableOfContentDrawer) {
-        shouldUpdateTopAppBarAndBottomAppBarOnScrolling.value = !state.showTableOfContentDrawer
       }
       if (state.showTableOfContentDrawer) {
         // Showing the background color on screen so that it look same as navigation drawer.
@@ -410,9 +432,7 @@ private fun ReaderContentLayout(
   state: ReaderUiState,
   onReaderAction: (ReaderAction) -> Unit,
   modifier: Modifier = Modifier,
-  bottomAppBarScrollBehavior: BottomAppBarScrollBehavior,
-  topAppBarScrollBehavior: TopAppBarScrollBehavior,
-  shouldUpdateTopAppBarAndBottomAppBarOnScrolling: MutableState<Boolean>,
+  toggleReaderBars: () -> Unit,
   onTtsPlayerHeightChanged: (Int) -> Unit = {},
 ) {
   Box(modifier = modifier.fillMaxSize()) {
@@ -424,12 +444,7 @@ private fun ReaderContentLayout(
 
         else -> {
           state.tabsState.currentWebView?.let { selectedWebView ->
-            KiwixWebViewWithAppBarScrolling(
-              selectedWebView,
-              topAppBarScrollBehavior,
-              bottomAppBarScrollBehavior,
-              shouldUpdateTopAppBarAndBottomAppBarOnScrolling
-            )
+            KiwixWebViewWithAppBarTapToggle(selectedWebView, toggleReaderBars)
           }
           ShowProgressBarIfZIMFilePageIsLoading(state)
           if (state.ttsControlsItem.isTtsPlaying && state.ttsControlsItem.showTtsControlsOverlay) {

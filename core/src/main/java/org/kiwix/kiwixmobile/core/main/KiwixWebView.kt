@@ -116,6 +116,11 @@ open class KiwixWebView constructor(
     webChromeClient = kiwixWebChromeClient
   }
 
+  override fun performClick(): Boolean {
+    super.performClick()
+    return true
+  }
+
   override fun performLongClick(): Boolean {
     val result = hitTestResult
     if (result.type == HitTestResult.SRC_ANCHOR_TYPE) {
