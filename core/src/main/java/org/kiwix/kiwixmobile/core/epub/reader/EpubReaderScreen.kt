@@ -26,18 +26,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,12 +68,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
+import org.kiwix.kiwixmobile.core.ui.components.KiwixSearchView
 import org.kiwix.kiwixmobile.core.ui.components.NavigationIcon
 import org.kiwix.kiwixmobile.core.ui.models.ActionMenuItem
 import org.kiwix.kiwixmobile.core.ui.models.IconItem
@@ -89,6 +94,10 @@ const val EPUB_READER_SETTINGS_TESTING_TAG = "epubReaderSettingsTestingTag"
 const val EPUB_READER_TOC_ITEM_TESTING_TAG = "epubReaderTocItemTestingTag"
 const val EPUB_READER_PROGRESS_SLIDER_TESTING_TAG = "epubReaderProgressSliderTestingTag"
 const val EPUB_READER_PAGE_LABEL_TESTING_TAG = "epubReaderPageLabelTestingTag"
+const val EPUB_READER_SEARCH_BUTTON_TESTING_TAG = "epubReaderSearchButtonTestingTag"
+const val EPUB_READER_SEARCH_FIELD_TESTING_TAG = "epubReaderSearchFieldTestingTag"
+const val EPUB_READER_SEARCH_RESULT_TESTING_TAG = "epubReaderSearchResultTestingTag"
+const val EPUB_READER_PREVIOUS_PAGE_TESTING_TAG = "epubReaderPreviousPageTestingTag"
 
 private const val PERCENT = 100
 private const val TRACK_ALPHA = 0.24f
@@ -101,7 +110,13 @@ data class EpubReaderActions(
   val onPreviousChapter: () -> Unit = {},
   val onNextChapter: () -> Unit = {},
   val onSeek: (Float) -> Unit = {},
-  val onSettings: ((EpubReaderSettings) -> EpubReaderSettings) -> Unit = {}
+  val onSettings: ((EpubReaderSettings) -> EpubReaderSettings) -> Unit = {},
+  val onOpenSearch: () -> Unit = {},
+  val onSearchQueryChange: (String) -> Unit = {},
+  val onSearch: (String) -> Unit = {},
+  val onCloseSearch: () -> Unit = {},
+  val onSearchResult: (Locator) -> Unit = {},
+  val onReturnToPreviousPage: () -> Unit = {}
 )
 
 /** Where the reader is, for the progress bar and the chapter buttons. */
@@ -116,6 +131,7 @@ data class EpubReadingState(
 class EpubReaderPanels {
   var showToc by mutableStateOf(false)
   var showSettings by mutableStateOf(false)
+  var showSearch by mutableStateOf(false)
 }
 
 /**
@@ -132,7 +148,9 @@ fun EpubReaderScreen(
   chromeVisible: Boolean,
   actions: EpubReaderActions,
   pageReady: Boolean = true,
-  panels: EpubReaderPanels = remember { EpubReaderPanels() }
+  panels: EpubReaderPanels = remember { EpubReaderPanels() },
+  search: EpubSearchState = EpubSearchState(),
+  previousPage: Locator? = null
 ) {
   val ready = state as? EpubReaderUiState.Ready
   val overlay = settings.overlayColors(isSystemInDarkTheme())
@@ -144,37 +162,116 @@ fun EpubReaderScreen(
         state == EpubReaderUiState.Loading || !pageReady -> LoadingContent(overlay)
       }
       OverlayTheme(overlay) {
-        AnimatedVisibility(
-          visible = ready == null || chromeVisible || !pageReady,
-          modifier = Modifier.align(Alignment.TopCenter),
-          enter = fadeIn(),
-          exit = fadeOut()
-        ) {
-          TopBar(ready?.book?.title.orEmpty(), showSettings = ready != null, actions.onBack) {
-            panels.showSettings = true
-          }
-        }
-        AnimatedVisibility(
-          visible = ready != null && chromeVisible,
-          modifier = Modifier.align(Alignment.BottomCenter),
-          enter = fadeIn(),
-          exit = fadeOut()
-        ) {
-          if (ready != null) {
-            BottomBar(ready.book, reading, actions, onToc = { panels.showToc = true })
-          }
-        }
+        ReaderChrome(
+          ReaderChromeState(ready, reading, chromeVisible, pageReady, previousPage),
+          panels,
+          search,
+          actions
+        )
       }
     }
-    if (panels.showToc && ready != null) {
-      TocDialog(ready.book.toc, reading.locator, onDismiss = { panels.showToc = false }) {
-        panels.showToc = false
-        actions.onTocItem(it)
-      }
+    ReaderPanels(ready, reading, settings, panels, actions)
+  }
+}
+
+private data class ReaderChromeState(
+  val ready: EpubReaderUiState.Ready?,
+  val reading: EpubReadingState,
+  val chromeVisible: Boolean,
+  val pageReady: Boolean,
+  val previousPage: Locator?
+)
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun BoxScope.ReaderChrome(
+  state: ReaderChromeState,
+  panels: EpubReaderPanels,
+  search: EpubSearchState,
+  actions: EpubReaderActions
+) {
+  val ready = state.ready
+  val reading = state.reading
+  val chromeVisible = state.chromeVisible
+  val pageReady = state.pageReady
+  val previousPage = state.previousPage
+  AnimatedVisibility(
+    visible = ready == null || chromeVisible || !pageReady || panels.showSearch,
+    modifier = Modifier.align(Alignment.TopCenter),
+    enter = fadeIn(),
+    exit = fadeOut()
+  ) {
+    Column(Modifier.fillMaxWidth()) {
+      TopBar(
+        title = ready?.book?.title.orEmpty(),
+        showSettings = ready != null,
+        search = search,
+        actions = actions,
+        onSettings = {
+          panels.showSearch = false
+          panels.showSettings = true
+        }
+      )
+      if (ready != null && search.isOpen) SearchResults(search, actions.onSearchResult)
     }
-    if (panels.showSettings) {
-      EpubSettingsSheet(settings, actions.onSettings) { panels.showSettings = false }
+  }
+  AnimatedVisibility(
+    visible = ready != null && chromeVisible,
+    modifier = Modifier.align(Alignment.BottomCenter),
+    enter = fadeIn(),
+    exit = fadeOut()
+  ) {
+    if (ready != null) BottomBar(ready.book, reading, actions) { panels.showToc = true }
+  }
+  val returnPage = previousPage.takeIf { ready != null && pageReady && !search.isOpen }
+  returnPage?.let {
+    PreviousPageChip(it, chromeVisible, actions.onReturnToPreviousPage)
+  }
+}
+
+@Composable
+private fun ReaderPanels(
+  ready: EpubReaderUiState.Ready?,
+  reading: EpubReadingState,
+  settings: EpubReaderSettings,
+  panels: EpubReaderPanels,
+  actions: EpubReaderActions
+) {
+  if (panels.showToc && ready != null) {
+    TocDialog(ready.book.toc, reading.locator, onDismiss = { panels.showToc = false }) {
+      panels.showToc = false
+      actions.onTocItem(it)
     }
+  }
+  if (panels.showSettings) {
+    EpubSettingsSheet(settings, actions.onSettings) { panels.showSettings = false }
+  }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun BoxScope.PreviousPageChip(locator: Locator, chromeVisible: Boolean, onClick: () -> Unit) {
+  Surface(
+    modifier = Modifier
+      .align(Alignment.BottomEnd)
+      .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility)
+      .padding(end = SIXTEEN_DP, bottom = if (chromeVisible) 88.dp else SIXTEEN_DP)
+      .clickable(onClick = onClick)
+      .testTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG),
+    color = MaterialTheme.colorScheme.surface,
+    contentColor = MaterialTheme.colorScheme.onSurface,
+    shadowElevation = EIGHT_DP,
+    shape = MaterialTheme.shapes.large
+  ) {
+    Text(
+      text = locator.title?.takeIf { it.isNotBlank() }?.let {
+        stringResource(R.string.epub_previous_page_in, it)
+      } ?: stringResource(R.string.epub_previous_page),
+      modifier = Modifier.padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP),
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      style = MaterialTheme.typography.labelLarge
+    )
   }
 }
 
@@ -202,7 +299,13 @@ private fun OverlayTheme(colors: EpubOverlayColors, content: @Composable () -> U
 /** Back, title and the "Aa" button; KiwixAppBar leaves the status bar to its host. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun TopBar(title: String, showSettings: Boolean, onBack: () -> Unit, onSettings: () -> Unit) {
+private fun TopBar(
+  title: String,
+  showSettings: Boolean,
+  search: EpubSearchState,
+  actions: EpubReaderActions,
+  onSettings: () -> Unit
+) {
   Box(
     Modifier
       .background(MaterialTheme.colorScheme.onPrimary)
@@ -211,20 +314,124 @@ private fun TopBar(title: String, showSettings: Boolean, onBack: () -> Unit, onS
     KiwixAppBar(
       useAppTheme = false,
       title = title,
-      navigationIcon = { NavigationIcon(onClick = onBack) },
-      actionMenuItems = if (showSettings) {
-        listOf(
-          ActionMenuItem(
-            icon = IconItem.Drawable(R.drawable.ic_text_size_24dp),
-            contentDescription = R.string.epub_reading_settings,
-            onClick = onSettings,
-            testingTag = EPUB_READER_SETTINGS_TESTING_TAG
-          )
-        )
-      } else {
-        emptyList()
-      }
+      navigationIcon = {
+        NavigationIcon(onClick = if (search.isOpen) actions.onCloseSearch else actions.onBack)
+      },
+      searchBar = searchBar(search, actions),
+      actionMenuItems = topBarActions(search, showSettings, actions, onSettings)
     )
+  }
+}
+
+@Composable
+private fun searchBar(search: EpubSearchState, actions: EpubReaderActions): (@Composable () -> Unit)? =
+  if (search.isOpen) {
+    {
+      KiwixSearchView(
+        modifier = Modifier.fillMaxWidth(),
+        value = search.query,
+        searchViewTextFiledTestTag = EPUB_READER_SEARCH_FIELD_TESTING_TAG,
+        imeAction = ImeAction.Search,
+        onValueChange = actions.onSearchQueryChange,
+        onClearClick = { actions.onSearchQueryChange("") },
+        onKeyboardSubmitButtonClick = actions.onSearch
+      )
+    }
+  } else {
+    null
+  }
+
+private fun topBarActions(
+  search: EpubSearchState,
+  showSettings: Boolean,
+  actions: EpubReaderActions,
+  onSettings: () -> Unit
+): List<ActionMenuItem> = when {
+  search.isOpen -> listOf(
+    ActionMenuItem(
+      icon = IconItem.Drawable(R.drawable.action_search),
+      contentDescription = R.string.search_label,
+      onClick = { actions.onSearch(search.query) },
+      testingTag = EPUB_READER_SEARCH_BUTTON_TESTING_TAG
+    ),
+    ActionMenuItem(
+      icon = IconItem.Drawable(R.drawable.ic_close_white_24dp),
+      contentDescription = R.string.cancel,
+      onClick = actions.onCloseSearch,
+      testingTag = "epubReaderCloseSearchTestingTag"
+    )
+  )
+  showSettings -> listOf(
+    ActionMenuItem(
+      icon = IconItem.Drawable(R.drawable.action_search),
+      contentDescription = R.string.search_label,
+      onClick = actions.onOpenSearch,
+      testingTag = EPUB_READER_SEARCH_BUTTON_TESTING_TAG
+    ),
+    ActionMenuItem(
+      icon = IconItem.Drawable(R.drawable.ic_text_size_24dp),
+      contentDescription = R.string.epub_reading_settings,
+      onClick = onSettings,
+      testingTag = EPUB_READER_SETTINGS_TESTING_TAG
+    )
+  )
+  else -> emptyList()
+}
+
+@Composable
+private fun SearchResults(search: EpubSearchState, onSelect: (Locator) -> Unit) {
+  Surface(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(horizontal = EIGHT_DP)
+      .heightIn(max = 360.dp),
+    color = MaterialTheme.colorScheme.surface,
+    shadowElevation = EIGHT_DP
+  ) {
+    when {
+      search.isSearching -> Box(Modifier.padding(SIXTEEN_DP), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+      }
+      search.failed -> Text(
+        text = stringResource(R.string.epub_search_error),
+        modifier = Modifier.padding(SIXTEEN_DP),
+        color = MaterialTheme.colorScheme.onSurface
+      )
+      search.hasSearched && search.results.isEmpty() -> Text(
+        text = stringResource(R.string.epub_search_no_results),
+        modifier = Modifier.padding(SIXTEEN_DP),
+        color = MaterialTheme.colorScheme.onSurface
+      )
+      search.results.isNotEmpty() -> Column {
+        if (search.limited) {
+          Text(
+            text = stringResource(R.string.epub_search_limited),
+            modifier = Modifier.padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP),
+            style = MaterialTheme.typography.labelMedium
+          )
+        }
+        LazyColumn {
+          itemsIndexed(
+            search.results,
+            key = { index, result -> "${result.locator.href}:$index" }
+          ) { _, result ->
+            Column(
+              Modifier
+                .fillMaxWidth()
+                .clickable { onSelect(result.locator) }
+                .padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP)
+                .testTag(EPUB_READER_SEARCH_RESULT_TESTING_TAG)
+            ) {
+              result.locator.title?.let { chapter ->
+                Text(chapter, style = MaterialTheme.typography.labelMedium)
+              }
+              Text(result.snippet, color = MaterialTheme.colorScheme.onSurface)
+            }
+          }
+        }
+      }
+      else -> Unit
+    }
   }
 }
 

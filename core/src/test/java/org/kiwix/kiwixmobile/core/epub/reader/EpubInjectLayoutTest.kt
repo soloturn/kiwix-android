@@ -22,7 +22,6 @@ import android.os.Build
 import org.junit.Assert.assertNotSame
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.readium.r2.shared.publication.Layout
 import org.readium.r2.shared.publication.LocalizedString
 import org.readium.r2.shared.publication.Manifest
 import org.readium.r2.shared.publication.Metadata
@@ -34,14 +33,21 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.R])
 class EpubInjectLayoutTest {
-  private fun builder(layout: Layout?) = Publication.Builder(
-    Manifest(metadata = Metadata(localizedTitle = LocalizedString("t"), layout = layout)),
+  private fun builder(layout: String?) = Publication.Builder(
+    Manifest(
+      metadata = Metadata(
+        localizedTitle = LocalizedString("t"),
+        otherMetadata = layout?.let {
+          mapOf("http://www.idpf.org/vocab/rendition/#layout" to it)
+        } ?: emptyMap()
+      )
+    ),
     EmptyContainer()
   )
 
   @Test
   fun `every layout, fixed included, gets the connection policy`() {
-    listOf(Layout.FIXED, Layout.REFLOWABLE, Layout.SCROLLED, null).forEach { layout ->
+    listOf("pre-paginated", "reflowable", "scrolled-continuous", null).forEach { layout ->
       val builder = builder(layout)
       val original = builder.container
 

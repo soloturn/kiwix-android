@@ -145,8 +145,10 @@ class EpubReaderActivity : BaseActivity() {
     val state by viewModel.state.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val locator by viewModel.currentLocator.collectAsState()
+    val previousPage by viewModel.previousPage.collectAsState()
     val chromeVisible by viewModel.chromeVisible.collectAsState()
     val positions by viewModel.positions.collectAsState()
+    val search by viewModel.search.collectAsState()
     val bookShown by pageReady.collectAsState()
     val readingOrder = (state as? EpubReaderUiState.Ready)?.book?.publication?.readingOrder.orEmpty()
     DialogHost(alertDialogShower)
@@ -159,6 +161,8 @@ class EpubReaderActivity : BaseActivity() {
         hasPreviousChapter = locator?.let { adjacentChapter(readingOrder, it, next = false) } != null,
         hasNextChapter = locator?.let { adjacentChapter(readingOrder, it, next = true) } != null
       ),
+      search = search,
+      previousPage = previousPage,
       chromeVisible = chromeVisible,
       pageReady = bookShown,
       panels = viewModel.panels,
@@ -168,7 +172,24 @@ class EpubReaderActivity : BaseActivity() {
         onPreviousChapter = { goToAdjacentChapter(next = false) },
         onNextChapter = { goToAdjacentChapter(next = true) },
         onSeek = { fraction -> seekTarget(positions, fraction)?.let { navigator?.go(it) } },
-        onSettings = viewModel::changeSettings
+        onSettings = viewModel::changeSettings,
+        onOpenSearch = {
+          viewModel.openSearch()
+          viewModel.setChromeVisible(true)
+        },
+        onSearchQueryChange = viewModel::updateSearchQuery,
+        onSearch = viewModel::searchBook,
+        onCloseSearch = viewModel::closeSearch,
+        onSearchResult = { result ->
+          viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
+          navigator?.go(result)
+          viewModel.closeSearch()
+          viewModel.setChromeVisible(false)
+        },
+        onReturnToPreviousPage = {
+          viewModel.previousPage.value?.let { navigator?.go(it) }
+          viewModel.clearPreviousPage()
+        }
       )
     )
   }
