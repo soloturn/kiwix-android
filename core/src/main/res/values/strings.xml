@@ -500,6 +500,14 @@
   <string name="restore_library_summary">Allow Kiwix to read %1$s again to get your books back.</string>
   <string name="library_folder_access_denied">Kiwix could not get access to this folder.</string>
   <string name="library_folder_books_added">Books added to the library: %1$d</string>
+  <string name="additional_scan_folder_title">Also scan Android/media</string>
+  <string name="additional_scan_folder_not_granted">Tap to allow scanning EPUBs in Android/media and its subfolders.</string>
+  <string name="additional_scan_folder_restore">Tap to restore access to Android/media.</string>
+  <string name="additional_scan_folder_summary">Scanning %1$s and its subfolders for books.</string>
+  <string name="documents_scan_folder_title">Also scan Documents</string>
+  <string name="documents_scan_folder_not_granted">Tap to allow scanning Documents and its subfolders.</string>
+  <string name="documents_scan_folder_restore">Tap to restore access to Documents.</string>
+  <string name="documents_scan_folder_summary">Scanning %1$s and its subfolders for books.</string>
   <string name="move_books_title">Keep your books after uninstall?</string>
   <string name="move_books_message">Books in app storage (count: %1$d, size: %2$s) are deleted when Kiwix is uninstalled. Move them to %3$s?</string>
   <string name="move_books_action">Move</string>

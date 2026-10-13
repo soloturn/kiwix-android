@@ -24,7 +24,6 @@ import android.os.Environment
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -491,7 +490,7 @@ class KiwixDataStore @Inject constructor(
   suspend fun hasExplicitStorage(): Boolean =
     context.kiwixDataStore.data.first()[PreferencesKeys.PREF_STORAGE] != null
 
-  /** Shared Documents is the default library location, so downloaded books survive uninstall. */
+  /** Shared Documents is the default; missing access must not redirect writes elsewhere. */
   suspend fun defaultLibraryStorage(): String = publicDocumentsDirectory().path
 
   fun publicDocumentsDirectory(): File =
@@ -516,6 +515,32 @@ class KiwixDataStore @Inject constructor(
         prefs.remove(PreferencesKeys.PREF_LIBRARY_TREE_URI)
       } else {
         prefs[PreferencesKeys.PREF_LIBRARY_TREE_URI] = treeUri
+      }
+    }
+  }
+
+  val mediaScanTreeUri: Flow<String?> =
+    context.kiwixDataStore.data.map { prefs -> prefs[PreferencesKeys.PREF_MEDIA_SCAN_TREE_URI] }
+
+  suspend fun setMediaScanTreeUri(treeUri: String?) {
+    context.kiwixDataStore.edit { prefs ->
+      if (treeUri == null) {
+        prefs.remove(PreferencesKeys.PREF_MEDIA_SCAN_TREE_URI)
+      } else {
+        prefs[PreferencesKeys.PREF_MEDIA_SCAN_TREE_URI] = treeUri
+      }
+    }
+  }
+
+  val documentsScanTreeUri: Flow<String?> =
+    context.kiwixDataStore.data.map { prefs -> prefs[PreferencesKeys.PREF_DOCUMENTS_SCAN_TREE_URI] }
+
+  suspend fun setDocumentsScanTreeUri(treeUri: String?) {
+    context.kiwixDataStore.edit { prefs ->
+      if (treeUri == null) {
+        prefs.remove(PreferencesKeys.PREF_DOCUMENTS_SCAN_TREE_URI)
+      } else {
+        prefs[PreferencesKeys.PREF_DOCUMENTS_SCAN_TREE_URI] = treeUri
       }
     }
   }
@@ -767,6 +792,8 @@ class KiwixDataStore @Inject constructor(
     const val DEFAULT_SEARCH_MODE = "TITLE"
     const val PREF_STORAGE = "pref_select_folder"
     const val PREF_LIBRARY_TREE_URI = "pref_library_tree_uri"
+    const val PREF_MEDIA_SCAN_TREE_URI = "pref_media_scan_tree_uri"
+    const val PREF_DOCUMENTS_SCAN_TREE_URI = "pref_documents_scan_tree_uri"
     const val PREF_LEGACY_BOOKS_MOVE_DECLINED = "pref_legacy_books_move_declined"
     const val STORAGE_POSITION = "storage_position"
     const val PREF_WIFI_ONLY = "pref_wifi_only"
