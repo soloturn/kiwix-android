@@ -83,10 +83,72 @@ class EpubReaderScreenTest {
       hasPreviousChapter = true,
       hasNextChapter = true
     ),
+    search: EpubSearchState = EpubSearchState(),
     actions: EpubReaderActions = EpubReaderActions(),
-    pageReady: Boolean = true
+    pageReady: Boolean = true,
+    previousPage: Locator? = null
   ) = composeTestRule.setContent {
-    EpubReaderScreen(state, settings, reading, chromeVisible, actions, pageReady)
+    EpubReaderScreen(
+      state,
+      settings,
+      reading,
+      chromeVisible,
+      actions,
+      pageReady,
+      search = search,
+      previousPage = previousPage
+    )
+  }
+
+  @Test
+  fun `the top bar opens the book search field`() {
+    var opened = false
+    show(actions = EpubReaderActions(onOpenSearch = { opened = true }))
+
+    composeTestRule.onNodeWithTag(EPUB_READER_SEARCH_BUTTON_TESTING_TAG).performClick()
+
+    assertTrue(opened)
+  }
+
+  @Test
+  fun `search results show their text and navigate to the selected locator`() {
+    var selected: Locator? = null
+    show(
+      search = EpubSearchState(
+        isOpen = true,
+        query = "kiwi",
+        results = listOf(EpubSearchResult(locator, "Some text around kiwi."))
+      ),
+      actions = EpubReaderActions(onSearchResult = { selected = it })
+    )
+
+    composeTestRule.onNodeWithTag(EPUB_READER_SEARCH_FIELD_TESTING_TAG).assertIsDisplayed()
+    composeTestRule.onNodeWithText("Some text around kiwi.").performClick()
+
+    assertEquals(locator, selected)
+  }
+
+  @Test
+  fun `the minimized previous page remains available with hidden or visible menus`() {
+    var returned = 0
+    val chrome = mutableStateOf(false)
+    composeTestRule.setContent {
+      EpubReaderScreen(
+        ready,
+        EpubReaderSettings(),
+        EpubReadingState(locator, 100),
+        chrome.value,
+        EpubReaderActions(onReturnToPreviousPage = { returned++ }),
+        previousPage = locator
+      )
+    }
+
+    composeTestRule.onNodeWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG).assertIsDisplayed().performClick()
+    assertEquals(1, returned)
+
+    chrome.value = true
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG).assertIsDisplayed()
   }
 
   @Test

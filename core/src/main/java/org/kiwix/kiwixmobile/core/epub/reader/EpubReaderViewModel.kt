@@ -22,6 +22,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -36,9 +37,12 @@ import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
 import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
 import org.kiwix.kiwixmobile.core.epub.EpubSource
 import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
+import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.ReadingProgression
+import org.readium.r2.shared.publication.services.search.search
+import org.readium.r2.shared.util.getOrElse
 import java.io.File
 import javax.inject.Inject
 
@@ -50,6 +54,18 @@ class OpenEpub(
   val toc: List<EpubTocItem>,
   val initialLocator: Locator?,
   val rtl: Boolean = false
+)
+
+data class EpubSearchResult(val locator: Locator, val snippet: String)
+
+data class EpubSearchState(
+  val isOpen: Boolean = false,
+  val query: String = "",
+  val results: List<EpubSearchResult> = emptyList(),
+  val isSearching: Boolean = false,
+  val hasSearched: Boolean = false,
+  val failed: Boolean = false,
+  val limited: Boolean = false
 )
 
 sealed interface EpubReaderUiState {
@@ -76,6 +92,9 @@ class EpubReaderViewModel @Inject constructor(
   private val _currentLocator = MutableStateFlow<Locator?>(null)
   val currentLocator: StateFlow<Locator?> = _currentLocator.asStateFlow()
 
+  private val _previousPage = MutableStateFlow<Locator?>(null)
+  val previousPage: StateFlow<Locator?> = _previousPage.asStateFlow()
+
   // Hidden while reading; the screen shows its own bars until a book is ready.
   private val _chromeVisible = MutableStateFlow(false)
   val chromeVisible: StateFlow<Boolean> = _chromeVisible.asStateFlow()
@@ -83,10 +102,14 @@ class EpubReaderViewModel @Inject constructor(
   private val _positions = MutableStateFlow<List<Locator>>(emptyList())
   val positions: StateFlow<List<Locator>> = _positions.asStateFlow()
 
+  private val _search = MutableStateFlow(EpubSearchState())
+  val search: StateFlow<EpubSearchState> = _search.asStateFlow()
+
   /** Open panels; they survive an activity recreation, which restores no saved state. */
   val panels = EpubReaderPanels()
 
   private var saveJob: Job? = null
+  private var searchJob: Job? = null
 
   init {
     open(savedStateHandle.get<String>(EXTRA_PATH))
@@ -133,11 +156,109 @@ class EpubReaderViewModel @Inject constructor(
     _chromeVisible.value = visible
   }
 
+  fun rememberPreviousPage(locator: Locator?) {
+    _previousPage.value = locator
+  }
+
+  fun clearPreviousPage() {
+    _previousPage.value = null
+  }
+
   fun changeSettings(transform: (EpubReaderSettings) -> EpubReaderSettings) {
     val updated = transform(_settings.value)
     if (updated == _settings.value) return
     _settings.value = updated
     viewModelScope.launch { kiwixDataStore.setEpubReaderSettingsJson(updated.toJson()) }
+  }
+
+  fun openSearch() {
+    panels.showToc = false
+    panels.showSettings = false
+    panels.showSearch = true
+    _search.value = EpubSearchState(isOpen = true)
+  }
+
+  fun closeSearch() {
+    searchJob?.cancel()
+    searchJob = null
+    panels.showSearch = false
+    _search.value = EpubSearchState()
+  }
+
+  fun updateSearchQuery(query: String) {
+    val current = _search.value
+    if (current.query == query) return
+    searchJob?.cancel()
+    _search.value = current.copy(
+      query = query,
+      results = emptyList(),
+      isSearching = false,
+      hasSearched = false,
+      failed = false,
+      limited = false
+    )
+  }
+
+  /** Runs Readium's publication search and gathers a bounded first page of matches. */
+  @OptIn(ExperimentalReadiumApi::class)
+  fun searchBook(query: String) {
+    val normalizedQuery = query.trim()
+    if (normalizedQuery.isEmpty()) {
+      _search.value = _search.value.copy(
+        results = emptyList(),
+        hasSearched = false,
+        failed = false,
+        limited = false
+      )
+      return
+    }
+    searchJob?.cancel()
+    val publication = (_state.value as? EpubReaderUiState.Ready)?.book?.publication ?: return
+    _search.value = _search.value.copy(
+      query = query,
+      results = emptyList(),
+      isSearching = true,
+      hasSearched = false,
+      failed = false,
+      limited = false
+    )
+    searchJob = viewModelScope.launch {
+      try {
+        val iterator = publication.search(normalizedQuery)
+          ?: error("This publication does not support search")
+        try {
+          val results = mutableListOf<EpubSearchResult>()
+          while (results.size < MAX_SEARCH_RESULTS) {
+            val page = iterator.next().getOrElse { error(it.toString()) } ?: break
+            page.locators.forEach { locator ->
+              if (results.size < MAX_SEARCH_RESULTS) {
+                val snippet = listOfNotNull(
+                  locator.text.before,
+                  locator.text.highlight,
+                  locator.text.after
+                ).joinToString(" ").replace(WHITESPACE, " ").trim()
+                results += EpubSearchResult(locator, snippet)
+              }
+            }
+          }
+          results to (results.size == MAX_SEARCH_RESULTS)
+        } finally {
+          iterator.close()
+        }
+          .also { (results, limited) ->
+            _search.value = _search.value.copy(
+              results = results,
+              isSearching = false,
+              hasSearched = true,
+              limited = limited
+            )
+          }
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (_: Exception) {
+        _search.value = _search.value.copy(isSearching = false, hasSearched = true, failed = true)
+      }
+    }
   }
 
   /** Called on every page turn; the write is debounced. */
@@ -172,5 +293,7 @@ class EpubReaderViewModel @Inject constructor(
   companion object {
     const val EXTRA_PATH = "epub_path"
     private const val SAVE_DELAY_MS = 500L
+    private const val MAX_SEARCH_RESULTS = 100
+    private val WHITESPACE = Regex("\\s+")
   }
 }
