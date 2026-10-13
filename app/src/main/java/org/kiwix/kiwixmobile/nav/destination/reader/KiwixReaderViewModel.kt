@@ -230,12 +230,6 @@ class KiwixReaderViewModel @Inject constructor(
       emitEffect(ReaderEffect.ShowToast(context.getString(string.error_file_not_found, zimFileUri)))
       return
     }
-    if (isEpubFile(filePath)) {
-      // Covers EPUBs opened from outside the library (VIEW intents) as well as from it.
-      runCatching { epubLibraryManager.add(File(filePath), markOpened = true) }
-      openEpubFile(File(filePath))
-      return
-    }
     val zimReaderSource = ZimReaderSource(File(filePath))
     openZimFile(zimReaderSource)
   }
