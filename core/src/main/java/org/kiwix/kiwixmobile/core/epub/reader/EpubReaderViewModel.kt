@@ -62,9 +62,17 @@ data class EpubSearchState(
   val isOpen: Boolean = false,
   val query: String = "",
   val results: List<EpubSearchResult> = emptyList(),
+  val suggestions: List<String> = emptyList(),
+  val showingSuggestions: Boolean = false,
   val isSearching: Boolean = false,
   val hasSearched: Boolean = false,
   val failed: Boolean = false,
+  val limited: Boolean = false
+)
+
+private data class EpubSearchBatch(
+  val results: List<EpubSearchResult> = emptyList(),
+  val suggestions: List<String> = emptyList(),
   val limited: Boolean = false
 )
 
@@ -175,14 +183,12 @@ class EpubReaderViewModel @Inject constructor(
     panels.showToc = false
     panels.showSettings = false
     panels.showSearch = true
-    _search.value = EpubSearchState(isOpen = true)
+    _search.value = _search.value.copy(isOpen = true)
   }
 
   fun closeSearch() {
-    searchJob?.cancel()
-    searchJob = null
     panels.showSearch = false
-    _search.value = EpubSearchState()
+    _search.value = _search.value.copy(isOpen = false)
   }
 
   fun updateSearchQuery(query: String) {
@@ -192,11 +198,18 @@ class EpubReaderViewModel @Inject constructor(
     _search.value = current.copy(
       query = query,
       results = emptyList(),
-      isSearching = false,
+      suggestions = emptyList(),
+      showingSuggestions = true,
+      isSearching = query.isNotBlank(),
       hasSearched = false,
       failed = false,
       limited = false
     )
+    if (query.isBlank()) return
+    searchJob = viewModelScope.launch {
+      delay(SEARCH_DEBOUNCE_MS)
+      runSearch(query, suggestionsOnly = true)
+    }
   }
 
   /** Runs Readium's publication search and gathers a bounded first page of matches. */
@@ -206,6 +219,7 @@ class EpubReaderViewModel @Inject constructor(
     if (normalizedQuery.isEmpty()) {
       _search.value = _search.value.copy(
         results = emptyList(),
+        suggestions = emptyList(),
         hasSearched = false,
         failed = false,
         limited = false
@@ -213,10 +227,28 @@ class EpubReaderViewModel @Inject constructor(
       return
     }
     searchJob?.cancel()
+    _search.value = _search.value.copy(
+      query = normalizedQuery,
+      results = emptyList(),
+      suggestions = emptyList(),
+      showingSuggestions = false,
+      isSearching = true,
+      hasSearched = false,
+      failed = false,
+      limited = false
+    )
+    runSearch(normalizedQuery, suggestionsOnly = false)
+  }
+
+  fun selectSearchSuggestion(word: String) {
+    searchBook(word)
+  }
+
+  /** Runs Readium search and either extracts word suggestions or gathers a bounded result page. */
+  @OptIn(ExperimentalReadiumApi::class)
+  private fun runSearch(query: String, suggestionsOnly: Boolean) {
     val publication = (_state.value as? EpubReaderUiState.Ready)?.book?.publication ?: return
     _search.value = _search.value.copy(
-      query = query,
-      results = emptyList(),
       isSearching = true,
       hasSearched = false,
       failed = false,
@@ -224,41 +256,85 @@ class EpubReaderViewModel @Inject constructor(
     )
     searchJob = viewModelScope.launch {
       try {
-        val iterator = publication.search(normalizedQuery)
+        val iterator = publication.search(query)
           ?: error("This publication does not support search")
-        try {
-          val results = mutableListOf<EpubSearchResult>()
-          while (results.size < MAX_SEARCH_RESULTS) {
-            val page = iterator.next().getOrElse { error(it.toString()) } ?: break
-            page.locators.forEach { locator ->
-              if (results.size < MAX_SEARCH_RESULTS) {
-                val snippet = listOfNotNull(
-                  locator.text.before,
-                  locator.text.highlight,
-                  locator.text.after
-                ).joinToString(" ").replace(WHITESPACE, " ").trim()
-                results += EpubSearchResult(locator, snippet)
-              }
-            }
+        val batch = try {
+          collectSearchBatch(query, suggestionsOnly) {
+            iterator.next().getOrElse { error(it.toString()) }?.locators
           }
-          results to (results.size == MAX_SEARCH_RESULTS)
         } finally {
           iterator.close()
         }
-          .also { (results, limited) ->
-            _search.value = _search.value.copy(
-              results = results,
-              isSearching = false,
-              hasSearched = true,
-              limited = limited
-            )
-          }
+        _search.value = _search.value.copy(
+          results = batch.results,
+          suggestions = batch.suggestions,
+          isSearching = false,
+          hasSearched = true,
+          limited = batch.limited,
+          showingSuggestions = suggestionsOnly
+        )
       } catch (cancelled: CancellationException) {
         throw cancelled
       } catch (_: Exception) {
-        _search.value = _search.value.copy(isSearching = false, hasSearched = true, failed = true)
+        _search.value = _search.value.copy(
+          isSearching = false,
+          hasSearched = true,
+          failed = true,
+          showingSuggestions = suggestionsOnly
+        )
       }
     }
+  }
+
+  private suspend fun collectSearchBatch(
+    query: String,
+    suggestionsOnly: Boolean,
+    nextPage: suspend () -> List<Locator>?
+  ): EpubSearchBatch =
+    if (suggestionsOnly) collectSuggestions(query, nextPage) else collectResults(nextPage)
+
+  private suspend fun collectResults(nextPage: suspend () -> List<Locator>?): EpubSearchBatch {
+    val results = mutableListOf<EpubSearchResult>()
+    while (results.size < MAX_SEARCH_RESULTS) {
+      val locators = nextPage() ?: break
+      for (locator in locators) {
+        results += EpubSearchResult(locator, searchSnippet(locator))
+        if (results.size == MAX_SEARCH_RESULTS) break
+      }
+    }
+    return EpubSearchBatch(results = results, limited = results.size == MAX_SEARCH_RESULTS)
+  }
+
+  private suspend fun collectSuggestions(
+    query: String,
+    nextPage: suspend () -> List<Locator>?
+  ): EpubSearchBatch {
+    val suggestions = linkedSetOf<String>()
+    var scanned = 0
+    while (scanned < MAX_SUGGESTION_MATCHES && suggestions.size < MAX_SEARCH_SUGGESTIONS) {
+      val locators = nextPage() ?: break
+      for (locator in locators) {
+        searchWord(locator, query)?.let(suggestions::add)
+        scanned++
+        if (scanned == MAX_SUGGESTION_MATCHES || suggestions.size == MAX_SEARCH_SUGGESTIONS) break
+      }
+    }
+    return EpubSearchBatch(suggestions = suggestions.toList())
+  }
+
+  private fun searchSnippet(locator: Locator): String = buildString {
+    append(locator.text.before.orEmpty())
+    append(locator.text.highlight.orEmpty())
+    append(locator.text.after.orEmpty())
+  }.replace(WHITESPACE, " ").trim()
+
+  private fun searchWord(locator: Locator, query: String): String? {
+    val text = searchSnippet(locator)
+    val highlight = locator.text.highlight?.takeIf { it.isNotBlank() } ?: query
+    val matchStart = text.indexOf(highlight, ignoreCase = true)
+      .takeIf { it >= 0 } ?: text.indexOf(query, ignoreCase = true).takeIf { it >= 0 } ?: return null
+    return WORD.findAll(text).firstOrNull { matchStart in it.range || it.range.first >= matchStart }
+      ?.value?.takeIf { it.contains(query, ignoreCase = true) }
   }
 
   /** Called on every page turn; the write is debounced. */
@@ -294,6 +370,10 @@ class EpubReaderViewModel @Inject constructor(
     const val EXTRA_PATH = "epub_path"
     private const val SAVE_DELAY_MS = 500L
     private const val MAX_SEARCH_RESULTS = 100
+    private const val MAX_SEARCH_SUGGESTIONS = 12
+    private const val MAX_SUGGESTION_MATCHES = 100
+    private const val SEARCH_DEBOUNCE_MS = 300L
+    private val WORD = Regex("[\\p{L}\\p{M}\\p{N}]+(?:['’_-][\\p{L}\\p{M}\\p{N}]+)*")
     private val WHITESPACE = Regex("\\s+")
   }
 }

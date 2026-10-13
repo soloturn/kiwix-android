@@ -67,9 +67,12 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -97,6 +100,9 @@ const val EPUB_READER_PAGE_LABEL_TESTING_TAG = "epubReaderPageLabelTestingTag"
 const val EPUB_READER_SEARCH_BUTTON_TESTING_TAG = "epubReaderSearchButtonTestingTag"
 const val EPUB_READER_SEARCH_FIELD_TESTING_TAG = "epubReaderSearchFieldTestingTag"
 const val EPUB_READER_SEARCH_RESULT_TESTING_TAG = "epubReaderSearchResultTestingTag"
+const val EPUB_READER_SEARCH_SUGGESTION_TESTING_TAG = "epubReaderSearchSuggestionTestingTag"
+const val EPUB_READER_SEARCH_CHAPTER_TESTING_TAG = "epubReaderSearchChapterTestingTag"
+const val EPUB_READER_SEARCH_POSITION_TESTING_TAG = "epubReaderSearchPositionTestingTag"
 const val EPUB_READER_PREVIOUS_PAGE_TESTING_TAG = "epubReaderPreviousPageTestingTag"
 
 private const val PERCENT = 100
@@ -114,6 +120,7 @@ data class EpubReaderActions(
   val onOpenSearch: () -> Unit = {},
   val onSearchQueryChange: (String) -> Unit = {},
   val onSearch: (String) -> Unit = {},
+  val onSearchSuggestion: (String) -> Unit = {},
   val onCloseSearch: () -> Unit = {},
   val onSearchResult: (Locator) -> Unit = {},
   val onReturnToPreviousPage: () -> Unit = {}
@@ -212,7 +219,15 @@ private fun BoxScope.ReaderChrome(
           panels.showSettings = true
         }
       )
-      if (ready != null && search.isOpen) SearchResults(search, actions.onSearchResult)
+      if (ready != null && search.isOpen) {
+        SearchResults(
+          search,
+          ready.book.toc,
+          reading.positionCount,
+          actions.onSearchSuggestion,
+          actions.onSearchResult
+        )
+      }
     }
   }
   AnimatedVisibility(
@@ -379,7 +394,13 @@ private fun topBarActions(
 }
 
 @Composable
-private fun SearchResults(search: EpubSearchState, onSelect: (Locator) -> Unit) {
+private fun SearchResults(
+  search: EpubSearchState,
+  toc: List<EpubTocItem>,
+  positionCount: Int,
+  onSuggestion: (String) -> Unit,
+  onSelect: (Locator) -> Unit
+) {
   Surface(
     modifier = Modifier
       .fillMaxWidth()
@@ -388,50 +409,152 @@ private fun SearchResults(search: EpubSearchState, onSelect: (Locator) -> Unit) 
     color = MaterialTheme.colorScheme.surface,
     shadowElevation = EIGHT_DP
   ) {
-    when {
-      search.isSearching -> Box(Modifier.padding(SIXTEEN_DP), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+    SearchResultsContent(search, toc, positionCount, onSuggestion, onSelect)
+  }
+}
+
+@Composable
+private fun SearchResultsContent(
+  search: EpubSearchState,
+  toc: List<EpubTocItem>,
+  positionCount: Int,
+  onSuggestion: (String) -> Unit,
+  onSelect: (Locator) -> Unit
+) {
+  when {
+    search.isSearching -> SearchLoading()
+    search.failed -> SearchMessage(R.string.epub_search_error)
+    search.hasSearched && search.showingSuggestions && search.suggestions.isEmpty() ->
+      SearchMessage(R.string.epub_search_no_words)
+    search.hasSearched && !search.showingSuggestions && search.results.isEmpty() ->
+      SearchMessage(R.string.epub_search_no_results)
+    search.showingSuggestions -> SearchSuggestions(search.suggestions, onSuggestion)
+    search.results.isNotEmpty() -> SearchResultList(search, toc, positionCount, onSelect)
+    else -> Unit
+  }
+}
+
+@Composable
+private fun SearchLoading() {
+  Box(Modifier.padding(SIXTEEN_DP), contentAlignment = Alignment.Center) {
+    CircularProgressIndicator()
+  }
+}
+
+@Composable
+private fun SearchMessage(message: Int) {
+  Text(
+    text = stringResource(message),
+    modifier = Modifier.padding(SIXTEEN_DP),
+    color = MaterialTheme.colorScheme.onSurface
+  )
+}
+
+@Composable
+private fun SearchSuggestions(suggestions: List<String>, onSuggestion: (String) -> Unit) {
+  Column {
+    Text(
+      text = stringResource(R.string.epub_search_suggestions),
+      modifier = Modifier.padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP),
+      style = MaterialTheme.typography.labelMedium
+    )
+    LazyColumn {
+      items(suggestions, key = { it }) { suggestion ->
+        Text(
+          text = suggestion,
+          modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSuggestion(suggestion) }
+            .padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP)
+            .testTag(EPUB_READER_SEARCH_SUGGESTION_TESTING_TAG),
+          color = MaterialTheme.colorScheme.onSurface,
+          style = MaterialTheme.typography.bodyLarge
+        )
       }
-      search.failed -> Text(
-        text = stringResource(R.string.epub_search_error),
-        modifier = Modifier.padding(SIXTEEN_DP),
-        color = MaterialTheme.colorScheme.onSurface
-      )
-      search.hasSearched && search.results.isEmpty() -> Text(
-        text = stringResource(R.string.epub_search_no_results),
-        modifier = Modifier.padding(SIXTEEN_DP),
-        color = MaterialTheme.colorScheme.onSurface
-      )
-      search.results.isNotEmpty() -> Column {
-        if (search.limited) {
-          Text(
-            text = stringResource(R.string.epub_search_limited),
-            modifier = Modifier.padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP),
-            style = MaterialTheme.typography.labelMedium
-          )
-        }
-        LazyColumn {
-          itemsIndexed(
-            search.results,
-            key = { index, result -> "${result.locator.href}:$index" }
-          ) { _, result ->
-            Column(
-              Modifier
-                .fillMaxWidth()
-                .clickable { onSelect(result.locator) }
-                .padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP)
-                .testTag(EPUB_READER_SEARCH_RESULT_TESTING_TAG)
-            ) {
-              result.locator.title?.let { chapter ->
-                Text(chapter, style = MaterialTheme.typography.labelMedium)
-              }
-              Text(result.snippet, color = MaterialTheme.colorScheme.onSurface)
-            }
-          }
-        }
-      }
-      else -> Unit
     }
+  }
+}
+
+@Composable
+private fun SearchResultList(
+  search: EpubSearchState,
+  toc: List<EpubTocItem>,
+  positionCount: Int,
+  onSelect: (Locator) -> Unit
+) {
+  Column {
+    if (search.limited) {
+      Text(
+        text = stringResource(R.string.epub_search_limited),
+        modifier = Modifier.padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP),
+        style = MaterialTheme.typography.labelMedium
+      )
+    }
+    LazyColumn {
+      itemsIndexed(search.results, key = { index, result -> "${result.locator.href}:$index" }) { _, result ->
+        SearchResultRow(result, search.query, toc, positionCount, onSelect)
+      }
+    }
+  }
+}
+
+@Composable
+private fun SearchResultRow(
+  result: EpubSearchResult,
+  query: String,
+  toc: List<EpubTocItem>,
+  positionCount: Int,
+  onSelect: (Locator) -> Unit
+) {
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clickable { onSelect(result.locator) }
+      .padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP)
+      .testTag(EPUB_READER_SEARCH_RESULT_TESTING_TAG)
+  ) {
+    chapterTitle(toc, result.locator)?.let { chapter ->
+      Text(
+        chapter,
+        modifier = Modifier.testTag(EPUB_READER_SEARCH_CHAPTER_TESTING_TAG),
+        style = MaterialTheme.typography.labelMedium
+      )
+    }
+    val progress = readingProgress(result.locator, positionCount)
+    if (progress.position > 0) {
+      Text(
+        text = stringResource(R.string.epub_position_of, progress.position, progress.total),
+        modifier = Modifier.testTag(EPUB_READER_SEARCH_POSITION_TESTING_TAG),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+      )
+    }
+    Text(
+      text = highlightedSearchText(
+        result.snippet,
+        result.locator.text.highlight?.takeIf { it.isNotBlank() } ?: query
+      ),
+      color = MaterialTheme.colorScheme.onSurface
+    )
+  }
+}
+
+@Composable
+private fun highlightedSearchText(text: String, query: String) = buildAnnotatedString {
+  val start = query.takeIf { it.isNotBlank() }?.let { text.indexOf(it, ignoreCase = true) } ?: -1
+  if (start < 0) {
+    append(text)
+  } else {
+    append(text.substring(0, start))
+    withStyle(
+      SpanStyle(
+        background = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+        fontWeight = FontWeight.Bold
+      )
+    ) {
+      append(text.substring(start, start + query.length))
+    }
+    append(text.substring(start + query.length))
   }
 }
 
