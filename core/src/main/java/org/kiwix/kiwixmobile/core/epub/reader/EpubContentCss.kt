@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.core.epub.reader
 
-import org.readium.r2.shared.publication.Layout
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.util.Try
 import org.readium.r2.shared.util.Url
@@ -121,7 +120,7 @@ object EpubContentCss {
  * fixed-layout books, which position everything exactly, [EpubContentCss.CSS].
  */
 fun Publication.Builder.injectContentCss() {
-  val withCss = manifest.metadata.layout != Layout.FIXED
+  val withCss = manifest.metadata["http://www.idpf.org/vocab/rendition/#layout"] != "pre-paginated"
   container = TransformingContainer(container) { url: Url, resource: Resource ->
     if (EpubContentCss.isHtml(url)) {
       TransformingResource(resource) { bytes ->

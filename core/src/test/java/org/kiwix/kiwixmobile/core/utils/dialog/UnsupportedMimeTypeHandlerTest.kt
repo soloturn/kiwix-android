@@ -22,6 +22,7 @@ import android.app.Activity
 import android.net.Uri
 import androidx.core.content.FileProvider
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -38,9 +39,12 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.R
+import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
+import org.kiwix.kiwixmobile.core.epub.EpubSource
 import org.kiwix.kiwixmobile.core.extensions.isFileExist
 import org.kiwix.kiwixmobile.core.extensions.toast
 import org.kiwix.kiwixmobile.core.reader.ZimReaderContainer
+import org.kiwix.kiwixmobile.core.utils.files.EPUB_MIME_TYPE
 import org.kiwix.kiwixmobile.core.utils.files.FileUtils
 import org.kiwix.kiwixmobile.core.utils.files.SaveResult
 import org.kiwix.sharedFunctions.MainDispatcherRule
@@ -55,6 +59,7 @@ class UnsupportedMimeTypeHandlerTest {
 
   private val activity: Activity = mockk(relaxed = true)
   private val zimReaderContainer: ZimReaderContainer = mockk(relaxed = true)
+  private val epubOpenUseCase: EpubOpenUseCase = mockk(relaxed = true)
   private val alertDialogShower: AlertDialogShower = mockk(relaxed = true)
 
   private lateinit var handler: UnsupportedMimeTypeHandler
@@ -77,7 +82,7 @@ class UnsupportedMimeTypeHandlerTest {
     every { FileProvider.getUriForFile(any(), any(), any()) } returns mockk()
     coEvery { any<File>().isFileExist(testDispatcher) } returns true
 
-    handler = UnsupportedMimeTypeHandler(zimReaderContainer, testDispatcher)
+    handler = UnsupportedMimeTypeHandler(zimReaderContainer, epubOpenUseCase, testDispatcher)
     handler.initialize(activity, alertDialogShower)
     handler.intent = mockk(relaxed = true)
   }
@@ -95,6 +100,21 @@ class UnsupportedMimeTypeHandlerTest {
     verify {
       alertDialogShower.show(any(), capture(openAction), capture(saveAction), any())
     }
+  }
+
+  @Test
+  fun openEpubFromZim_opensInReadiumWithoutShowingChoiceDialog() = runTest {
+    val savedFile = mockk<File>()
+    val fileUri = mockk<Uri>()
+    every { FileProvider.getUriForFile(any(), any(), savedFile) } returns fileUri
+    coEvery { FileUtils.downloadFileFromUrl(any(), any(), any(), any()) } returns
+      SaveResult.FileSaved(savedFile)
+
+    handler.showSaveOrOpenUnsupportedFilesDialog(testUrl, EPUB_MIME_TYPE, this)
+    advanceUntilIdle()
+
+    verify(exactly = 0) { alertDialogShower.show(any(), any(), any(), any()) }
+    coVerify { epubOpenUseCase.open(activity, EpubSource.Content(fileUri)) }
   }
 
   @Test
