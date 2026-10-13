@@ -68,7 +68,18 @@ class DocumentTree(private val contentResolver: ContentResolver) {
   }
 
   /** Breadth-first walk returning every ZIM (or first split part) below the tree root. */
-  fun findZimFiles(treeUri: Uri, onDirectoryScanned: (Int) -> Unit = {}): List<DocumentEntry> {
+  fun findZimFiles(treeUri: Uri, onDirectoryScanned: (Int) -> Unit = {}): List<DocumentEntry> =
+    findFiles(treeUri, onDirectoryScanned, ::isZimName)
+
+  /** Breadth-first walk returning ZIMs and EPUBs below the granted library tree. */
+  fun findLibraryFiles(treeUri: Uri, onDirectoryScanned: (Int) -> Unit = {}): List<DocumentEntry> =
+    findFiles(treeUri, onDirectoryScanned) { isZimName(it) || isEpubName(it) }
+
+  private fun findFiles(
+    treeUri: Uri,
+    onDirectoryScanned: (Int) -> Unit,
+    matches: (String) -> Boolean
+  ): List<DocumentEntry> {
     val result = mutableListOf<DocumentEntry>()
     val pending = ArrayDeque<String>().apply { add(rootDocumentId(treeUri)) }
     val visited = mutableSetOf<String>()
@@ -78,7 +89,7 @@ class DocumentTree(private val contentResolver: ContentResolver) {
       val children = listChildren(treeUri, directoryId)
       children.filter { it.isDirectory && !isSkippedDirectory(it.name) }
         .forEach { pending.add(it.documentId) }
-      result += children.filter { !it.isDirectory && isZimName(it.name) }
+      result += children.filter { !it.isDirectory && matches(it.name) }
       onDirectoryScanned(visited.size)
     }
     return result
@@ -210,6 +221,8 @@ class DocumentTree(private val contentResolver: ContentResolver) {
 
     fun isZimName(name: String): Boolean =
       name.endsWith(".zim", ignoreCase = true) || name.endsWith(".zimaa", ignoreCase = true)
+
+    private fun isEpubName(name: String): Boolean = name.endsWith(".epub", ignoreCase = true)
 
     // Mirrors FileSearch: hidden folders and the trash never hold library books.
     private fun isSkippedDirectory(name: String): Boolean =

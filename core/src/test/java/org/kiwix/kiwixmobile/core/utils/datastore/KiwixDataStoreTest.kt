@@ -772,6 +772,30 @@ class KiwixDataStoreTest {
   }
 
   @Test
+  fun `selectedStorage moves an empty legacy app folder to public documents`() = runTest {
+    val (storageContext, storageDataStore) = storageAwareDataStore()
+    val legacyDirectory = File(tempFolder.root, "Android/media/com.github.soloturn.kiwix")
+      .apply { mkdirs() }
+    storageDataStore.setSelectedStorage(legacyDirectory.absolutePath)
+
+    assertThat(storageDataStore.selectedStorage.first())
+      .isEqualTo(expectedDefaultPublicStorage(storageContext))
+    assertThat(storageContext.kiwixDataStore.data.first()[PreferencesKeys.PREF_STORAGE])
+      .isEqualTo(expectedDefaultPublicStorage(storageContext))
+  }
+
+  @Test
+  fun `selectedStorage keeps legacy app folder when it contains an epub`() = runTest {
+    val (_, storageDataStore) = storageAwareDataStore()
+    val legacyDirectory = File(tempFolder.root, "Android/media/com.github.soloturn.kiwix")
+      .apply { mkdirs() }
+    File(legacyDirectory, "book.EPUB").createNewFile()
+    storageDataStore.setSelectedStorage(legacyDirectory.absolutePath)
+
+    assertThat(storageDataStore.selectedStorage.first()).isEqualTo(legacyDirectory.absolutePath)
+  }
+
+  @Test
   @Config(sdk = [Build.VERSION_CODES.P])
   fun `below Q without write permission the default stays app specific`() = runTest {
     val (storageContext, storageDataStore) = storageAwareDataStore()
