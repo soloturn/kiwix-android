@@ -243,6 +243,8 @@
   <string name="epub_close">Close</string>
   <string name="epub_reading_settings">Reading settings</string>
   <string name="epub_search_error">Search failed for this book.</string>
+  <string name="epub_search_suggestions">Words found</string>
+  <string name="epub_search_no_words">No matching words found.</string>
   <string name="epub_search_limited">Showing the first 100 matches.</string>
   <string name="epub_previous_page">Previous page</string>
   <string name="epub_previous_page_in">Previous page · %1$s</string>

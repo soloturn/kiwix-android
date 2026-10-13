@@ -179,6 +179,7 @@ class EpubReaderActivity : BaseActivity() {
         },
         onSearchQueryChange = viewModel::updateSearchQuery,
         onSearch = viewModel::searchBook,
+        onSearchSuggestion = viewModel::selectSearchSuggestion,
         onCloseSearch = viewModel::closeSearch,
         onSearchResult = { result ->
           viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)

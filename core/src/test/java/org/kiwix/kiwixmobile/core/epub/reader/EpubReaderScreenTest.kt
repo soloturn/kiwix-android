@@ -35,6 +35,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -123,9 +124,54 @@ class EpubReaderScreenTest {
     )
 
     composeTestRule.onNodeWithTag(EPUB_READER_SEARCH_FIELD_TESTING_TAG).assertIsDisplayed()
+    assertEquals(
+      2,
+      composeTestRule.onAllNodesWithText("Chapter One").fetchSemanticsNodes().size
+    )
+    assertEquals(
+      2,
+      composeTestRule.onAllNodesWithText("Position 26 of 100").fetchSemanticsNodes().size
+    )
     composeTestRule.onNodeWithText("Some text around kiwi.").performClick()
 
     assertEquals(locator, selected)
+  }
+
+  @Test
+  fun `search suggestions show found words and submit the selected word`() {
+    var selected: String? = null
+    show(
+      search = EpubSearchState(
+        isOpen = true,
+        query = "kiw",
+        suggestions = listOf("kiwi", "kiwifruit"),
+        showingSuggestions = true,
+        hasSearched = true
+      ),
+      actions = EpubReaderActions(onSearchSuggestion = { selected = it })
+    )
+
+    composeTestRule.onNodeWithText("Words found").assertIsDisplayed()
+    composeTestRule.onNodeWithText("kiwi").performClick()
+
+    assertEquals("kiwi", selected)
+  }
+
+  @Test
+  fun `search result highlights the matched word`() {
+    show(
+      search = EpubSearchState(
+        isOpen = true,
+        query = "kiwi",
+        results = listOf(EpubSearchResult(locator, "Some text around kiwi."))
+      )
+    )
+    val layouts = mutableListOf<TextLayoutResult>()
+
+    composeTestRule.onNodeWithText("Some text around kiwi.", useUnmergedTree = true)
+      .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+
+    assertTrue(layouts.single().layoutInput.text.spanStyles.isNotEmpty())
   }
 
   @Test
