@@ -55,8 +55,7 @@ class LibraryFolderTest {
 
   @Before
   fun setUp() {
-    every { kiwixDataStore.publicDocumentsDirectory() } returns
-      Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+    every { kiwixDataStore.publicDocumentsDirectory() } returns File(context.cacheDir, "Documents")
     libraryFolder = LibraryFolder(context, kiwixDataStore)
   }
 
@@ -69,6 +68,30 @@ class LibraryFolderTest {
         "primary:Documents/Kiwix"
       ),
       libraryFolder.pickerInitialUri()
+    )
+  }
+
+  @Test
+  fun mediaScanPickerOpensAtAndroidMediaWhenNothingWasPicked() = runTest {
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf(null)
+    assertEquals(
+      DocumentsContract.buildDocumentUri(
+        LibraryFolder.EXTERNAL_STORAGE_AUTHORITY,
+        "primary:Android/media"
+      ),
+      libraryFolder.mediaScanPickerInitialUri()
+    )
+  }
+
+  @Test
+  fun documentsScanPickerOpensAtDocumentsWhenNothingWasPicked() = runTest {
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf(null)
+    assertEquals(
+      DocumentsContract.buildDocumentUri(
+        LibraryFolder.EXTERNAL_STORAGE_AUTHORITY,
+        "primary:Documents"
+      ),
+      libraryFolder.documentsScanPickerInitialUri()
     )
   }
 
@@ -95,6 +118,50 @@ class LibraryFolderTest {
     coEvery { kiwixDataStore.libraryTreeUri } returns flowOf("$picked")
     assertEquals(picked, libraryFolder.activeTreeUri())
     assertFalse(libraryFolder.needsAccessRestore())
+  }
+
+  @Test
+  fun scanTreeNeedsOnlyReadAccess() = runTest {
+    val documentsTree = tree("primary:Documents")
+    coEvery { kiwixDataStore.libraryTreeUri } returns flowOf(null)
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf(null)
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf(null)
+
+    assertTrue(libraryFolder.onDocumentsScanTreePicked(documentsTree))
+    assertTrue(libraryFolder.activeScanTreeUris().contains(documentsTree))
+    assertFalse(libraryFolder.hasTreeAccess(documentsTree))
+  }
+
+  @Test
+  fun pickingMediaFolderAddsItWithoutReplacingTheLibraryFolder() = runTest {
+    val libraryTree = tree("primary:Documents/Kiwix")
+    val mediaTree = tree("primary:Android/media")
+    coEvery { kiwixDataStore.libraryTreeUri } returns flowOf("$libraryTree")
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf(null)
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf(null)
+    assertTrue(libraryFolder.onTreePicked(libraryTree))
+    assertTrue(libraryFolder.onMediaScanTreePicked(mediaTree))
+    coVerify { kiwixDataStore.setMediaScanTreeUri("$mediaTree") }
+    assertEquals(listOf(libraryTree, mediaTree), libraryFolder.activeScanTreeUris())
+  }
+
+  @Test
+  fun documentsScanTreeIsAddedAlongsideLibraryAndMediaTrees() = runTest {
+    val libraryTree = tree("primary:Documents/Kiwix")
+    val documentsTree = tree("primary:Documents")
+    val mediaTree = tree("primary:Android/media")
+    coEvery { kiwixDataStore.libraryTreeUri } returns flowOf("$libraryTree")
+    coEvery { kiwixDataStore.documentsScanTreeUri } returns flowOf(null)
+    coEvery { kiwixDataStore.mediaScanTreeUri } returns flowOf("$mediaTree")
+    libraryFolder.onTreePicked(libraryTree)
+    libraryFolder.onMediaScanTreePicked(mediaTree)
+
+    assertTrue(libraryFolder.onDocumentsScanTreePicked(documentsTree))
+    coVerify { kiwixDataStore.setDocumentsScanTreeUri("$documentsTree") }
+    assertEquals(
+      listOf(libraryTree, documentsTree, mediaTree),
+      libraryFolder.activeScanTreeUris()
+    )
   }
 
   @Test

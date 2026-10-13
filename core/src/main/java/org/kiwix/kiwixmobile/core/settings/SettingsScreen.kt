@@ -189,8 +189,20 @@ private fun SetUpViewModelAndPermissionLauncher(
       }
     }
   val folderPicker = rememberLibraryFolderPicker(coreSettingsViewModel::onLibraryFolderPicked)
+  val documentsScanFolderPicker =
+    rememberLibraryFolderPicker(coreSettingsViewModel::onDocumentsScanFolderPicked)
+  val mediaScanFolderPicker =
+    rememberLibraryFolderPicker(coreSettingsViewModel::onMediaScanFolderPicked)
   LaunchedEffect(Unit) {
     coreSettingsViewModel.libraryFolderPickerRequests.collect { folderPicker(it) }
+  }
+  LaunchedEffect(Unit) {
+    coreSettingsViewModel.documentsScanFolderPickerRequests.collect {
+      documentsScanFolderPicker(it)
+    }
+  }
+  LaunchedEffect(Unit) {
+    coreSettingsViewModel.mediaScanFolderPickerRequests.collect { mediaScanFolderPicker(it) }
   }
   LaunchedEffect(Unit) {
     coreSettingsViewModel.initialize()
@@ -517,6 +529,20 @@ private fun LazyListScope.storageCategory(
                 stringResource(R.string.restore_library_title),
                 restoreSummary,
                 coreSettingsViewModel::chooseLibraryFolder
+              )
+            }
+            libraryFolder.documentsScanSummary?.let { summary ->
+              PreferenceItem(
+                stringResource(R.string.documents_scan_folder_title),
+                summary,
+                coreSettingsViewModel::chooseDocumentsScanFolder
+              )
+            }
+            libraryFolder.mediaScanSummary?.let { summary ->
+              PreferenceItem(
+                stringResource(R.string.additional_scan_folder_title),
+                summary,
+                coreSettingsViewModel::chooseMediaScanFolder
               )
             }
           }

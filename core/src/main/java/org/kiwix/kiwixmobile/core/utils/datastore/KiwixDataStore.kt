@@ -532,6 +532,32 @@ class KiwixDataStore @Inject constructor(
     }
   }
 
+  val mediaScanTreeUri: Flow<String?> =
+    context.kiwixDataStore.data.map { prefs -> prefs[PreferencesKeys.PREF_MEDIA_SCAN_TREE_URI] }
+
+  suspend fun setMediaScanTreeUri(treeUri: String?) {
+    context.kiwixDataStore.edit { prefs ->
+      if (treeUri == null) {
+        prefs.remove(PreferencesKeys.PREF_MEDIA_SCAN_TREE_URI)
+      } else {
+        prefs[PreferencesKeys.PREF_MEDIA_SCAN_TREE_URI] = treeUri
+      }
+    }
+  }
+
+  val documentsScanTreeUri: Flow<String?> =
+    context.kiwixDataStore.data.map { prefs -> prefs[PreferencesKeys.PREF_DOCUMENTS_SCAN_TREE_URI] }
+
+  suspend fun setDocumentsScanTreeUri(treeUri: String?) {
+    context.kiwixDataStore.edit { prefs ->
+      if (treeUri == null) {
+        prefs.remove(PreferencesKeys.PREF_DOCUMENTS_SCAN_TREE_URI)
+      } else {
+        prefs[PreferencesKeys.PREF_DOCUMENTS_SCAN_TREE_URI] = treeUri
+      }
+    }
+  }
+
   val legacyBooksMoveDeclined: Flow<Boolean> =
     context.kiwixDataStore.data.map { prefs ->
       prefs[PreferencesKeys.PREF_LEGACY_BOOKS_MOVE_DECLINED] ?: false
@@ -784,6 +810,8 @@ class KiwixDataStore @Inject constructor(
     const val DEFAULT_SEARCH_MODE = "TITLE"
     const val PREF_STORAGE = "pref_select_folder"
     const val PREF_LIBRARY_TREE_URI = "pref_library_tree_uri"
+    const val PREF_MEDIA_SCAN_TREE_URI = "pref_media_scan_tree_uri"
+    const val PREF_DOCUMENTS_SCAN_TREE_URI = "pref_documents_scan_tree_uri"
     const val PREF_LEGACY_BOOKS_MOVE_DECLINED = "pref_legacy_books_move_declined"
     const val STORAGE_POSITION = "storage_position"
     const val PREF_WIFI_ONLY = "pref_wifi_only"

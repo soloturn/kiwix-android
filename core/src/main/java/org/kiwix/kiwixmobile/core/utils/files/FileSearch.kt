@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.extensions.forEachRow
 import org.kiwix.kiwixmobile.core.extensions.get
+import org.kiwix.kiwixmobile.core.utils.files.EpubImportResult.Imported
 import org.kiwix.kiwixmobile.core.utils.files.saf.DocumentEntry
 import org.kiwix.kiwixmobile.core.utils.files.saf.DocumentTree
 import java.io.File
@@ -73,14 +74,21 @@ class FileSearch @Inject constructor(
   suspend fun scanTree(
     treeUri: Uri,
     scanningProgressListener: ScanningProgressListener? = null
-  ): List<Uri> = withContext(ioDispatcher) {
-    DocumentTree(context.contentResolver)
-      .findZimFiles(treeUri) { scanned ->
+  ): TreeScanResult = withContext(ioDispatcher) {
+    val files = DocumentTree(context.contentResolver)
+      .findLibraryFiles(treeUri) { scanned ->
         // The directory count is only known at the end of a tree walk.
         scanningProgressListener?.onProgressUpdate(scanned, scanned + 1)
       }
-      .map(DocumentEntry::uri)
+    TreeScanResult(
+      zimFiles = files.filter { DocumentTree.isZimName(it.name) }.map(DocumentEntry::uri),
+      epubFiles = files.filter { isEpubFile(it.name) }.map(DocumentEntry::uri)
+    )
   }
+
+  /** Copies a SAF EPUB into app-private storage so Readium can open it as a File. */
+  suspend fun importEpubFromTree(uri: Uri): File? =
+    (importEpubContentUriResult(context, uri) as? Imported)?.file
 
   private fun scanMediaStore(extensions: Array<String>) =
     mutableListOf<File>().apply {
@@ -153,5 +161,7 @@ class FileSearch @Inject constructor(
     }.toList()
 }
 
+data class TreeScanResult(val zimFiles: List<Uri>, val epubFiles: List<Uri>)
+
 internal fun String.isAny(vararg suffixes: String) =
-  suffixes.any { endsWith(it) }
+  suffixes.any { endsWith(it, ignoreCase = true) }
