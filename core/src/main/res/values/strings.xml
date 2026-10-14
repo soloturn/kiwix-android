@@ -274,6 +274,32 @@
   <string name="epub_align_left">Left</string>
   <string name="epub_align_justify">Justify</string>
   <string name="epub_no_table_of_contents">This book has no table of contents.</string>
+  <string name="epub_add_bookmark">Bookmark</string>
+  <string name="epub_remove_bookmark">Remove bookmark</string>
+  <string name="epub_annotations">Annotations</string>
+  <string name="epub_no_annotations">No favorites, bookmarks, notes or highlights yet.</string>
+  <string name="epub_bookmark">Bookmark</string>
+  <string name="epub_favorite">Favorite</string>
+  <string name="epub_note">Note</string>
+  <string name="epub_highlight">Highlight</string>
+  <string name="epub_delete_annotation">Delete</string>
+  <string name="epub_add_note">Add note</string>
+  <string name="epub_edit_note">Edit note</string>
+  <string name="epub_copy_annotation">Copy annotation</string>
+  <string name="epub_annotation_types">Types</string>
+  <string name="epub_annotation_colors">Colors</string>
+  <string name="epub_annotation_chapters">Chapters</string>
+  <string name="epub_no_matching_annotations">No annotations match these filters.</string>
+  <string name="epub_highlight_light_yellow">Light yellow</string>
+  <string name="epub_highlight_light_green">Light green</string>
+  <string name="epub_highlight_light_blue">Light blue</string>
+  <string name="epub_highlight_light_pink">Light pink</string>
+  <string name="epub_highlight_light_purple">Light purple</string>
+  <string name="epub_note_hint">Write a note</string>
+  <string name="epub_selection_actions">Selected text</string>
+  <string name="epub_search_web">Search web</string>
+  <string name="epub_select_all">Select all</string>
+  <string name="epub_selected_text">Selected text</string>
   <string name="select_language" tools:keep="@string/select_language">Select language</string>
   <string name="save_languages" tools:keep="@string/save_languages">Save languages</string>
   <string name="all_languages" tools:keep="@string/all_languages">All languages</string>
