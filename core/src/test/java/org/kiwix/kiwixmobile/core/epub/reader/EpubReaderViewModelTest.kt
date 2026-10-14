@@ -68,6 +68,7 @@ class EpubReaderViewModelTest {
   val mainDispatcherRule = MainDispatcherRule(testDispatcher)
 
   private val library: EpubLibraryManager = mockk()
+  private val annotations: EpubAnnotationRepository = mockk()
   private val openUseCase: EpubOpenUseCase = mockk()
   private val store: KiwixDataStore = mockk()
   private val opener =
@@ -85,6 +86,8 @@ class EpubReaderViewModelTest {
     every { store.epubReaderSettingsJson } returns flowOf(settings.toJson())
     coEvery { library.locator(BOOK_ID) } returns savedLocator
     coEvery { library.saveLocator(any(), any()) } just Runs
+    coEvery { annotations.load(any()) } returns emptyList()
+    coEvery { annotations.save(any(), any(), any()) } just Runs
     coEvery { store.setEpubReaderSettingsJson(any()) } just Runs
     coEvery { openUseCase.prepare(any(), any()) } answers {
       EpubOpenResult.Ready((firstArg<EpubSource>() as EpubSource.Path).file, BOOK_ID)
@@ -93,6 +96,7 @@ class EpubReaderViewModelTest {
       SavedStateHandle(path?.let { mapOf(EpubReaderViewModel.EXTRA_PATH to it) } ?: emptyMap()),
       opener,
       library,
+      annotations,
       openUseCase,
       store
     )
@@ -126,6 +130,29 @@ class EpubReaderViewModelTest {
 
     assertEquals(saved, vm.ready().initialLocator)
     assertEquals(saved, vm.currentLocator.value)
+  }
+
+  @Test
+  fun `saves bookmarks notes and highlights for the open book`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    val selected = locator("c1.xhtml", 0.4).copy(
+      text = Locator.Text("before", "selected passage", "after")
+    )
+    vm.onLocatorChanged(locator("c1.xhtml", 0.3))
+
+    vm.addBookmark()
+    vm.addNote(selected, "My note")
+    vm.addHighlight(selected)
+    runCurrent()
+
+    assertEquals(
+      listOf(EpubAnnotationKind.BOOKMARK, EpubAnnotationKind.NOTE, EpubAnnotationKind.HIGHLIGHT),
+      vm.annotations.value.map { it.kind }
+    )
+    assertEquals("selected passage", vm.annotations.value[1].text)
+    assertEquals("My note", vm.annotations.value[1].note)
+    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, match { it.size == 3 }) }
   }
 
   @Test

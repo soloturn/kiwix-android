@@ -149,6 +149,7 @@ class EpubReaderActivity : BaseActivity() {
     val chromeVisible by viewModel.chromeVisible.collectAsState()
     val positions by viewModel.positions.collectAsState()
     val search by viewModel.search.collectAsState()
+    val annotations by viewModel.annotations.collectAsState()
     val bookShown by pageReady.collectAsState()
     val readingOrder = (state as? EpubReaderUiState.Ready)?.book?.publication?.readingOrder.orEmpty()
     DialogHost(alertDialogShower)
@@ -163,6 +164,7 @@ class EpubReaderActivity : BaseActivity() {
       ),
       search = search,
       previousPages = previousPages,
+      annotations = annotations,
       chromeVisible = chromeVisible,
       pageReady = bookShown,
       panels = viewModel.panels,
@@ -190,7 +192,11 @@ class EpubReaderActivity : BaseActivity() {
         onReturnToPreviousPage = { target ->
           viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
           navigator?.go(target)
-        }
+        },
+        onBookmark = viewModel::addBookmark,
+        onShowAnnotations = { viewModel.panels.showAnnotations = true },
+        onAnnotationSelected = { navigator?.go(it.locator) },
+        onDeleteAnnotation = { viewModel.deleteAnnotation(it.id) }
       )
     )
   }
