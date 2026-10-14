@@ -238,9 +238,11 @@ private fun BoxScope.ReaderChrome(
   ) {
     if (ready != null) BottomBar(ready.book, reading, actions) { panels.showToc = true }
   }
-  val returnPage = previousPage.takeIf { ready != null && pageReady && !search.isOpen }
+  val returnPage = previousPage.takeIf {
+    ready != null && pageReady && chromeVisible && !search.isOpen
+  }
   returnPage?.let {
-    PreviousPageChip(it, chromeVisible, actions.onReturnToPreviousPage)
+    PreviousPageChip(it, reading.positionCount, chromeVisible, actions.onReturnToPreviousPage)
   }
 }
 
@@ -265,7 +267,14 @@ private fun ReaderPanels(
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun BoxScope.PreviousPageChip(locator: Locator, chromeVisible: Boolean, onClick: () -> Unit) {
+private fun BoxScope.PreviousPageChip(
+  locator: Locator,
+  positionCount: Int,
+  chromeVisible: Boolean,
+  onClick: () -> Unit
+) {
+  val page = readingProgress(locator, positionCount).position.takeIf { it > 0 }
+    ?: locator.locations.position ?: 1
   Surface(
     modifier = Modifier
       .align(Alignment.BottomEnd)
@@ -279,9 +288,7 @@ private fun BoxScope.PreviousPageChip(locator: Locator, chromeVisible: Boolean, 
     shape = MaterialTheme.shapes.large
   ) {
     Text(
-      text = locator.title?.takeIf { it.isNotBlank() }?.let {
-        stringResource(R.string.epub_previous_page_in, it)
-      } ?: stringResource(R.string.epub_previous_page),
+      text = stringResource(R.string.epub_back_to_page, page),
       modifier = Modifier.padding(horizontal = SIXTEEN_DP, vertical = EIGHT_DP),
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
