@@ -256,6 +256,7 @@ fun ReaderScreen(
   onUserBackPressed: suspend () -> BackPressActivityExtensions.Super,
   navHostController: NavHostController,
   mainActivityBottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
+  onSystemBarsVisibilityChange: (Boolean) -> Unit = {},
   navigationIcon: @Composable () -> Unit
 ) {
   val topAppBarScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -287,6 +288,15 @@ fun ReaderScreen(
     topAppBarScrollBehavior.state.heightOffset = topOffset
     bottomAppBarScrollBehavior.state.heightOffset = bottomOffset
   }
+  val readerOpen = isReaderOpen(state)
+  val searchVisible = state.findInPageUiState.visible
+  HandleReaderSystemBars(
+    topAppBarScrollBehavior,
+    bottomAppBarScrollBehavior,
+    readerOpen,
+    searchVisible,
+    onSystemBarsVisibilityChange
+  )
   LaunchedEffect(bottomAppBarScrollBehavior.state.heightOffset) {
     mainActivityBottomAppBarScrollBehaviour?.state?.heightOffset =
       bottomAppBarScrollBehavior.state.heightOffset
@@ -369,6 +379,39 @@ fun ReaderScreen(
     }
   }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HandleReaderSystemBars(
+  topAppBarScrollBehavior: TopAppBarScrollBehavior,
+  bottomAppBarScrollBehavior: BottomAppBarScrollBehavior,
+  readerOpen: Boolean,
+  searchVisible: Boolean,
+  onSystemBarsVisibilityChange: (Boolean) -> Unit
+) {
+  LaunchedEffect(topAppBarScrollBehavior, bottomAppBarScrollBehavior, readerOpen, searchVisible) {
+    snapshotFlow {
+      shouldShowSystemBars(
+        readerOpen = readerOpen,
+        searchVisible = searchVisible,
+        topBarVisible = topAppBarScrollBehavior.state.heightOffset == 0f,
+        bottomBarVisible = bottomAppBarScrollBehavior.state.heightOffset == 0f
+      )
+    }.collect { onSystemBarsVisibilityChange(it) }
+  }
+}
+
+private fun isReaderOpen(state: ReaderUiState): Boolean =
+  state.tabsState.currentWebView != null &&
+    !state.showNoBookOpenInReader &&
+    !state.showTabSwitcher
+
+private fun shouldShowSystemBars(
+  readerOpen: Boolean,
+  searchVisible: Boolean,
+  topBarVisible: Boolean,
+  bottomBarVisible: Boolean
+): Boolean = !readerOpen || searchVisible || topBarVisible || bottomBarVisible
 
 @Composable
 fun OnBackPressed(

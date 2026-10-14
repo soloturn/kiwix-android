@@ -246,8 +246,7 @@
   <string name="epub_search_suggestions">Words found</string>
   <string name="epub_search_no_words">No matching words found.</string>
   <string name="epub_search_limited">Showing the first 100 matches.</string>
-  <string name="epub_previous_page">Previous page</string>
-  <string name="epub_previous_page_in">Previous page · %1$s</string>
+  <string name="epub_back_to_page">Back to page %1$d</string>
   <string name="epub_search_no_results">No matches found.</string>
   <string name="epub_text_size">Text size</string>
   <string name="epub_page_margins">Page margins</string>

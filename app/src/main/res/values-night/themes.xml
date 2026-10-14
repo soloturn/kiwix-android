@@ -18,7 +18,7 @@
 
 <resources>
   <style name="KiwixTheme.Splash" parent="Theme.SplashScreen">
-    <item name="windowSplashScreenBackground">@color/mine_shaft_gray900</item>
+    <item name="windowSplashScreenBackground">@color/black</item>
     <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     <item name="postSplashScreenTheme">@style/KiwixTheme</item>
   </style>

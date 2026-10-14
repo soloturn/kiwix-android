@@ -175,7 +175,7 @@ class EpubReaderScreenTest {
   }
 
   @Test
-  fun `the minimized previous page remains available with hidden or visible menus`() {
+  fun `the minimized previous page follows menu visibility`() {
     var returned = 0
     val chrome = mutableStateOf(false)
     composeTestRule.setContent {
@@ -189,12 +189,22 @@ class EpubReaderScreenTest {
       )
     }
 
-    composeTestRule.onNodeWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG).assertIsDisplayed().performClick()
-    assertEquals(1, returned)
-
+    assertTrue(
+      composeTestRule.onAllNodesWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG)
+        .fetchSemanticsNodes().isEmpty()
+    )
     chrome.value = true
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG).assertIsDisplayed()
+    composeTestRule.onNodeWithText("Back to page 26").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG).performClick()
+    assertEquals(1, returned)
+
+    chrome.value = false
+    composeTestRule.waitForIdle()
+    assertTrue(
+      composeTestRule.onAllNodesWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG)
+        .fetchSemanticsNodes().isEmpty()
+    )
   }
 
   @Test
