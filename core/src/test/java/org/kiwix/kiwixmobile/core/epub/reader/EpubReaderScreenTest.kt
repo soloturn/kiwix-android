@@ -33,11 +33,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
@@ -124,6 +126,11 @@ class EpubReaderScreenTest {
     )
 
     composeTestRule.onNodeWithTag(EPUB_READER_SEARCH_FIELD_TESTING_TAG).assertIsDisplayed()
+    assertEquals(
+      composeTestRule.onRoot().getUnclippedBoundsInRoot().bottom,
+      composeTestRule.onNodeWithTag(EPUB_READER_SEARCH_PANEL_TESTING_TAG)
+        .getUnclippedBoundsInRoot().bottom
+    )
     assertEquals(
       2,
       composeTestRule.onAllNodesWithText("Chapter One").fetchSemanticsNodes().size
