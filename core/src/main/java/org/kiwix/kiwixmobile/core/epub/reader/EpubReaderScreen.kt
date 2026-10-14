@@ -38,8 +38,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -103,6 +105,7 @@ const val EPUB_READER_SEARCH_SUGGESTION_TESTING_TAG = "epubReaderSearchSuggestio
 const val EPUB_READER_SEARCH_CHAPTER_TESTING_TAG = "epubReaderSearchChapterTestingTag"
 const val EPUB_READER_SEARCH_POSITION_TESTING_TAG = "epubReaderSearchPositionTestingTag"
 const val EPUB_READER_SEARCH_PANEL_TESTING_TAG = "epubReaderSearchPanelTestingTag"
+const val EPUB_READER_SEARCH_RESULTS_LIST_TESTING_TAG = "epubReaderSearchResultsListTestingTag"
 const val EPUB_READER_PREVIOUS_PAGE_TESTING_TAG = "epubReaderPreviousPageTestingTag"
 
 private const val PERCENT = 100
@@ -160,6 +163,7 @@ fun EpubReaderScreen(
   previousPages: List<Locator> = emptyList()
 ) {
   val ready = state as? EpubReaderUiState.Ready
+  val searchResultsListState = rememberLazyListState()
   val overlay = settings.overlayColors(isSystemInDarkTheme())
   KiwixTheme {
     Box(Modifier.fillMaxSize()) {
@@ -173,7 +177,8 @@ fun EpubReaderScreen(
           ReaderChromeState(ready, reading, chromeVisible, pageReady, previousPages),
           panels,
           search,
-          actions
+          actions,
+          searchResultsListState
         )
       }
     }
@@ -195,7 +200,8 @@ private fun BoxScope.ReaderChrome(
   state: ReaderChromeState,
   panels: EpubReaderPanels,
   search: EpubSearchState,
-  actions: EpubReaderActions
+  actions: EpubReaderActions,
+  searchResultsListState: LazyListState
 ) {
   val ready = state.ready
   val reading = state.reading
@@ -226,7 +232,8 @@ private fun BoxScope.ReaderChrome(
           reading.positionCount,
           actions.onSearchSuggestion,
           actions.onSearchResult,
-          Modifier.weight(1f)
+          Modifier.weight(1f),
+          searchResultsListState
         )
       }
     }
@@ -424,7 +431,8 @@ private fun SearchResults(
   positionCount: Int,
   onSuggestion: (String) -> Unit,
   onSelect: (Locator) -> Unit,
-  modifier: Modifier
+  modifier: Modifier,
+  searchResultsListState: LazyListState
 ) {
   Surface(
     modifier = modifier
@@ -433,7 +441,7 @@ private fun SearchResults(
     color = MaterialTheme.colorScheme.surface,
     shadowElevation = EIGHT_DP
   ) {
-    SearchResultsContent(search, toc, positionCount, onSuggestion, onSelect)
+    SearchResultsContent(search, toc, positionCount, onSuggestion, onSelect, searchResultsListState)
   }
 }
 
@@ -443,7 +451,8 @@ private fun SearchResultsContent(
   toc: List<EpubTocItem>,
   positionCount: Int,
   onSuggestion: (String) -> Unit,
-  onSelect: (Locator) -> Unit
+  onSelect: (Locator) -> Unit,
+  searchResultsListState: LazyListState
 ) {
   when {
     search.isSearching -> SearchLoading()
@@ -453,7 +462,8 @@ private fun SearchResultsContent(
     search.hasSearched && !search.showingSuggestions && search.results.isEmpty() ->
       SearchMessage(R.string.epub_search_no_results)
     search.showingSuggestions -> SearchSuggestions(search.suggestions, onSuggestion)
-    search.results.isNotEmpty() -> SearchResultList(search, toc, positionCount, onSelect)
+    search.results.isNotEmpty() ->
+      SearchResultList(search, toc, positionCount, onSelect, searchResultsListState)
     else -> Unit
   }
 }
@@ -504,7 +514,8 @@ private fun SearchResultList(
   search: EpubSearchState,
   toc: List<EpubTocItem>,
   positionCount: Int,
-  onSelect: (Locator) -> Unit
+  onSelect: (Locator) -> Unit,
+  listState: LazyListState
 ) {
   Column {
     if (search.limited) {
@@ -514,7 +525,10 @@ private fun SearchResultList(
         style = MaterialTheme.typography.labelMedium
       )
     }
-    LazyColumn {
+    LazyColumn(
+      modifier = Modifier.testTag(EPUB_READER_SEARCH_RESULTS_LIST_TESTING_TAG),
+      state = listState
+    ) {
       itemsIndexed(search.results, key = { index, result -> "${result.locator.href}:$index" }) { _, result ->
         SearchResultRow(result, search.query, toc, positionCount, onSelect)
       }
