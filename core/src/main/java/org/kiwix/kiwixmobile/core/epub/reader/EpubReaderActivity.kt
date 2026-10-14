@@ -145,7 +145,7 @@ class EpubReaderActivity : BaseActivity() {
     val state by viewModel.state.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val locator by viewModel.currentLocator.collectAsState()
-    val previousPage by viewModel.previousPage.collectAsState()
+    val previousPages by viewModel.previousPages.collectAsState()
     val chromeVisible by viewModel.chromeVisible.collectAsState()
     val positions by viewModel.positions.collectAsState()
     val search by viewModel.search.collectAsState()
@@ -162,7 +162,7 @@ class EpubReaderActivity : BaseActivity() {
         hasNextChapter = locator?.let { adjacentChapter(readingOrder, it, next = true) } != null
       ),
       search = search,
-      previousPage = previousPage,
+      previousPages = previousPages,
       chromeVisible = chromeVisible,
       pageReady = bookShown,
       panels = viewModel.panels,
@@ -187,9 +187,9 @@ class EpubReaderActivity : BaseActivity() {
           viewModel.closeSearch()
           viewModel.setChromeVisible(false)
         },
-        onReturnToPreviousPage = {
-          viewModel.previousPage.value?.let { navigator?.go(it) }
-          viewModel.clearPreviousPage()
+        onReturnToPreviousPage = { target ->
+          viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
+          navigator?.go(target)
         }
       )
     )

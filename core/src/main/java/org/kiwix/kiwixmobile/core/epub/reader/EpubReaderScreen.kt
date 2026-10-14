@@ -123,7 +123,7 @@ data class EpubReaderActions(
   val onSearchSuggestion: (String) -> Unit = {},
   val onCloseSearch: () -> Unit = {},
   val onSearchResult: (Locator) -> Unit = {},
-  val onReturnToPreviousPage: () -> Unit = {}
+  val onReturnToPreviousPage: (Locator) -> Unit = {}
 )
 
 /** Where the reader is, for the progress bar and the chapter buttons. */
@@ -157,7 +157,7 @@ fun EpubReaderScreen(
   pageReady: Boolean = true,
   panels: EpubReaderPanels = remember { EpubReaderPanels() },
   search: EpubSearchState = EpubSearchState(),
-  previousPage: Locator? = null
+  previousPages: List<Locator> = emptyList()
 ) {
   val ready = state as? EpubReaderUiState.Ready
   val overlay = settings.overlayColors(isSystemInDarkTheme())
@@ -170,7 +170,7 @@ fun EpubReaderScreen(
       }
       OverlayTheme(overlay) {
         ReaderChrome(
-          ReaderChromeState(ready, reading, chromeVisible, pageReady, previousPage),
+          ReaderChromeState(ready, reading, chromeVisible, pageReady, previousPages),
           panels,
           search,
           actions
@@ -186,7 +186,7 @@ private data class ReaderChromeState(
   val reading: EpubReadingState,
   val chromeVisible: Boolean,
   val pageReady: Boolean,
-  val previousPage: Locator?
+  val previousPages: List<Locator>
 )
 
 @Composable
@@ -201,7 +201,7 @@ private fun BoxScope.ReaderChrome(
   val reading = state.reading
   val chromeVisible = state.chromeVisible
   val pageReady = state.pageReady
-  val previousPage = state.previousPage
+  val previousPages = state.previousPages
   AnimatedVisibility(
     visible = ready == null || chromeVisible || !pageReady || panels.showSearch,
     modifier = Modifier.align(Alignment.TopCenter),
@@ -239,11 +239,32 @@ private fun BoxScope.ReaderChrome(
   ) {
     if (ready != null) BottomBar(ready.book, reading, actions) { panels.showToc = true }
   }
-  val returnPage = previousPage.takeIf {
+  val visiblePreviousPages = previousPages.takeIf {
     ready != null && pageReady && chromeVisible && !search.isOpen
+  }.orEmpty()
+  if (visiblePreviousPages.isNotEmpty()) {
+    PreviousPageChips(visiblePreviousPages, reading.positionCount, actions.onReturnToPreviousPage)
   }
-  returnPage?.let {
-    PreviousPageChip(it, reading.positionCount, chromeVisible, actions.onReturnToPreviousPage)
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun BoxScope.PreviousPageChips(
+  pages: List<Locator>,
+  positionCount: Int,
+  onSelect: (Locator) -> Unit
+) {
+  Column(
+    modifier = Modifier
+      .align(Alignment.BottomEnd)
+      .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility)
+      .padding(end = SIXTEEN_DP, bottom = 88.dp),
+    horizontalAlignment = Alignment.End,
+    verticalArrangement = Arrangement.spacedBy(EIGHT_DP)
+  ) {
+    pages.forEach { page ->
+      PreviousPageChip(page, positionCount) { onSelect(page) }
+    }
   }
 }
 
@@ -267,20 +288,15 @@ private fun ReaderPanels(
 }
 
 @Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun BoxScope.PreviousPageChip(
+private fun PreviousPageChip(
   locator: Locator,
   positionCount: Int,
-  chromeVisible: Boolean,
   onClick: () -> Unit
 ) {
   val page = readingProgress(locator, positionCount).position.takeIf { it > 0 }
     ?: locator.locations.position ?: 1
   Surface(
     modifier = Modifier
-      .align(Alignment.BottomEnd)
-      .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility)
-      .padding(end = SIXTEEN_DP, bottom = if (chromeVisible) 88.dp else SIXTEEN_DP)
       .clickable(onClick = onClick)
       .testTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG),
     color = MaterialTheme.colorScheme.surface,
