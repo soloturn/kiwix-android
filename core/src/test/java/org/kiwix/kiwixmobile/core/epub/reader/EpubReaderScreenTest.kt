@@ -37,6 +37,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -90,7 +91,9 @@ class EpubReaderScreenTest {
     search: EpubSearchState = EpubSearchState(),
     actions: EpubReaderActions = EpubReaderActions(),
     pageReady: Boolean = true,
-    previousPages: List<Locator> = emptyList()
+    previousPages: List<Locator> = emptyList(),
+    panels: EpubReaderPanels = EpubReaderPanels(),
+    annotations: List<EpubAnnotation> = emptyList()
   ) = composeTestRule.setContent {
     EpubReaderScreen(
       state,
@@ -100,7 +103,9 @@ class EpubReaderScreenTest {
       actions,
       pageReady,
       search = search,
-      previousPages = previousPages
+      previousPages = previousPages,
+      panels = panels,
+      annotations = annotations
     )
   }
 
@@ -112,6 +117,23 @@ class EpubReaderScreenTest {
     composeTestRule.onNodeWithTag(EPUB_READER_SEARCH_BUTTON_TESTING_TAG).performClick()
 
     assertTrue(opened)
+  }
+
+  @Test
+  fun `bookmark margin button shows saved state and toggles the current page`() {
+    var toggled = false
+    show(
+      actions = EpubReaderActions(onBookmark = { toggled = true }),
+      annotations = listOf(
+        EpubAnnotation("bookmark", EpubAnnotationKind.BOOKMARK, locator, "")
+      )
+    )
+
+    composeTestRule.onNodeWithContentDescription("Remove bookmark")
+      .assertIsDisplayed()
+      .performClick()
+
+    assertTrue(toggled)
   }
 
   @Test
@@ -267,6 +289,40 @@ class EpubReaderScreenTest {
     composeTestRule.onNodeWithText("Back to page 20").performClick()
     assertEquals(pages[1], selected)
     composeTestRule.onNodeWithText("Back to page 40").assertIsDisplayed()
+  }
+
+  @Test
+  fun `bookmark control saves current place and annotation list can delete an item`() {
+    var bookmarks = 0
+    val annotation = EpubAnnotation(
+      id = "note-id",
+      kind = EpubAnnotationKind.NOTE,
+      locator = locator.copy(text = Locator.Text("before context", "selected text", "after context")),
+      text = "selected text",
+      note = "My note",
+      title = "Chapter One"
+    )
+    val panels = EpubReaderPanels().apply { showAnnotations = true }
+    show(
+      actions = EpubReaderActions(
+        onBookmark = { bookmarks++ }
+      ),
+      panels = panels,
+      annotations = listOf(annotation)
+    )
+
+    composeTestRule.onNodeWithTag(EPUB_READER_BOOKMARK_TESTING_TAG).performClick()
+    composeTestRule.onNodeWithText("Types").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Colors").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Chapters").assertIsDisplayed()
+    assertTrue(composeTestRule.onAllNodesWithText("Chapter One").fetchSemanticsNodes().isNotEmpty())
+    composeTestRule.onNodeWithText("My note").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(EPUB_READER_ANNOTATION_DELETE_TESTING_TAG)
+      .performScrollTo().assertIsDisplayed().assertIsEnabled()
+    composeTestRule.onNodeWithTag(EPUB_READER_ANNOTATION_COPY_TESTING_TAG)
+      .performScrollTo().assertIsDisplayed().assertIsEnabled()
+
+    assertEquals(1, bookmarks)
   }
 
   @Test

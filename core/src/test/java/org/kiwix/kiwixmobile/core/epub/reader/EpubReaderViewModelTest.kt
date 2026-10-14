@@ -68,6 +68,7 @@ class EpubReaderViewModelTest {
   val mainDispatcherRule = MainDispatcherRule(testDispatcher)
 
   private val library: EpubLibraryManager = mockk()
+  private val annotations: EpubAnnotationRepository = mockk()
   private val openUseCase: EpubOpenUseCase = mockk()
   private val store: KiwixDataStore = mockk()
   private val opener =
@@ -85,6 +86,8 @@ class EpubReaderViewModelTest {
     every { store.epubReaderSettingsJson } returns flowOf(settings.toJson())
     coEvery { library.locator(BOOK_ID) } returns savedLocator
     coEvery { library.saveLocator(any(), any()) } just Runs
+    coEvery { annotations.load(any()) } returns emptyList()
+    coEvery { annotations.save(any(), any(), any()) } just Runs
     coEvery { store.setEpubReaderSettingsJson(any()) } just Runs
     coEvery { openUseCase.prepare(any(), any()) } answers {
       EpubOpenResult.Ready((firstArg<EpubSource>() as EpubSource.Path).file, BOOK_ID)
@@ -93,6 +96,7 @@ class EpubReaderViewModelTest {
       SavedStateHandle(path?.let { mapOf(EpubReaderViewModel.EXTRA_PATH to it) } ?: emptyMap()),
       opener,
       library,
+      annotations,
       openUseCase,
       store
     )
@@ -129,6 +133,56 @@ class EpubReaderViewModelTest {
   }
 
   @Test
+  fun `saves bookmarks notes and highlights for the open book`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    val selected = locator("c1.xhtml", 0.4).copy(
+      text = Locator.Text("before", "selected passage", "after")
+    )
+    vm.onLocatorChanged(locator("c1.xhtml", 0.3))
+
+    vm.addBookmark()
+    vm.addNote(selected, "My note")
+    vm.addFavorite(selected)
+    vm.addHighlight(selected, EpubHighlightColor.LIGHT_BLUE)
+    vm.updateAnnotationNote(vm.annotations.value.last().id, "Highlight note")
+    runCurrent()
+
+    assertEquals(
+      listOf(
+        EpubAnnotationKind.BOOKMARK,
+        EpubAnnotationKind.NOTE,
+        EpubAnnotationKind.FAVORITE,
+        EpubAnnotationKind.HIGHLIGHT
+      ),
+      vm.annotations.value.map { it.kind }
+    )
+    assertEquals("selected passage", vm.annotations.value[1].text)
+    assertEquals("My note", vm.annotations.value[1].note)
+    assertEquals("Chapter One", vm.annotations.value.last().title)
+    assertEquals(EpubHighlightColor.LIGHT_BLUE, vm.annotations.value.last().color)
+    assertEquals("Highlight note", vm.annotations.value.last().note)
+    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, match { it.size == 4 }) }
+  }
+
+  @Test
+  fun `bookmark toggle tracks the current location and removes it when tapped again`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    val page = locator("c1.xhtml", 0.4)
+
+    assertFalse(vm.isBookmarked(page))
+    vm.toggleBookmark(page)
+    assertTrue(vm.isBookmarked(page.copyWithLocations(progression = 0.401)))
+    vm.toggleBookmark(page.copyWithLocations(progression = 0.401))
+    runCurrent()
+
+    assertFalse(vm.isBookmarked(page))
+    assertTrue(vm.annotations.value.isEmpty())
+    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, emptyList()) }
+  }
+
+  @Test
   fun `a recreated navigator starts at the latest position, not the opening one`() = runTest {
     val vm = viewModel(book().path, savedLocator = EpubLocatorCodec.encode(locator("c1.xhtml", 0.1)))
     val open = vm.ready()
@@ -151,6 +205,16 @@ class EpubReaderViewModelTest {
     vm.rememberPreviousPage(pages[3])
 
     assertEquals(listOf(pages[1], pages[2], pages[4], pages[3]), vm.previousPages.value)
+  }
+
+  @Test
+  fun `locator changes remember the four most recently left pages`() = runTest {
+    val vm = viewModel(null)
+    val pages = (1..6).map { locator("chapter$it.xhtml", it / 10.0) }
+
+    pages.forEach(vm::onLocatorChanged)
+
+    assertEquals(pages.dropLast(1).takeLast(4), vm.previousPages.value)
   }
 
   @Test
