@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
 import org.kiwix.kiwixmobile.core.epub.EpubOpenUseCase
@@ -83,11 +84,13 @@ sealed interface EpubReaderUiState {
 }
 
 /** Opens the book named by [EXTRA_PATH], restores and records its position, owns the settings. */
+@Suppress("LongParameterList")
 @HiltViewModel
 class EpubReaderViewModel @Inject constructor(
   savedStateHandle: SavedStateHandle,
   private val opener: EpubPublicationOpener,
   private val libraryManager: EpubLibraryManager,
+  private val annotationRepository: EpubAnnotationRepository,
   private val openUseCase: EpubOpenUseCase,
   private val kiwixDataStore: KiwixDataStore
 ) : ViewModel() {
@@ -113,11 +116,15 @@ class EpubReaderViewModel @Inject constructor(
   private val _search = MutableStateFlow(EpubSearchState())
   val search: StateFlow<EpubSearchState> = _search.asStateFlow()
 
+  private val _annotations = MutableStateFlow<List<EpubAnnotation>>(emptyList())
+  val annotations: StateFlow<List<EpubAnnotation>> = _annotations.asStateFlow()
+
   /** Open panels; they survive an activity recreation, which restores no saved state. */
   val panels = EpubReaderPanels()
 
   private var saveJob: Job? = null
   private var searchJob: Job? = null
+  private var annotationSaveJob: Job? = null
 
   init {
     open(savedStateHandle.get<String>(EXTRA_PATH))
@@ -140,6 +147,7 @@ class EpubReaderViewModel @Inject constructor(
           val title = publication.metadata.title?.takeIf { it.isNotBlank() }
             ?: file.nameWithoutExtension
           _currentLocator.value = locator
+          _annotations.value = annotationRepository.load(bookId)
           _state.value = EpubReaderUiState.Ready(
             OpenEpub(
               publication,
@@ -168,6 +176,48 @@ class EpubReaderViewModel @Inject constructor(
     if (locator == null || _previousPages.value.lastOrNull() == locator) return
     _previousPages.value = (_previousPages.value.filterNot { it == locator } + locator)
       .takeLast(MAX_PREVIOUS_PAGES)
+  }
+
+  fun addBookmark() {
+    _currentLocator.value?.let { addAnnotation(EpubAnnotationKind.BOOKMARK, it) }
+  }
+
+  fun addHighlight(locator: Locator) {
+    addAnnotation(EpubAnnotationKind.HIGHLIGHT, locator)
+  }
+
+  fun addNote(locator: Locator, note: String) {
+    if (note.isNotBlank()) addAnnotation(EpubAnnotationKind.NOTE, locator, note.trim())
+  }
+
+  fun deleteAnnotation(id: String) {
+    _annotations.value = _annotations.value.filterNot { it.id == id }
+    persistAnnotations()
+  }
+
+  private fun addAnnotation(kind: EpubAnnotationKind, locator: Locator, note: String? = null) {
+    val text = EpubLocatorCodec.encode(locator).let { json ->
+      runCatching { JSONObject(json).optJSONObject("text")?.optString("highlight").orEmpty() }
+        .getOrDefault("")
+    }
+    _annotations.value = _annotations.value + EpubAnnotation(
+      id = java.util.UUID.randomUUID().toString(),
+      kind = kind,
+      locator = locator,
+      text = text,
+      note = note
+    )
+    persistAnnotations()
+  }
+
+  private fun persistAnnotations() {
+    val book = (_state.value as? EpubReaderUiState.Ready)?.book ?: return
+    annotationSaveJob?.cancel()
+    annotationSaveJob = viewModelScope.launch {
+      withContext(NonCancellable) {
+        annotationRepository.save(book.bookId, book.title, _annotations.value)
+      }
+    }
   }
 
   fun changeSettings(transform: (EpubReaderSettings) -> EpubReaderSettings) {

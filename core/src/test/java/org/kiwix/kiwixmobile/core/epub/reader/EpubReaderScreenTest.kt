@@ -90,7 +90,9 @@ class EpubReaderScreenTest {
     search: EpubSearchState = EpubSearchState(),
     actions: EpubReaderActions = EpubReaderActions(),
     pageReady: Boolean = true,
-    previousPages: List<Locator> = emptyList()
+    previousPages: List<Locator> = emptyList(),
+    panels: EpubReaderPanels = EpubReaderPanels(),
+    annotations: List<EpubAnnotation> = emptyList()
   ) = composeTestRule.setContent {
     EpubReaderScreen(
       state,
@@ -100,7 +102,9 @@ class EpubReaderScreenTest {
       actions,
       pageReady,
       search = search,
-      previousPages = previousPages
+      previousPages = previousPages,
+      panels = panels,
+      annotations = annotations
     )
   }
 
@@ -267,6 +271,35 @@ class EpubReaderScreenTest {
     composeTestRule.onNodeWithText("Back to page 20").performClick()
     assertEquals(pages[1], selected)
     composeTestRule.onNodeWithText("Back to page 40").assertIsDisplayed()
+  }
+
+  @Test
+  fun `bookmark control saves current place and annotation list can delete an item`() {
+    var bookmarks = 0
+    var deleted = 0
+    val annotation = EpubAnnotation(
+      id = "note-id",
+      kind = EpubAnnotationKind.NOTE,
+      locator = locator,
+      text = "selected text",
+      note = "My note"
+    )
+    val panels = EpubReaderPanels().apply { showAnnotations = true }
+    show(
+      actions = EpubReaderActions(
+        onBookmark = { bookmarks++ },
+        onDeleteAnnotation = { deleted++ }
+      ),
+      panels = panels,
+      annotations = listOf(annotation)
+    )
+
+    composeTestRule.onNodeWithTag(EPUB_READER_BOOKMARK_TESTING_TAG).performClick()
+    composeTestRule.onNodeWithText("My note").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Delete").performClick()
+
+    assertEquals(1, bookmarks)
+    assertEquals(1, deleted)
   }
 
   @Test

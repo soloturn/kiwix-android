@@ -107,6 +107,8 @@ const val EPUB_READER_SEARCH_POSITION_TESTING_TAG = "epubReaderSearchPositionTes
 const val EPUB_READER_SEARCH_PANEL_TESTING_TAG = "epubReaderSearchPanelTestingTag"
 const val EPUB_READER_SEARCH_RESULTS_LIST_TESTING_TAG = "epubReaderSearchResultsListTestingTag"
 const val EPUB_READER_PREVIOUS_PAGE_TESTING_TAG = "epubReaderPreviousPageTestingTag"
+const val EPUB_READER_BOOKMARK_TESTING_TAG = "epubReaderBookmarkTestingTag"
+const val EPUB_READER_ANNOTATIONS_TESTING_TAG = "epubReaderAnnotationsTestingTag"
 
 private const val PERCENT = 100
 private const val TRACK_ALPHA = 0.24f
@@ -126,7 +128,11 @@ data class EpubReaderActions(
   val onSearchSuggestion: (String) -> Unit = {},
   val onCloseSearch: () -> Unit = {},
   val onSearchResult: (Locator) -> Unit = {},
-  val onReturnToPreviousPage: (Locator) -> Unit = {}
+  val onReturnToPreviousPage: (Locator) -> Unit = {},
+  val onBookmark: () -> Unit = {},
+  val onShowAnnotations: () -> Unit = {},
+  val onAnnotationSelected: (EpubAnnotation) -> Unit = {},
+  val onDeleteAnnotation: (EpubAnnotation) -> Unit = {}
 )
 
 /** Where the reader is, for the progress bar and the chapter buttons. */
@@ -142,6 +148,7 @@ class EpubReaderPanels {
   var showToc by mutableStateOf(false)
   var showSettings by mutableStateOf(false)
   var showSearch by mutableStateOf(false)
+  var showAnnotations by mutableStateOf(false)
 }
 
 /**
@@ -160,7 +167,8 @@ fun EpubReaderScreen(
   pageReady: Boolean = true,
   panels: EpubReaderPanels = remember { EpubReaderPanels() },
   search: EpubSearchState = EpubSearchState(),
-  previousPages: List<Locator> = emptyList()
+  previousPages: List<Locator> = emptyList(),
+  annotations: List<EpubAnnotation> = emptyList()
 ) {
   val ready = state as? EpubReaderUiState.Ready
   val searchResultsListState = rememberLazyListState()
@@ -182,7 +190,7 @@ fun EpubReaderScreen(
         )
       }
     }
-    ReaderPanels(ready, reading, settings, panels, actions)
+    ReaderPanels(ready, reading, settings, panels, actions, annotations)
   }
 }
 
@@ -281,7 +289,8 @@ private fun ReaderPanels(
   reading: EpubReadingState,
   settings: EpubReaderSettings,
   panels: EpubReaderPanels,
-  actions: EpubReaderActions
+  actions: EpubReaderActions,
+  annotations: List<EpubAnnotation>
 ) {
   if (panels.showToc && ready != null) {
     TocDialog(ready.book.toc, reading.locator, onDismiss = { panels.showToc = false }) {
@@ -291,6 +300,17 @@ private fun ReaderPanels(
   }
   if (panels.showSettings) {
     EpubSettingsSheet(settings, actions.onSettings) { panels.showSettings = false }
+  }
+  if (panels.showAnnotations) {
+    AnnotationsDialog(
+      annotations = annotations,
+      onDismiss = { panels.showAnnotations = false },
+      onItem = {
+        panels.showAnnotations = false
+        actions.onAnnotationSelected(it)
+      },
+      onDelete = actions.onDeleteAnnotation
+    )
   }
 }
 
@@ -645,6 +665,21 @@ private fun BottomBar(
       ChapterRow(chapterTitle(book.toc, reading.locator).orEmpty(), onToc)
       SeekRow(shown, preview, reading, actions, book.rtl)
       PositionLabels(shown, position, reading.positionCount)
+      Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        TextButton(onClick = actions.onBookmark, modifier = Modifier.testTag(EPUB_READER_BOOKMARK_TESTING_TAG)) {
+          Text(stringResource(R.string.epub_add_bookmark))
+        }
+        TextButton(
+          onClick = actions.onShowAnnotations,
+          modifier = Modifier.testTag(EPUB_READER_ANNOTATIONS_TESTING_TAG)
+        ) {
+          Text(stringResource(R.string.epub_annotations))
+        }
+      }
     }
   }
 }
@@ -805,4 +840,55 @@ private fun TocDialog(
     },
     confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.epub_close)) } }
   )
+}
+
+@Composable
+private fun AnnotationsDialog(
+  annotations: List<EpubAnnotation>,
+  onDismiss: () -> Unit,
+  onItem: (EpubAnnotation) -> Unit,
+  onDelete: (EpubAnnotation) -> Unit
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text(stringResource(R.string.epub_annotations)) },
+    text = {
+      if (annotations.isEmpty()) {
+        Text(stringResource(R.string.epub_no_annotations))
+      } else {
+        LazyColumn {
+          items(annotations, key = { it.id }) { annotation ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+              Column(
+                Modifier.weight(1f).clickable { onItem(annotation) }.padding(vertical = EIGHT_DP)
+              ) {
+                Text(
+                  text = stringResource(annotation.kind.labelResource()),
+                  style = MaterialTheme.typography.labelMedium,
+                  color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                  text = annotation.label,
+                  maxLines = 2,
+                  overflow = TextOverflow.Ellipsis,
+                  style = MaterialTheme.typography.bodyLarge
+                )
+              }
+              TextButton(onClick = { onDelete(annotation) }) {
+                Text(stringResource(R.string.epub_delete_annotation))
+              }
+            }
+          }
+        }
+      }
+    },
+    confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.epub_close)) } }
+  )
+}
+
+@androidx.annotation.StringRes
+private fun EpubAnnotationKind.labelResource() = when (this) {
+  EpubAnnotationKind.BOOKMARK -> R.string.epub_bookmark
+  EpubAnnotationKind.NOTE -> R.string.epub_note
+  EpubAnnotationKind.HIGHLIGHT -> R.string.epub_highlight
 }
