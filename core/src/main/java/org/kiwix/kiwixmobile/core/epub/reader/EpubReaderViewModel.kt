@@ -100,8 +100,8 @@ class EpubReaderViewModel @Inject constructor(
   private val _currentLocator = MutableStateFlow<Locator?>(null)
   val currentLocator: StateFlow<Locator?> = _currentLocator.asStateFlow()
 
-  private val _previousPage = MutableStateFlow<Locator?>(null)
-  val previousPage: StateFlow<Locator?> = _previousPage.asStateFlow()
+  private val _previousPages = MutableStateFlow<List<Locator>>(emptyList())
+  val previousPages: StateFlow<List<Locator>> = _previousPages.asStateFlow()
 
   // Hidden while reading; the screen shows its own bars until a book is ready.
   private val _chromeVisible = MutableStateFlow(false)
@@ -165,11 +165,9 @@ class EpubReaderViewModel @Inject constructor(
   }
 
   fun rememberPreviousPage(locator: Locator?) {
-    _previousPage.value = locator
-  }
-
-  fun clearPreviousPage() {
-    _previousPage.value = null
+    if (locator == null || _previousPages.value.lastOrNull() == locator) return
+    _previousPages.value = (_previousPages.value.filterNot { it == locator } + locator)
+      .takeLast(MAX_PREVIOUS_PAGES)
   }
 
   fun changeSettings(transform: (EpubReaderSettings) -> EpubReaderSettings) {
@@ -369,6 +367,7 @@ class EpubReaderViewModel @Inject constructor(
   companion object {
     const val EXTRA_PATH = "epub_path"
     private const val SAVE_DELAY_MS = 500L
+    private const val MAX_PREVIOUS_PAGES = 4
     private const val MAX_SEARCH_RESULTS = 100
     private const val MAX_SEARCH_SUGGESTIONS = 12
     private const val MAX_SUGGESTION_MATCHES = 100

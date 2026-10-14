@@ -141,6 +141,19 @@ class EpubReaderViewModelTest {
   }
 
   @Test
+  fun `previous page history keeps four entries and retains pages when revisiting`() = runTest {
+    val vm = viewModel(null)
+    val pages = (1..5).map { locator("chapter$it.xhtml", it / 10.0) }
+
+    pages.forEach(vm::rememberPreviousPage)
+
+    assertEquals(pages.takeLast(4), vm.previousPages.value)
+    vm.rememberPreviousPage(pages[3])
+
+    assertEquals(listOf(pages[1], pages[2], pages[4], pages[3]), vm.previousPages.value)
+  }
+
+  @Test
   fun `a corrupt stored locator opens at the start`() = runTest {
     val vm = viewModel(book().path, savedLocator = "{garbage")
     assertEquals(null, vm.ready().initialLocator)

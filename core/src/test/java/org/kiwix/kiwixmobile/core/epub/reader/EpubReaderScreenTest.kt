@@ -89,7 +89,7 @@ class EpubReaderScreenTest {
     search: EpubSearchState = EpubSearchState(),
     actions: EpubReaderActions = EpubReaderActions(),
     pageReady: Boolean = true,
-    previousPage: Locator? = null
+    previousPages: List<Locator> = emptyList()
   ) = composeTestRule.setContent {
     EpubReaderScreen(
       state,
@@ -99,7 +99,7 @@ class EpubReaderScreenTest {
       actions,
       pageReady,
       search = search,
-      previousPage = previousPage
+      previousPages = previousPages
     )
   }
 
@@ -183,7 +183,7 @@ class EpubReaderScreenTest {
 
   @Test
   fun `the minimized previous page follows menu visibility`() {
-    var returned = 0
+    var returned: Locator? = null
     val chrome = mutableStateOf(false)
     composeTestRule.setContent {
       EpubReaderScreen(
@@ -191,8 +191,8 @@ class EpubReaderScreenTest {
         EpubReaderSettings(),
         EpubReadingState(locator, 100),
         chrome.value,
-        EpubReaderActions(onReturnToPreviousPage = { returned++ }),
-        previousPage = locator
+        EpubReaderActions(onReturnToPreviousPage = { returned = it }),
+        previousPages = listOf(locator)
       )
     }
 
@@ -204,7 +204,7 @@ class EpubReaderScreenTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("Back to page 26").assertIsDisplayed()
     composeTestRule.onNodeWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG).performClick()
-    assertEquals(1, returned)
+    assertEquals(locator, returned)
 
     chrome.value = false
     composeTestRule.waitForIdle()
@@ -212,6 +212,27 @@ class EpubReaderScreenTest {
       composeTestRule.onAllNodesWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG)
         .fetchSemanticsNodes().isEmpty()
     )
+  }
+
+  @Test
+  fun `all previous page chips remain available for back and forward navigation`() {
+    var selected: Locator? = null
+    val pages = (1..4).map { page ->
+      locator.copyWithLocations(position = page * 10, totalProgression = page / 10.0)
+    }
+    show(
+      actions = EpubReaderActions(onReturnToPreviousPage = { selected = it }),
+      previousPages = pages
+    )
+
+    assertEquals(
+      4,
+      composeTestRule.onAllNodesWithTag(EPUB_READER_PREVIOUS_PAGE_TESTING_TAG)
+        .fetchSemanticsNodes().size
+    )
+    composeTestRule.onNodeWithText("Back to page 20").performClick()
+    assertEquals(pages[1], selected)
+    composeTestRule.onNodeWithText("Back to page 40").assertIsDisplayed()
   }
 
   @Test
