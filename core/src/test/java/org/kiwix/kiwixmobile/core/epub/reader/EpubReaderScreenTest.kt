@@ -42,6 +42,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
@@ -142,6 +143,39 @@ class EpubReaderScreenTest {
     composeTestRule.onNodeWithText("Some text around kiwi.").performClick()
 
     assertEquals(locator, selected)
+  }
+
+  @Test
+  fun `reopening search restores the previous result scroll position`() {
+    val search = mutableStateOf(
+      EpubSearchState(
+        isOpen = true,
+        query = "kiwi",
+        results = (0..40).map { index ->
+          EpubSearchResult(locator, "Search result $index")
+        }
+      )
+    )
+    composeTestRule.setContent {
+      EpubReaderScreen(
+        ready,
+        EpubReaderSettings(),
+        EpubReadingState(locator, 100),
+        chromeVisible = true,
+        actions = EpubReaderActions(
+          onOpenSearch = { search.value = search.value.copy(isOpen = true) },
+          onCloseSearch = { search.value = search.value.copy(isOpen = false) }
+        ),
+        search = search.value
+      )
+    }
+
+    composeTestRule.onNodeWithTag(EPUB_READER_SEARCH_RESULTS_LIST_TESTING_TAG)
+      .performScrollToIndex(25)
+    composeTestRule.onNodeWithTag("epubReaderCloseSearchTestingTag").performClick()
+    composeTestRule.onNodeWithTag(EPUB_READER_SEARCH_BUTTON_TESTING_TAG).performClick()
+
+    composeTestRule.onNodeWithText("Search result 25").assertIsDisplayed()
   }
 
   @Test
