@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -103,6 +102,7 @@ const val EPUB_READER_SEARCH_RESULT_TESTING_TAG = "epubReaderSearchResultTesting
 const val EPUB_READER_SEARCH_SUGGESTION_TESTING_TAG = "epubReaderSearchSuggestionTestingTag"
 const val EPUB_READER_SEARCH_CHAPTER_TESTING_TAG = "epubReaderSearchChapterTestingTag"
 const val EPUB_READER_SEARCH_POSITION_TESTING_TAG = "epubReaderSearchPositionTestingTag"
+const val EPUB_READER_SEARCH_PANEL_TESTING_TAG = "epubReaderSearchPanelTestingTag"
 const val EPUB_READER_PREVIOUS_PAGE_TESTING_TAG = "epubReaderPreviousPageTestingTag"
 
 private const val PERCENT = 100
@@ -208,7 +208,7 @@ private fun BoxScope.ReaderChrome(
     enter = fadeIn(),
     exit = fadeOut()
   ) {
-    Column(Modifier.fillMaxWidth()) {
+    Column(if (search.isOpen) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
       TopBar(
         title = ready?.book?.title.orEmpty(),
         showSettings = ready != null,
@@ -225,7 +225,8 @@ private fun BoxScope.ReaderChrome(
           ready.book.toc,
           reading.positionCount,
           actions.onSearchSuggestion,
-          actions.onSearchResult
+          actions.onSearchResult,
+          Modifier.weight(1f)
         )
       }
     }
@@ -406,13 +407,13 @@ private fun SearchResults(
   toc: List<EpubTocItem>,
   positionCount: Int,
   onSuggestion: (String) -> Unit,
-  onSelect: (Locator) -> Unit
+  onSelect: (Locator) -> Unit,
+  modifier: Modifier
 ) {
   Surface(
-    modifier = Modifier
+    modifier = modifier
       .fillMaxWidth()
-      .padding(horizontal = EIGHT_DP)
-      .heightIn(max = 360.dp),
+      .testTag(EPUB_READER_SEARCH_PANEL_TESTING_TAG),
     color = MaterialTheme.colorScheme.surface,
     shadowElevation = EIGHT_DP
   ) {
