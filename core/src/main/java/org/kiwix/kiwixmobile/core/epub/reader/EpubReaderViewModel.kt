@@ -179,7 +179,23 @@ class EpubReaderViewModel @Inject constructor(
   }
 
   fun addBookmark() {
-    _currentLocator.value?.let { addAnnotation(EpubAnnotationKind.BOOKMARK, it) }
+    _currentLocator.value?.let(::toggleBookmark)
+  }
+
+  fun toggleBookmark(locator: Locator) {
+    val existing = _annotations.value.filter {
+      it.kind == EpubAnnotationKind.BOOKMARK && it.locator.sameBookmarkPosition(locator)
+    }
+    if (existing.isNotEmpty()) {
+      _annotations.value = _annotations.value.filterNot { it in existing }
+      persistAnnotations()
+    } else {
+      addAnnotation(EpubAnnotationKind.BOOKMARK, locator)
+    }
+  }
+
+  fun isBookmarked(locator: Locator): Boolean = _annotations.value.any {
+    it.kind == EpubAnnotationKind.BOOKMARK && it.locator.sameBookmarkPosition(locator)
   }
 
   fun addHighlight(locator: Locator) {
