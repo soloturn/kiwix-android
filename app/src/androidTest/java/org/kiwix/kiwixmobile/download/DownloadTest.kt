@@ -264,12 +264,12 @@ class DownloadTest : BaseActivityTest() {
 
       // Restart the application
       val context = ApplicationProvider.getApplicationContext<Context>()
-      val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-      intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-      context.startActivity(intent)
-      InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+      val intent =
+        requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
+          .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+      activityScenario.close()
 
-      activityScenario = ActivityScenario.launch(KiwixMainActivity::class.java).apply {
+      activityScenario = ActivityScenario.launch<KiwixMainActivity>(intent).apply {
         moveToState(Lifecycle.State.RESUMED)
         onActivity {
           kiwixMainActivity = it
@@ -333,12 +333,12 @@ class DownloadTest : BaseActivityTest() {
       )
       // relaunch the application.
       val context = ApplicationProvider.getApplicationContext<Context>()
-      val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-      intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-      context.startActivity(intent)
-      InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+      val intent =
+        requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
+          .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+      activityScenario.close()
 
-      activityScenario = ActivityScenario.launch(KiwixMainActivity::class.java).apply {
+      activityScenario = ActivityScenario.launch<KiwixMainActivity>(intent).apply {
         moveToState(Lifecycle.State.RESUMED)
         onActivity {
           kiwixMainActivity = it

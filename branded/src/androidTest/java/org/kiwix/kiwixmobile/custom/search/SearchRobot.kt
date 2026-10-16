@@ -123,6 +123,13 @@ class SearchRobot {
     composeTestRule.waitUntilTimeout()
     searchWithFrequentlyTypedWords(searchString, composeTestRule = composeTestRule)
     clickOnSearchItemInSearchList(composeTestRule)
+    waitForArticleToLoad()
+  }
+
+  private fun waitForArticleToLoad() {
+    testFlakyView({
+      onWebView().withElement(findElement(Locator.TAG_NAME, "body"))
+    })
   }
 
   private fun clickOnSearchItemInSearchList(composeTestRule: ComposeContentTestRule) {
