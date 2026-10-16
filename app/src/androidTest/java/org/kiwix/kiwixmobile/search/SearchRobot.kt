@@ -173,13 +173,6 @@ class SearchRobot : BaseRobot() {
     searchWithFrequentlyTypedWords(searchString, composeTestRule = composeTestRule)
     clickOnSearchItemInSearchList(composeTestRule)
     checkZimFileSearchSuccessful(composeTestRule)
-    waitForArticleToLoad()
-  }
-
-  private fun waitForArticleToLoad() {
-    testFlakyView({
-      onWebView().withElement(findElement(Locator.TAG_NAME, "body"))
-    })
   }
 
   fun assertArticleLoaded() {
