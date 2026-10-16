@@ -19,12 +19,16 @@
 package org.kiwix.kiwixmobile.core.epub.reader
 
 import android.app.ActivityManager
+import android.app.SearchManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.ActionMode
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.WindowManager
@@ -51,6 +55,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BaseActivity
 import org.kiwix.kiwixmobile.core.utils.ExternalLinkOpener
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
@@ -62,6 +67,7 @@ import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.preferences.ReadingProgression
 import org.readium.r2.shared.ExperimentalReadiumApi
+import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.util.AbsoluteUrl
 import java.io.File
 import javax.inject.Inject
@@ -80,6 +86,7 @@ class EpubReaderActivity : BaseActivity() {
   private val viewModel: EpubReaderViewModel by viewModels()
   private val darkTheme = MutableStateFlow(false)
   private val pageReady = MutableStateFlow(false)
+  private val selectionMenuLocator = MutableStateFlow<Locator?>(null)
   private var navigator: EpubNavigatorFragment? = null
   private lateinit var root: FrameLayout
   private lateinit var navigatorContainer: FragmentContainerView
@@ -152,6 +159,7 @@ class EpubReaderActivity : BaseActivity() {
     val positions by viewModel.positions.collectAsState()
     val search by viewModel.search.collectAsState()
     val annotations by viewModel.annotations.collectAsState()
+    val selectionLocator by selectionMenuLocator.collectAsState()
     val bookShown by pageReady.collectAsState()
     val readingOrder = (state as? EpubReaderUiState.Ready)?.book?.publication?.readingOrder.orEmpty()
     DialogHost(alertDialogShower)
@@ -167,41 +175,52 @@ class EpubReaderActivity : BaseActivity() {
       search = search,
       previousPages = previousPages,
       annotations = annotations,
+      selectionLocator = selectionLocator,
       chromeVisible = chromeVisible,
       pageReady = bookShown,
       panels = viewModel.panels,
-      actions = EpubReaderActions(
-        onBack = { onBackPressedDispatcher.onBackPressed() },
-        onTocItem = { navigator?.go(it.link) },
-        onPreviousChapter = { goToAdjacentChapter(next = false) },
-        onNextChapter = { goToAdjacentChapter(next = true) },
-        onSeek = { fraction -> seekTarget(positions, fraction)?.let { navigator?.go(it) } },
-        onSettings = viewModel::changeSettings,
-        onOpenSearch = {
-          viewModel.openSearch()
-          viewModel.setChromeVisible(true)
-        },
-        onSearchQueryChange = viewModel::updateSearchQuery,
-        onSearch = viewModel::searchBook,
-        onSearchSuggestion = viewModel::selectSearchSuggestion,
-        onCloseSearch = viewModel::closeSearch,
-        onSearchResult = { result ->
-          viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
-          navigator?.go(result)
-          viewModel.closeSearch()
-          viewModel.setChromeVisible(false)
-        },
-        onReturnToPreviousPage = { target ->
-          viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
-          navigator?.go(target)
-        },
-        onBookmark = viewModel::addBookmark,
-        onShowAnnotations = { viewModel.panels.showAnnotations = true },
-        onAnnotationSelected = { navigator?.go(it.locator) },
-        onDeleteAnnotation = { viewModel.deleteAnnotation(it.id) }
-      )
+      actions = readerActions(positions, locator)
     )
   }
+
+  private fun readerActions(positions: List<Locator>, locator: Locator?) = EpubReaderActions(
+    onBack = { onBackPressedDispatcher.onBackPressed() },
+    onTocItem = { navigator?.go(it.link) },
+    onPreviousChapter = { goToAdjacentChapter(next = false) },
+    onNextChapter = { goToAdjacentChapter(next = true) },
+    onSeek = { fraction -> seekTarget(positions, fraction)?.let { navigator?.go(it) } },
+    onSettings = viewModel::changeSettings,
+    onOpenSearch = {
+      viewModel.openSearch()
+      viewModel.setChromeVisible(true)
+    },
+    onSearchQueryChange = viewModel::updateSearchQuery,
+    onSearch = viewModel::searchBook,
+    onSearchSuggestion = viewModel::selectSearchSuggestion,
+    onCloseSearch = viewModel::closeSearch,
+    onSearchResult = { result ->
+      viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
+      navigator?.go(result)
+      viewModel.closeSearch()
+      viewModel.setChromeVisible(false)
+    },
+    onReturnToPreviousPage = { target ->
+      viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
+      navigator?.go(target)
+    },
+    onBookmark = viewModel::addBookmark,
+    onShowAnnotations = { viewModel.panels.showAnnotations = true },
+    onAnnotationSelected = { navigator?.go(it.locator) },
+    onDeleteAnnotation = { viewModel.deleteAnnotation(it.id) },
+    onDismissSelectionMenu = ::dismissSelectionMenu,
+    onCopySelection = ::copySelection,
+    onShareSelection = ::shareSelection,
+    onSearchSelection = ::searchSelection,
+    onSelectAll = ::selectAll,
+    onBookmarkSelection = { viewModel.toggleBookmark(it) },
+    onHighlightSelection = viewModel::addHighlight,
+    onNoteSelection = viewModel::addNote
+  )
 
   private fun attachNavigator(book: OpenEpub) {
     val factory = EpubNavigatorFactory(book.publication).createFragmentFactory(
@@ -214,7 +233,8 @@ class EpubReaderActivity : BaseActivity() {
       // The container's padding already keeps the book clear of the cutout.
       configuration = EpubNavigatorFragment.Configuration(
         shouldApplyInsetsPadding = false,
-        decorationTemplates = epubBookmarkDecorationTemplates()
+        decorationTemplates = epubBookmarkDecorationTemplates(),
+        selectionActionModeCallback = selectionActionModeCallback
       )
     )
     supportFragmentManager.fragmentFactory = factory
@@ -224,6 +244,14 @@ class EpubReaderActivity : BaseActivity() {
     val fragment = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as? EpubNavigatorFragment
       ?: return
     navigator = fragment
+    attachBookmarkMarkers(fragment)
+    observeBookmarkMarkers(fragment)
+    observeHighlightAnnotations(fragment)
+    // The loading screen covers the book; a failed load must not leave it there.
+    observePageLoading(fragment)
+  }
+
+  private fun attachBookmarkMarkers(fragment: EpubNavigatorFragment) {
     val bookmarkListener = object : DecorableNavigator.Listener {
       override fun onDecorationActivated(event: DecorableNavigator.OnActivatedEvent): Boolean {
         if (event.decoration.style is EpubBookmarkMarkerStyle) {
@@ -234,6 +262,9 @@ class EpubReaderActivity : BaseActivity() {
       }
     }
     fragment.addDecorationListener(BOOKMARK_DECORATION_GROUP, bookmarkListener)
+  }
+
+  private fun observeBookmarkMarkers(fragment: EpubNavigatorFragment) {
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
         combine(fragment.currentLocator, viewModel.annotations) { locator, annotations ->
@@ -246,7 +277,30 @@ class EpubReaderActivity : BaseActivity() {
         }
       }
     }
-    // The loading screen covers the book; a failed load must not leave it there.
+  }
+
+  private fun observeHighlightAnnotations(fragment: EpubNavigatorFragment) {
+    lifecycleScope.launch {
+      repeatOnLifecycle(Lifecycle.State.STARTED) {
+        viewModel.annotations.collectLatest { annotations ->
+          val highlights = annotations
+            .filter { it.kind == EpubAnnotationKind.HIGHLIGHT }
+            .map { annotation ->
+              org.readium.r2.navigator.Decoration(
+                id = annotation.id,
+                locator = annotation.locator,
+                style = org.readium.r2.navigator.Decoration.Style.Highlight(
+                  tint = 0x66FFCA28
+                )
+              )
+            }
+          fragment.applyDecorations(highlights, ANNOTATION_DECORATION_GROUP)
+        }
+      }
+    }
+  }
+
+  private fun observePageLoading(fragment: EpubNavigatorFragment) {
     lifecycleScope.launch {
       delay(REVEAL_TIMEOUT_MS)
       revealBook()
@@ -275,6 +329,61 @@ class EpubReaderActivity : BaseActivity() {
 
   private fun revealBook() {
     pageReady.value = true
+  }
+
+  private val selectionActionModeCallback = object : ActionMode.Callback {
+    override fun onCreateActionMode(mode: ActionMode, menu: android.view.Menu): Boolean {
+      menu.clear()
+      lifecycleScope.launch {
+        val selection = navigator?.currentSelection()
+        if (selection != null) selectionMenuLocator.value = selection.locator
+        mode.finish()
+      }
+      return true
+    }
+
+    override fun onPrepareActionMode(mode: ActionMode, menu: android.view.Menu) = false
+
+    override fun onActionItemClicked(mode: ActionMode, item: android.view.MenuItem) = false
+
+    override fun onDestroyActionMode(mode: ActionMode) = Unit
+  }
+
+  private fun dismissSelectionMenu() {
+    selectionMenuLocator.value = null
+    navigator?.clearSelection()
+  }
+
+  private fun copySelection(text: String) {
+    if (text.isNotBlank()) {
+      val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+      clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.epub_selected_text), text))
+    }
+    dismissSelectionMenu()
+  }
+
+  private fun shareSelection(text: String) {
+    dismissSelectionMenu()
+    if (text.isBlank()) return
+    startActivity(
+      Intent.createChooser(
+        Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
+        getString(R.string.share)
+      )
+    )
+  }
+
+  private fun searchSelection(text: String) {
+    dismissSelectionMenu()
+    if (text.isBlank()) return
+    startActivity(Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, text))
+  }
+
+  private fun selectAll() {
+    dismissSelectionMenu()
+    lifecycleScope.launch {
+      navigator?.evaluateJavascript("window.getSelection()?.selectAllChildren(document.body)")
+    }
   }
 
   /** Links never reach here; Readium follows them itself. Scrolling books have no edge zones. */
@@ -337,6 +446,7 @@ class EpubReaderActivity : BaseActivity() {
     // Constant top and bottom margin around the page, so the overlay toggling never reflows it.
     private const val READING_MARGIN_DP = 32
     private const val BOOKMARK_DECORATION_GROUP = "kiwix-bookmark-toggle"
+    private const val ANNOTATION_DECORATION_GROUP = "kiwix-annotations"
 
     /**
      * The main activity is singleInstance, so the reader can't share its task. Each book is its

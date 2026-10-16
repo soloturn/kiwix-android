@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -72,6 +73,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
@@ -132,7 +134,15 @@ data class EpubReaderActions(
   val onBookmark: () -> Unit = {},
   val onShowAnnotations: () -> Unit = {},
   val onAnnotationSelected: (EpubAnnotation) -> Unit = {},
-  val onDeleteAnnotation: (EpubAnnotation) -> Unit = {}
+  val onDeleteAnnotation: (EpubAnnotation) -> Unit = {},
+  val onDismissSelectionMenu: () -> Unit = {},
+  val onCopySelection: (String) -> Unit = {},
+  val onShareSelection: (String) -> Unit = {},
+  val onSearchSelection: (String) -> Unit = {},
+  val onSelectAll: () -> Unit = {},
+  val onBookmarkSelection: (Locator) -> Unit = {},
+  val onHighlightSelection: (Locator) -> Unit = {},
+  val onNoteSelection: (Locator, String) -> Unit = { _, _ -> }
 )
 
 /** Where the reader is, for the progress bar and the chapter buttons. */
@@ -168,7 +178,8 @@ fun EpubReaderScreen(
   panels: EpubReaderPanels = remember { EpubReaderPanels() },
   search: EpubSearchState = EpubSearchState(),
   previousPages: List<Locator> = emptyList(),
-  annotations: List<EpubAnnotation> = emptyList()
+  annotations: List<EpubAnnotation> = emptyList(),
+  selectionLocator: Locator? = null
 ) {
   val ready = state as? EpubReaderUiState.Ready
   val searchResultsListState = rememberLazyListState()
@@ -191,6 +202,156 @@ fun EpubReaderScreen(
       }
     }
     ReaderPanels(ready, reading, settings, panels, actions, annotations)
+    selectionLocator?.let { SelectionActionsDialog(it, actions) }
+  }
+}
+
+@Composable
+private fun SelectionActionsDialog(locator: Locator, actions: EpubReaderActions) {
+  var editingNote by remember(locator) { mutableStateOf(false) }
+  var noteText by remember(locator) { mutableStateOf("") }
+  AlertDialog(
+    onDismissRequest = actions.onDismissSelectionMenu,
+    title = {
+      Text(
+        stringResource(if (editingNote) R.string.epub_add_note else R.string.epub_selection_actions)
+      )
+    },
+    text = {
+      if (editingNote) {
+        SelectionNoteEditor(noteText, onNoteChange = { noteText = it })
+      } else {
+        SelectionActionGrid(locator, actions, onAddNote = { editingNote = true })
+      }
+    },
+    confirmButton = {
+      if (editingNote) {
+        TextButton(
+          onClick = {
+            if (noteText.isNotBlank()) actions.onNoteSelection(locator, noteText)
+            actions.onDismissSelectionMenu()
+          }
+        ) {
+          Text(stringResource(R.string.save))
+        }
+      }
+    },
+    dismissButton = {
+      if (editingNote) {
+        TextButton(onClick = { editingNote = false }) {
+          Text(stringResource(android.R.string.cancel))
+        }
+      }
+    }
+  )
+}
+
+@Composable
+private fun SelectionNoteEditor(noteText: String, onNoteChange: (String) -> Unit) {
+  androidx.compose.material3.OutlinedTextField(
+    value = noteText,
+    onValueChange = onNoteChange,
+    label = { Text(stringResource(R.string.epub_note_hint)) },
+    modifier = Modifier.fillMaxWidth()
+  )
+}
+
+@Composable
+private fun SelectionActionGrid(
+  locator: Locator,
+  actions: EpubReaderActions,
+  onAddNote: () -> Unit
+) {
+  val selectedText = locator.text.highlight.orEmpty()
+  Column {
+    if (selectedText.isNotBlank()) {
+      Text(
+        text = selectedText,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(bottom = EIGHT_DP)
+      )
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(EIGHT_DP)) {
+      SelectionActionRow(
+        SelectionMenuItem(stringResource(android.R.string.copy), R.drawable.ic_file_copy) {
+          actions.onCopySelection(selectedText)
+        },
+        SelectionMenuItem(stringResource(R.string.share), R.drawable.baseline_share_24) {
+          actions.onShareSelection(selectedText)
+        }
+      )
+      SelectionActionRow(
+        SelectionMenuItem(stringResource(R.string.epub_search_web), R.drawable.action_search) {
+          actions.onSearchSelection(selectedText)
+        },
+        SelectionMenuItem(stringResource(R.string.epub_select_all), R.drawable.ic_select_all_24) {
+          actions.onSelectAll()
+        }
+      )
+      SelectionActionRow(
+        SelectionMenuItem(stringResource(R.string.epub_add_bookmark), R.drawable.ic_bookmark_24dp) {
+          actions.onBookmarkSelection(locator)
+          actions.onDismissSelectionMenu()
+        },
+        SelectionMenuItem(stringResource(R.string.epub_highlight), R.drawable.ic_highlight_24) {
+          actions.onHighlightSelection(locator)
+          actions.onDismissSelectionMenu()
+        }
+      )
+      SelectionActionRow(
+        SelectionMenuItem(stringResource(R.string.epub_add_note), R.drawable.ic_add_note, onAddNote),
+        SelectionMenuItem(
+          stringResource(android.R.string.cancel),
+          android.R.drawable.ic_menu_close_clear_cancel,
+          actions.onDismissSelectionMenu
+        )
+      )
+    }
+  }
+}
+
+private data class SelectionMenuItem(
+  val label: String,
+  val icon: Int,
+  val onClick: () -> Unit
+)
+
+@Composable
+private fun SelectionActionRow(first: SelectionMenuItem, second: SelectionMenuItem) {
+  Row(horizontalArrangement = Arrangement.spacedBy(EIGHT_DP)) {
+    listOf(first, second).forEach { item ->
+      SelectionActionTile(item.label, item.icon, Modifier.weight(1f), item.onClick)
+    }
+  }
+}
+
+@Composable
+private fun SelectionActionTile(
+  label: String,
+  icon: Int,
+  modifier: Modifier = Modifier,
+  onClick: () -> Unit
+) {
+  Surface(
+    modifier = modifier.height(72.dp).clickable(onClick = onClick),
+    shape = MaterialTheme.shapes.large,
+    color = MaterialTheme.colorScheme.surfaceVariant
+  ) {
+    Row(
+      Modifier.fillMaxSize().padding(horizontal = SIXTEEN_DP),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(EIGHT_DP)
+    ) {
+      Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+      Text(
+        text = label,
+        textAlign = TextAlign.Start,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        style = MaterialTheme.typography.labelLarge
+      )
+    }
   }
 }
 

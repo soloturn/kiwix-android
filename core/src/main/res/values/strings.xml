@@ -283,6 +283,10 @@
   <string name="epub_delete_annotation">Delete</string>
   <string name="epub_add_note">Add note</string>
   <string name="epub_note_hint">Write a note</string>
+  <string name="epub_selection_actions">Selected text</string>
+  <string name="epub_search_web">Search web</string>
+  <string name="epub_select_all">Select all</string>
+  <string name="epub_selected_text">Selected text</string>
   <string name="select_language" tools:keep="@string/select_language">Select language</string>
   <string name="save_languages" tools:keep="@string/save_languages">Save languages</string>
   <string name="all_languages" tools:keep="@string/all_languages">All languages</string>
