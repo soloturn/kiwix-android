@@ -156,6 +156,23 @@ class EpubReaderViewModelTest {
   }
 
   @Test
+  fun `bookmark toggle tracks the current location and removes it when tapped again`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    val page = locator("c1.xhtml", 0.4)
+
+    assertFalse(vm.isBookmarked(page))
+    vm.toggleBookmark(page)
+    assertTrue(vm.isBookmarked(page.copyWithLocations(progression = 0.401)))
+    vm.toggleBookmark(page.copyWithLocations(progression = 0.401))
+    runCurrent()
+
+    assertFalse(vm.isBookmarked(page))
+    assertTrue(vm.annotations.value.isEmpty())
+    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, emptyList()) }
+  }
+
+  @Test
   fun `a recreated navigator starts at the latest position, not the opening one`() = runTest {
     val vm = viewModel(book().path, savedLocator = EpubLocatorCodec.encode(locator("c1.xhtml", 0.1)))
     val open = vm.ready()
