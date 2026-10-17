@@ -143,16 +143,26 @@ class EpubReaderViewModelTest {
 
     vm.addBookmark()
     vm.addNote(selected, "My note")
-    vm.addHighlight(selected)
+    vm.addFavorite(selected)
+    vm.addHighlight(selected, EpubHighlightColor.LIGHT_BLUE)
+    vm.updateAnnotationNote(vm.annotations.value.last().id, "Highlight note")
     runCurrent()
 
     assertEquals(
-      listOf(EpubAnnotationKind.BOOKMARK, EpubAnnotationKind.NOTE, EpubAnnotationKind.HIGHLIGHT),
+      listOf(
+        EpubAnnotationKind.BOOKMARK,
+        EpubAnnotationKind.NOTE,
+        EpubAnnotationKind.FAVORITE,
+        EpubAnnotationKind.HIGHLIGHT
+      ),
       vm.annotations.value.map { it.kind }
     )
     assertEquals("selected passage", vm.annotations.value[1].text)
     assertEquals("My note", vm.annotations.value[1].note)
-    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, match { it.size == 3 }) }
+    assertEquals("Chapter One", vm.annotations.value.last().title)
+    assertEquals(EpubHighlightColor.LIGHT_BLUE, vm.annotations.value.last().color)
+    assertEquals("Highlight note", vm.annotations.value.last().note)
+    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, match { it.size == 4 }) }
   }
 
   @Test
@@ -195,6 +205,16 @@ class EpubReaderViewModelTest {
     vm.rememberPreviousPage(pages[3])
 
     assertEquals(listOf(pages[1], pages[2], pages[4], pages[3]), vm.previousPages.value)
+  }
+
+  @Test
+  fun `locator changes remember the four most recently left pages`() = runTest {
+    val vm = viewModel(null)
+    val pages = (1..6).map { locator("chapter$it.xhtml", it / 10.0) }
+
+    pages.forEach(vm::onLocatorChanged)
+
+    assertEquals(pages.dropLast(1).takeLast(4), vm.previousPages.value)
   }
 
   @Test
