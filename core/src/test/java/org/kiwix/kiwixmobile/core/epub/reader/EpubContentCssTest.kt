@@ -83,7 +83,9 @@ class EpubContentCssTest {
     val utf16le = "<html><head></head></html>".toByteArray(Charsets.UTF_16LE)
     assertArrayEquals(utf16le, EpubContentCss.transform(utf16le))
 
-    val invalid = "<html><head></head><body>".toByteArray() + byteArrayOf(0xE9.toByte()) + "</body></html>".toByteArray()
+    val invalid = "<html><head></head><body>".toByteArray() +
+      byteArrayOf(0xE9.toByte()) +
+      "</body></html>".toByteArray()
     val expected = "<html><head>${EpubContentCss.CONNECT_POLICY}</head><body>".toByteArray() +
       byteArrayOf(0xE9.toByte()) + "</body></html>".toByteArray()
     assertArrayEquals(expected, EpubContentCss.transform(invalid))

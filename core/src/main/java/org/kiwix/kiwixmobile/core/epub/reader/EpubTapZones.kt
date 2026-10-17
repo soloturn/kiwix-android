@@ -53,3 +53,20 @@ object EpubTapZones {
   fun dismissesOverlay(action: TapAction, overlayVisible: Boolean) =
     overlayVisible && action != TapAction.SHOW_OVERLAY
 }
+
+/** Recognizes a second tap within the platform's double-tap interval. */
+internal class DoubleTapDetector(private val timeoutMillis: Long) {
+  private var previousTapAt: Long? = null
+
+  fun registerTap(nowMillis: Long): Boolean {
+    val previous = previousTapAt
+    previousTapAt = null
+    if (previous != null && nowMillis - previous in 0..timeoutMillis) return true
+    previousTapAt = nowMillis
+    return false
+  }
+
+  fun reset() {
+    previousTapAt = null
+  }
+}

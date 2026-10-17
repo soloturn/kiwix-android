@@ -268,6 +268,11 @@
   <string name="epub_layout">Layout</string>
   <string name="epub_paginated">Paginated</string>
   <string name="epub_scroll">Scroll</string>
+  <string name="epub_single_page">Single page</string>
+  <string name="epub_page_carousel">Page carousel</string>
+  <string name="epub_page_overview">Page overview</string>
+  <string name="epub_page_number">Page %1$d</string>
+  <string name="epub_rendering_pages">Preparing page previews…</string>
   <string name="epub_book_formatting">Use the book\'s formatting</string>
   <string name="epub_line_spacing">Line spacing</string>
   <string name="epub_alignment">Alignment</string>
@@ -277,9 +282,8 @@
   <string name="epub_add_bookmark">Bookmark</string>
   <string name="epub_remove_bookmark">Remove bookmark</string>
   <string name="epub_annotations">Annotations</string>
-  <string name="epub_no_annotations">No favorites, bookmarks, notes or highlights yet.</string>
+  <string name="epub_no_annotations">No bookmarks, notes or highlights yet.</string>
   <string name="epub_bookmark">Bookmark</string>
-  <string name="epub_favorite">Favorite</string>
   <string name="epub_note">Note</string>
   <string name="epub_highlight">Highlight</string>
   <string name="epub_delete_annotation">Delete</string>

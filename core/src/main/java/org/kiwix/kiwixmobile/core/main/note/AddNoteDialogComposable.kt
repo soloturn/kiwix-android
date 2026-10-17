@@ -76,7 +76,8 @@ data class AddNoteDialogConfig(
   val articleTitle: String? = null,
   val zimFileUrl: String = "",
   val currentWebViewUrl: String? = null,
-  val currentWebViewTitle: String? = null
+  val currentWebViewTitle: String? = null,
+  val initialNoteText: String = ""
 )
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -118,7 +119,7 @@ fun AddNoteDialogComposable(
     // Display existing note
     addNoteViewModel.apply {
       initialize(config)
-      setInitialNoteText()
+      setInitialNoteText(config.initialNoteText)
     }
   }
 
