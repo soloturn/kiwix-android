@@ -198,8 +198,15 @@ class EpubReaderViewModel @Inject constructor(
     it.kind == EpubAnnotationKind.BOOKMARK && it.locator.sameBookmarkPosition(locator)
   }
 
-  fun addHighlight(locator: Locator) {
-    addAnnotation(EpubAnnotationKind.HIGHLIGHT, locator)
+  fun addFavorite(locator: Locator) {
+    addAnnotation(EpubAnnotationKind.FAVORITE, locator)
+  }
+
+  fun addHighlight(
+    locator: Locator,
+    color: EpubHighlightColor = EpubHighlightColor.LIGHT_YELLOW
+  ) {
+    addAnnotation(EpubAnnotationKind.HIGHLIGHT, locator, color = color)
   }
 
   fun addNote(locator: Locator, note: String) {
@@ -211,7 +218,19 @@ class EpubReaderViewModel @Inject constructor(
     persistAnnotations()
   }
 
-  private fun addAnnotation(kind: EpubAnnotationKind, locator: Locator, note: String? = null) {
+  fun updateAnnotationNote(id: String, note: String) {
+    _annotations.value = _annotations.value.map {
+      if (it.id == id) it.copy(note = note.trim().ifBlank { null }) else it
+    }
+    persistAnnotations()
+  }
+
+  private fun addAnnotation(
+    kind: EpubAnnotationKind,
+    locator: Locator,
+    note: String? = null,
+    color: EpubHighlightColor? = null
+  ) {
     val text = EpubLocatorCodec.encode(locator).let { json ->
       runCatching { JSONObject(json).optJSONObject("text")?.optString("highlight").orEmpty() }
         .getOrDefault("")
@@ -221,9 +240,30 @@ class EpubReaderViewModel @Inject constructor(
       kind = kind,
       locator = locator,
       text = text,
-      note = note
+      note = note,
+      title = chapterTitle(locator),
+      color = color
     )
     persistAnnotations()
+  }
+
+  private fun chapterTitle(locator: Locator): String {
+    val book = (_state.value as? EpubReaderUiState.Ready)?.book ?: return ""
+    val locatorHref = locator.href.toString().substringBefore('#')
+    val tocTitle = book.toc.firstOrNull { sameHref(it.link.href.toString(), locatorHref) }?.title
+    val readingOrderTitle = book.publication.readingOrder.firstOrNull {
+      sameHref(it.href.toString(), locatorHref)
+    }?.title
+    return tocTitle?.takeIf(String::isNotBlank)
+      ?: readingOrderTitle?.takeIf(String::isNotBlank)
+      ?: locatorHref.substringAfterLast('/').substringBeforeLast('.')
+  }
+
+  private fun sameHref(candidate: String, target: String): Boolean {
+    val candidatePath = candidate.substringBefore('#')
+    return candidatePath == target ||
+      candidatePath.endsWith("/$target") ||
+      target.endsWith("/$candidatePath")
   }
 
   private fun persistAnnotations() {
@@ -403,6 +443,7 @@ class EpubReaderViewModel @Inject constructor(
 
   /** Called on every page turn; the write is debounced. */
   fun onLocatorChanged(locator: Locator) {
+    if (_currentLocator.value != locator) rememberPreviousPage(_currentLocator.value)
     _currentLocator.value = locator
     saveJob?.cancel()
     saveJob = viewModelScope.launch {

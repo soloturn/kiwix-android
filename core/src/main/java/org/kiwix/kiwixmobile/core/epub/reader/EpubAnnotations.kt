@@ -30,9 +30,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 enum class EpubAnnotationKind(val motivation: String) {
+  FAVORITE("tagging"),
   BOOKMARK("bookmarking"),
   NOTE("commenting"),
   HIGHLIGHT("highlighting")
+}
+
+@Suppress("MagicNumber")
+enum class EpubHighlightColor(val tint: Int, val hex: String) {
+  LIGHT_YELLOW(0x66FFF59D, "#FFF59D"),
+  LIGHT_GREEN(0x66A5D6A7, "#A5D6A7"),
+  LIGHT_BLUE(0x6690CAF9, "#90CAF9"),
+  LIGHT_PINK(0x66F48FB1, "#F48FB1"),
+  LIGHT_PURPLE(0x66CE93D8, "#CE93D8")
 }
 
 /** One annotation in the Readium AnnotationSet, with its Readium locator for navigation. */
@@ -42,10 +52,13 @@ data class EpubAnnotation(
   val locator: Locator,
   val text: String,
   val note: String? = null,
-  val created: String = Instant.now().toString()
+  val created: String = Instant.now().toString(),
+  val title: String = "",
+  val color: EpubHighlightColor? = null
 ) {
   val label: String
     get() = when (kind) {
+      EpubAnnotationKind.FAVORITE -> text.ifBlank { "Favorite" }
       EpubAnnotationKind.BOOKMARK -> "Bookmark"
       EpubAnnotationKind.NOTE -> note?.takeIf(String::isNotBlank) ?: text.ifBlank { "Note" }
       EpubAnnotationKind.HIGHLIGHT -> text.ifBlank { "Highlight" }
@@ -55,13 +68,14 @@ data class EpubAnnotation(
 /** Readium AnnotationSet JSON serialization and parsing for bookmark, note and highlight. */
 object EpubAnnotationSetCodec {
   private const val CONTEXT = "http://www.w3.org/ns/anno.jsonld"
+  private const val KIWIX_CONTEXT = "https://kiwix.org/ns/annotations#"
 
   fun encode(
     setId: String,
     title: String,
     annotations: List<EpubAnnotation>
   ): String = JSONObject()
-    .put("@context", CONTEXT)
+    .put("@context", JSONArray().put(CONTEXT).put(JSONObject().put("kiwix", KIWIX_CONTEXT)))
     .put("id", setId)
     .put("type", "AnnotationSet")
     .put(
@@ -110,17 +124,21 @@ object EpubAnnotationSetCodec {
       .put("motivation", kind.motivation)
       .put("created", created)
       .put("target", target)
-    if (kind == EpubAnnotationKind.NOTE) {
+    if (kind == EpubAnnotationKind.FAVORITE) annotation.put("kiwix:kind", "favorite")
+    if (title.isNotBlank()) annotation.put("kiwix:title", title)
+    color?.let { annotation.put("kiwix:color", it.name) }
+    if (note != null || kind == EpubAnnotationKind.NOTE) {
       annotation.put("body", JSONObject().put("type", "TextualBody").put("value", note.orEmpty()))
     }
     return annotation
   }
 
   private fun JSONObject.toAnnotation(): EpubAnnotation? {
-    val kind = when (optString("motivation")) {
-      "bookmarking" -> EpubAnnotationKind.BOOKMARK
-      "commenting" -> EpubAnnotationKind.NOTE
-      "highlighting", "hightlighting" -> EpubAnnotationKind.HIGHLIGHT
+    val kind = when {
+      optString("kiwix:kind") == "favorite" -> EpubAnnotationKind.FAVORITE
+      optString("motivation") == "bookmarking" -> EpubAnnotationKind.BOOKMARK
+      optString("motivation") == "commenting" -> EpubAnnotationKind.NOTE
+      optString("motivation") in setOf("highlighting", "hightlighting") -> EpubAnnotationKind.HIGHLIGHT
       else -> return null
     }
     val target = getJSONObject("target")
@@ -150,7 +168,9 @@ object EpubAnnotationSetCodec {
       ),
       text = exact,
       note = body?.optString("value"),
-      created = optString("created").ifBlank { Instant.EPOCH.toString() }
+      created = optString("created").ifBlank { Instant.EPOCH.toString() },
+      title = optString("kiwix:title"),
+      color = runCatching { EpubHighlightColor.valueOf(optString("kiwix:color")) }.getOrNull()
     )
   }
 }

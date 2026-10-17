@@ -23,6 +23,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,26 +31,34 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,6 +72,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -78,6 +88,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.graphics.toColorInt
 import kotlinx.coroutines.delay
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
@@ -111,10 +124,42 @@ const val EPUB_READER_SEARCH_RESULTS_LIST_TESTING_TAG = "epubReaderSearchResults
 const val EPUB_READER_PREVIOUS_PAGE_TESTING_TAG = "epubReaderPreviousPageTestingTag"
 const val EPUB_READER_BOOKMARK_TESTING_TAG = "epubReaderBookmarkTestingTag"
 const val EPUB_READER_ANNOTATIONS_TESTING_TAG = "epubReaderAnnotationsTestingTag"
+const val EPUB_READER_ANNOTATION_DELETE_TESTING_TAG = "epubReaderAnnotationDeleteTestingTag"
+const val EPUB_READER_ANNOTATION_COPY_TESTING_TAG = "epubReaderAnnotationCopyTestingTag"
 
 private const val PERCENT = 100
 private const val TRACK_ALPHA = 0.24f
 private const val SEEK_SETTLE_MS = 800L
+private const val ANNOTATION_CONTEXT_CHARS = 48
+private val ANNOTATION_DIALOG_MAX_HEIGHT = 700.dp
+private val ANNOTATION_LIST_MAX_HEIGHT = 360.dp
+
+private class AnnotationFilterState(private val annotations: List<EpubAnnotation>) {
+  val chapters = annotations.map(EpubAnnotation::displayTitle).distinct().sorted()
+  var kinds by mutableStateOf(EpubAnnotationKind.entries.toSet())
+  var colors by mutableStateOf(EpubHighlightColor.entries.toSet())
+  var selectedChapters by mutableStateOf(chapters.toSet())
+  val visibleAnnotations
+    get() = annotations.filter { annotation ->
+      annotation.kind in kinds &&
+        (annotation.color == null || annotation.color in colors) &&
+        annotation.displayTitle() in selectedChapters
+    }
+
+  fun toggle(kind: EpubAnnotationKind) {
+    kinds = kinds.toggle(kind)
+  }
+
+  fun toggle(color: EpubHighlightColor) {
+    colors = colors.toggle(color)
+  }
+
+  fun toggle(chapter: String) {
+    selectedChapters = selectedChapters.toggle(chapter)
+  }
+}
+
+private fun <T> Set<T>.toggle(value: T) = if (value in this) this - value else this + value
 
 /** What the reader chrome can ask of its host. */
 data class EpubReaderActions(
@@ -135,13 +180,16 @@ data class EpubReaderActions(
   val onShowAnnotations: () -> Unit = {},
   val onAnnotationSelected: (EpubAnnotation) -> Unit = {},
   val onDeleteAnnotation: (EpubAnnotation) -> Unit = {},
+  val onUpdateAnnotationNote: (EpubAnnotation, String) -> Unit = { _, _ -> },
+  val onCopyAnnotation: (EpubAnnotation) -> Unit = {},
   val onDismissSelectionMenu: () -> Unit = {},
   val onCopySelection: (String) -> Unit = {},
   val onShareSelection: (String) -> Unit = {},
   val onSearchSelection: (String) -> Unit = {},
   val onSelectAll: () -> Unit = {},
+  val onFavoriteSelection: (Locator) -> Unit = {},
   val onBookmarkSelection: (Locator) -> Unit = {},
-  val onHighlightSelection: (Locator) -> Unit = {},
+  val onHighlightSelection: (Locator, EpubHighlightColor) -> Unit = { _, _ -> },
   val onNoteSelection: (Locator, String) -> Unit = { _, _ -> }
 )
 
@@ -182,6 +230,11 @@ fun EpubReaderScreen(
   selectionLocator: Locator? = null
 ) {
   val ready = state as? EpubReaderUiState.Ready
+  val currentPageBookmarked = reading.locator?.let { currentLocator ->
+    annotations.any {
+      it.kind == EpubAnnotationKind.BOOKMARK && it.locator.sameBookmarkPosition(currentLocator)
+    }
+  } == true
   val searchResultsListState = rememberLazyListState()
   val overlay = settings.overlayColors(isSystemInDarkTheme())
   KiwixTheme {
@@ -200,6 +253,9 @@ fun EpubReaderScreen(
           searchResultsListState
         )
       }
+      if (ready != null && pageReady && reading.locator != null) {
+        BookmarkMarginButton(currentPageBookmarked, actions.onBookmark)
+      }
     }
     ReaderPanels(ready, reading, settings, panels, actions, annotations)
     selectionLocator?.let { SelectionActionsDialog(it, actions) }
@@ -207,8 +263,33 @@ fun EpubReaderScreen(
 }
 
 @Composable
+private fun BoxScope.BookmarkMarginButton(bookmarked: Boolean, onClick: () -> Unit) {
+  Surface(
+    modifier = Modifier
+      .align(Alignment.CenterStart)
+      .padding(start = EIGHT_DP)
+      .shadow(EIGHT_DP, CircleShape),
+    shape = CircleShape,
+    color = MaterialTheme.colorScheme.surface
+  ) {
+    IconButton(onClick = onClick) {
+      Icon(
+        painter = painterResource(
+          if (bookmarked) R.drawable.ic_bookmark_24dp else R.drawable.ic_bookmark_border_24dp
+        ),
+        contentDescription = stringResource(
+          if (bookmarked) R.string.epub_remove_bookmark else R.string.epub_add_bookmark
+        ),
+        tint = MaterialTheme.colorScheme.primary
+      )
+    }
+  }
+}
+
+@Composable
 private fun SelectionActionsDialog(locator: Locator, actions: EpubReaderActions) {
   var editingNote by remember(locator) { mutableStateOf(false) }
+  var choosingHighlightColor by remember(locator) { mutableStateOf(false) }
   var noteText by remember(locator) { mutableStateOf("") }
   AlertDialog(
     onDismissRequest = actions.onDismissSelectionMenu,
@@ -220,8 +301,18 @@ private fun SelectionActionsDialog(locator: Locator, actions: EpubReaderActions)
     text = {
       if (editingNote) {
         SelectionNoteEditor(noteText, onNoteChange = { noteText = it })
+      } else if (choosingHighlightColor) {
+        HighlightColorGrid { color ->
+          actions.onHighlightSelection(locator, color)
+          actions.onDismissSelectionMenu()
+        }
       } else {
-        SelectionActionGrid(locator, actions, onAddNote = { editingNote = true })
+        SelectionActionGrid(
+          locator,
+          actions,
+          onAddNote = { editingNote = true },
+          onChooseHighlightColor = { choosingHighlightColor = true }
+        )
       }
     },
     confirmButton = {
@@ -236,13 +327,6 @@ private fun SelectionActionsDialog(locator: Locator, actions: EpubReaderActions)
         }
       }
     },
-    dismissButton = {
-      if (editingNote) {
-        TextButton(onClick = { editingNote = false }) {
-          Text(stringResource(android.R.string.cancel))
-        }
-      }
-    }
   )
 }
 
@@ -260,7 +344,8 @@ private fun SelectionNoteEditor(noteText: String, onNoteChange: (String) -> Unit
 private fun SelectionActionGrid(
   locator: Locator,
   actions: EpubReaderActions,
-  onAddNote: () -> Unit
+  onAddNote: () -> Unit,
+  onChooseHighlightColor: () -> Unit
 ) {
   val selectedText = locator.text.highlight.orEmpty()
   Column {
@@ -294,19 +379,46 @@ private fun SelectionActionGrid(
           actions.onBookmarkSelection(locator)
           actions.onDismissSelectionMenu()
         },
-        SelectionMenuItem(stringResource(R.string.epub_highlight), R.drawable.ic_highlight_24) {
-          actions.onHighlightSelection(locator)
+        SelectionMenuItem(stringResource(R.string.epub_favorite), R.drawable.ic_stars_black_24dp) {
+          actions.onFavoriteSelection(locator)
           actions.onDismissSelectionMenu()
         }
       )
       SelectionActionRow(
+        SelectionMenuItem(stringResource(R.string.epub_highlight), R.drawable.ic_highlight_24, onChooseHighlightColor),
         SelectionMenuItem(stringResource(R.string.epub_add_note), R.drawable.ic_add_note, onAddNote),
-        SelectionMenuItem(
-          stringResource(android.R.string.cancel),
-          android.R.drawable.ic_menu_close_clear_cancel,
-          actions.onDismissSelectionMenu
-        )
       )
+    }
+  }
+}
+
+@Composable
+private fun HighlightColorGrid(onColor: (EpubHighlightColor) -> Unit) {
+  Column(verticalArrangement = Arrangement.spacedBy(EIGHT_DP)) {
+    EpubHighlightColor.entries.chunked(2).forEach { rowColors ->
+      Row(horizontalArrangement = Arrangement.spacedBy(EIGHT_DP)) {
+        rowColors.forEach { color ->
+          Surface(
+            modifier = Modifier.weight(1f).clickable { onColor(color) },
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceVariant
+          ) {
+            Row(
+              Modifier.padding(EIGHT_DP),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(EIGHT_DP)
+            ) {
+              Surface(
+                Modifier.size(28.dp),
+                shape = CircleShape,
+                color = Color(color.hex.toColorInt())
+              ) {}
+              Text(stringResource(color.labelResource()))
+            }
+          }
+        }
+        if (rowColors.size == 1) Spacer(Modifier.weight(1f))
+      }
     }
   }
 }
@@ -470,7 +582,9 @@ private fun ReaderPanels(
         panels.showAnnotations = false
         actions.onAnnotationSelected(it)
       },
-      onDelete = actions.onDeleteAnnotation
+      onDelete = actions.onDeleteAnnotation,
+      onUpdateNote = actions.onUpdateAnnotationNote,
+      onCopy = actions.onCopyAnnotation
     )
   }
 }
@@ -1008,48 +1122,246 @@ private fun AnnotationsDialog(
   annotations: List<EpubAnnotation>,
   onDismiss: () -> Unit,
   onItem: (EpubAnnotation) -> Unit,
-  onDelete: (EpubAnnotation) -> Unit
+  onDelete: (EpubAnnotation) -> Unit,
+  onUpdateNote: (EpubAnnotation, String) -> Unit,
+  onCopy: (EpubAnnotation) -> Unit
+) {
+  val filters = remember(annotations) { AnnotationFilterState(annotations) }
+  var noteTarget by remember { mutableStateOf<EpubAnnotation?>(null) }
+  var noteText by remember { mutableStateOf("") }
+  Dialog(
+    onDismissRequest = onDismiss,
+    properties = DialogProperties(usePlatformDefaultWidth = false)
+  ) {
+    Surface(
+      modifier = Modifier.fillMaxWidth().widthIn(max = 640.dp).padding(horizontal = SIXTEEN_DP),
+      shape = MaterialTheme.shapes.extraLarge,
+      color = MaterialTheme.colorScheme.surface
+    ) {
+      Column(
+        Modifier.fillMaxWidth().heightIn(max = ANNOTATION_DIALOG_MAX_HEIGHT).padding(SIXTEEN_DP),
+        verticalArrangement = Arrangement.spacedBy(EIGHT_DP)
+      ) {
+        Text(stringResource(R.string.epub_annotations), style = MaterialTheme.typography.headlineSmall)
+        AnnotationFilters(filters)
+        AnnotationEntries(
+          allAnnotations = annotations,
+          visibleAnnotations = filters.visibleAnnotations,
+          onItem = onItem,
+          onAddNote = { annotation ->
+            noteTarget = annotation
+            noteText = annotation.note.orEmpty()
+          },
+          onDelete = onDelete,
+          onCopy = onCopy
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+          TextButton(onClick = onDismiss) { Text(stringResource(R.string.epub_close)) }
+        }
+      }
+    }
+  }
+  noteTarget?.let { annotation ->
+    AnnotationNoteEditor(
+      annotation = annotation,
+      note = noteText,
+      onNoteChange = { noteText = it },
+      onDismiss = { noteTarget = null },
+      onSave = {
+        onUpdateNote(annotation, noteText)
+        noteTarget = null
+      }
+    )
+  }
+}
+
+@Composable
+private fun AnnotationFilters(
+  filters: AnnotationFilterState
+) {
+  Column(verticalArrangement = Arrangement.spacedBy(EIGHT_DP)) {
+    Text(stringResource(R.string.epub_annotation_types), style = MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+      EpubAnnotationKind.entries.forEach { kind ->
+        FilterChip(
+          selected = kind in filters.kinds,
+          onClick = { filters.toggle(kind) },
+          label = { Text(stringResource(kind.labelResource())) }
+        )
+      }
+    }
+    Text(stringResource(R.string.epub_annotation_colors), style = MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+      EpubHighlightColor.entries.forEach { color ->
+        FilterChip(
+          selected = color in filters.colors,
+          onClick = { filters.toggle(color) },
+          label = { Text(stringResource(color.labelResource())) },
+          leadingIcon = {
+            Surface(
+              Modifier.size(16.dp),
+              shape = CircleShape,
+              color = Color(color.hex.toColorInt())
+            ) {}
+          }
+        )
+      }
+    }
+    Text(stringResource(R.string.epub_annotation_chapters), style = MaterialTheme.typography.labelLarge)
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+      filters.chapters.forEach { chapter ->
+        FilterChip(
+          selected = chapter in filters.selectedChapters,
+          onClick = { filters.toggle(chapter) },
+          label = { Text(chapter, maxLines = 1) }
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun AnnotationEntries(
+  allAnnotations: List<EpubAnnotation>,
+  visibleAnnotations: List<EpubAnnotation>,
+  onItem: (EpubAnnotation) -> Unit,
+  onAddNote: (EpubAnnotation) -> Unit,
+  onDelete: (EpubAnnotation) -> Unit,
+  onCopy: (EpubAnnotation) -> Unit
+) {
+  if (visibleAnnotations.isEmpty()) {
+    val emptyMessage = if (allAnnotations.isEmpty()) {
+      R.string.epub_no_annotations
+    } else {
+      R.string.epub_no_matching_annotations
+    }
+    Text(stringResource(emptyMessage), modifier = Modifier.padding(vertical = SIXTEEN_DP))
+  } else {
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = ANNOTATION_LIST_MAX_HEIGHT)) {
+      items(visibleAnnotations, key = { it.id }) { annotation ->
+        AnnotationListItem(
+          annotation = annotation,
+          onClick = { onItem(annotation) },
+          onAddNote = { onAddNote(annotation) },
+          onDelete = { onDelete(annotation) },
+          onCopy = { onCopy(annotation) }
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun AnnotationNoteEditor(
+  annotation: EpubAnnotation,
+  note: String,
+  onNoteChange: (String) -> Unit,
+  onDismiss: () -> Unit,
+  onSave: () -> Unit
 ) {
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = { Text(stringResource(R.string.epub_annotations)) },
-    text = {
-      if (annotations.isEmpty()) {
-        Text(stringResource(R.string.epub_no_annotations))
-      } else {
-        LazyColumn {
-          items(annotations, key = { it.id }) { annotation ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-              Column(
-                Modifier.weight(1f).clickable { onItem(annotation) }.padding(vertical = EIGHT_DP)
-              ) {
-                Text(
-                  text = stringResource(annotation.kind.labelResource()),
-                  style = MaterialTheme.typography.labelMedium,
-                  color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                  text = annotation.label,
-                  maxLines = 2,
-                  overflow = TextOverflow.Ellipsis,
-                  style = MaterialTheme.typography.bodyLarge
-                )
-              }
-              TextButton(onClick = { onDelete(annotation) }) {
-                Text(stringResource(R.string.epub_delete_annotation))
-              }
-            }
-          }
-        }
-      }
+    title = {
+      val title = if (annotation.note.isNullOrBlank()) R.string.epub_add_note else R.string.epub_edit_note
+      Text(stringResource(title))
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.epub_close)) } }
+    text = {
+      OutlinedTextField(
+        value = note,
+        onValueChange = onNoteChange,
+        label = { Text(stringResource(R.string.epub_note_hint)) }
+      )
+    },
+    confirmButton = { TextButton(onClick = onSave) { Text(stringResource(R.string.save)) } }
   )
 }
 
+@Composable
+private fun AnnotationListItem(
+  annotation: EpubAnnotation,
+  onClick: () -> Unit,
+  onAddNote: () -> Unit,
+  onDelete: () -> Unit,
+  onCopy: () -> Unit
+) {
+  Column(Modifier.fillMaxWidth().padding(vertical = EIGHT_DP)) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+          annotation.displayTitle(),
+          modifier = Modifier.weight(1f),
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold
+        )
+        Text(
+          stringResource(annotation.kind.labelResource()),
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.primary
+        )
+      }
+      AnnotationContext(annotation)
+      annotation.note?.takeIf(String::isNotBlank)?.let {
+        Text(it, modifier = Modifier.padding(top = EIGHT_DP), style = MaterialTheme.typography.bodyMedium)
+      }
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+      TextButton(onClick = onAddNote) {
+        Text(stringResource(if (annotation.note.isNullOrBlank()) R.string.epub_add_note else R.string.epub_edit_note))
+      }
+      TextButton(
+        onClick = onDelete,
+        modifier = Modifier.testTag(EPUB_READER_ANNOTATION_DELETE_TESTING_TAG)
+      ) { Text(stringResource(R.string.epub_delete_annotation)) }
+      TextButton(
+        onClick = onCopy,
+        modifier = Modifier.testTag(EPUB_READER_ANNOTATION_COPY_TESTING_TAG)
+      ) { Text(stringResource(R.string.epub_copy_annotation)) }
+    }
+    Surface(Modifier.fillMaxWidth().height(1.dp), color = MaterialTheme.colorScheme.outlineVariant) {}
+  }
+}
+
+@Composable
+private fun AnnotationContext(annotation: EpubAnnotation) {
+  val exact = annotation.text.ifBlank { annotation.locator.text.highlight.orEmpty() }
+  if (exact.isBlank()) return
+  val prefix = annotation.locator.text.before.orEmpty().takeLast(ANNOTATION_CONTEXT_CHARS)
+  val suffix = annotation.locator.text.after.orEmpty().take(ANNOTATION_CONTEXT_CHARS)
+  Text(
+    buildAnnotatedString {
+      if (prefix.isNotBlank()) append("…$prefix")
+      withStyle(
+        SpanStyle(
+          background = Color(
+            (annotation.color?.hex ?: EpubHighlightColor.LIGHT_YELLOW.hex).toColorInt()
+          )
+        )
+      ) { append(exact) }
+      if (suffix.isNotBlank()) append("$suffix…")
+    },
+    modifier = Modifier.fillMaxWidth().padding(top = EIGHT_DP),
+    maxLines = 3,
+    overflow = TextOverflow.Ellipsis,
+    style = MaterialTheme.typography.bodyMedium
+  )
+}
+
+private fun EpubAnnotation.displayTitle() =
+  title.ifBlank { locator.href.toString().substringAfterLast('/').substringBefore('?') }
+
 @androidx.annotation.StringRes
 private fun EpubAnnotationKind.labelResource() = when (this) {
+  EpubAnnotationKind.FAVORITE -> R.string.epub_favorite
   EpubAnnotationKind.BOOKMARK -> R.string.epub_bookmark
   EpubAnnotationKind.NOTE -> R.string.epub_note
   EpubAnnotationKind.HIGHLIGHT -> R.string.epub_highlight
+}
+
+@androidx.annotation.StringRes
+private fun EpubHighlightColor.labelResource() = when (this) {
+  EpubHighlightColor.LIGHT_YELLOW -> R.string.epub_highlight_light_yellow
+  EpubHighlightColor.LIGHT_GREEN -> R.string.epub_highlight_light_green
+  EpubHighlightColor.LIGHT_BLUE -> R.string.epub_highlight_light_blue
+  EpubHighlightColor.LIGHT_PINK -> R.string.epub_highlight_light_pink
+  EpubHighlightColor.LIGHT_PURPLE -> R.string.epub_highlight_light_purple
 }

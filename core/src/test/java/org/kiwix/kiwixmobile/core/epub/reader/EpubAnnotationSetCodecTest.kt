@@ -35,25 +35,39 @@ class EpubAnnotationSetCodecTest {
   @Test
   fun `encodes and decodes bookmark note and highlight as a Readium AnnotationSet`() {
     val annotations = listOf(
-      EpubAnnotation("bookmark-id", EpubAnnotationKind.BOOKMARK, selection, ""),
+      EpubAnnotation("bookmark-id", EpubAnnotationKind.BOOKMARK, selection, "", title = "Chapter 1"),
       EpubAnnotation("note-id", EpubAnnotationKind.NOTE, selection, "selected words", "My note"),
-      EpubAnnotation("highlight-id", EpubAnnotationKind.HIGHLIGHT, selection, "selected words")
+      EpubAnnotation(
+        "highlight-id",
+        EpubAnnotationKind.HIGHLIGHT,
+        selection,
+        "selected words",
+        title = "Chapter 1",
+        color = EpubHighlightColor.LIGHT_BLUE
+      ),
+      EpubAnnotation("favorite-id", EpubAnnotationKind.FAVORITE, selection, "selected words")
     )
 
     val encoded = EpubAnnotationSetCodec.encode("set-id", "Book title", annotations)
     val set = JSONObject(encoded)
     val items = set.getJSONArray("items")
 
-    assertEquals("http://www.w3.org/ns/anno.jsonld", set.getString("@context"))
+    assertEquals(
+      "http://www.w3.org/ns/anno.jsonld",
+      set.getJSONArray("@context").getString(0)
+    )
     assertEquals("AnnotationSet", set.getString("type"))
     assertEquals("Book title", set.getJSONObject("about").getString("dc:title"))
-    assertEquals(3, items.length())
+    assertEquals(4, items.length())
     assertEquals("bookmarking", items.getJSONObject(0).getString("motivation"))
     assertFalse(items.getJSONObject(0).has("body"))
     assertEquals("commenting", items.getJSONObject(1).getString("motivation"))
     assertEquals("My note", items.getJSONObject(1).getJSONObject("body").getString("value"))
     assertEquals("highlighting", items.getJSONObject(2).getString("motivation"))
     assertFalse(items.getJSONObject(2).has("body"))
+    assertEquals("LIGHT_BLUE", items.getJSONObject(2).getString("kiwix:color"))
+    assertEquals("Chapter 1", items.getJSONObject(2).getString("kiwix:title"))
+    assertEquals("favorite", items.getJSONObject(3).getString("kiwix:kind"))
     assertEquals(
       "TextQuoteSelector",
       items.getJSONObject(2).getJSONObject("target").getJSONArray("selector")
@@ -66,6 +80,9 @@ class EpubAnnotationSetCodecTest {
     assertEquals(0.25, restored[2].locator.locations.progression!!, 0.0)
     assertEquals("selected words", restored[2].text)
     assertEquals("My note", restored[1].note)
+    assertEquals(EpubHighlightColor.LIGHT_BLUE, restored[2].color)
+    assertEquals("Chapter 1", restored[2].title)
+    assertEquals(EpubAnnotationKind.FAVORITE, restored[3].kind)
   }
 
   @Test
