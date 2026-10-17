@@ -25,20 +25,26 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.ActionMode
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageView
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
+import androidx.core.graphics.createBitmap
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -49,6 +55,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -56,6 +64,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BaseActivity
 import org.kiwix.kiwixmobile.core.utils.ExternalLinkOpener
@@ -65,11 +75,13 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
+import org.readium.r2.navigator.preferences.ColumnCount
 import org.readium.r2.navigator.preferences.ReadingProgression
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.util.AbsoluteUrl
 import java.io.File
+import java.util.WeakHashMap
 import javax.inject.Inject
 
 /**
@@ -87,11 +99,20 @@ class EpubReaderActivity : BaseActivity() {
   private val darkTheme = MutableStateFlow(false)
   private val pageReady = MutableStateFlow(false)
   private val selectionMenuLocator = MutableStateFlow<Locator?>(null)
+  private val pageMode = MutableStateFlow(EpubPageMode.SINGLE_PAGE)
+  private val pagePreviews = MutableStateFlow<List<EpubPagePreview>>(emptyList())
+  private val pagePreviewLoading = MutableStateFlow(false)
   private var selectionActionMode: ActionMode? = null
   private var selectionMenuOpening = false
   private var navigator: EpubNavigatorFragment? = null
+  private var previewJob: Job? = null
+  private var previewRefreshJob: Job? = null
+  private var generatingPagePreviews = false
+  private val overviewAttachListeners = WeakHashMap<FragmentContainerView, View.OnAttachStateChangeListener>()
   private lateinit var root: FrameLayout
   private lateinit var navigatorContainer: FragmentContainerView
+  private lateinit var previousPagePeek: ImageView
+  private lateinit var nextPagePeek: ImageView
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // The navigator fragment needs a factory built from the opened book, so it can't be restored;
@@ -100,6 +121,8 @@ class EpubReaderActivity : BaseActivity() {
     externalLinkOpener.initialize(this, alertDialogShower)
     darkTheme.value = isNightMode(resources.configuration)
     navigatorContainer = FragmentContainerView(this).apply { id = View.generateViewId() }
+    previousPagePeek = pagePeekView(previous = true)
+    nextPagePeek = pagePeekView(previous = false)
     // Immersive: the book fills the screen and the bars and overlay float above it. Only the
     // (constant) display cutout and fixed margins are reserved, never the system bars, so the
     // text doesn't re-paginate when the bars or overlay toggle.
@@ -109,6 +132,10 @@ class EpubReaderActivity : BaseActivity() {
     }
     root = FrameLayout(this).apply {
       addView(navigatorContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+      // Keep the live Readium page at its normal size; the cached neighboring pages sit over
+      // only the outer edge strips, where the page margin normally is.
+      addView(previousPagePeek)
+      addView(nextPagePeek)
       addView(
         ComposeView(context).apply { setContent { Chrome() } },
         FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
@@ -122,9 +149,18 @@ class EpubReaderActivity : BaseActivity() {
       setTaskTitle(ready.book.title)
     }
     lifecycleScope.launch {
-      combine(viewModel.settings, darkTheme, ::Pair).collect { (settings, dark) ->
+      combine(viewModel.settings, darkTheme, pageMode) { settings, dark, mode ->
+        Triple(settings, dark, mode)
+      }.collect { (settings, dark, mode) ->
         root.setBackgroundColor(settings.backgroundColor(dark))
-        navigator?.submitPreferences(settings.toPreferences(dark))
+        val preferences = settings.toPreferences(dark).let {
+          when (mode) {
+            EpubPageMode.SINGLE_PAGE -> it.copy(columnCount = ColumnCount.ONE)
+            EpubPageMode.CAROUSEL -> it.copy(scroll = false, columnCount = ColumnCount.ONE)
+            EpubPageMode.OVERVIEW -> it.copy(scroll = false, columnCount = ColumnCount.ONE)
+          }
+        }
+        navigator?.submitPreferences(preferences)
       }
     }
   }
@@ -191,6 +227,10 @@ class EpubReaderActivity : BaseActivity() {
     val annotations by viewModel.annotations.collectAsState()
     val selectionLocator by selectionMenuLocator.collectAsState()
     val bookShown by pageReady.collectAsState()
+    val shownPageMode by pageMode.collectAsState()
+    val shownPagePreviews by pagePreviews.collectAsState()
+    val previewsLoading by pagePreviewLoading.collectAsState()
+    val overviewPages = positions
     val readingOrder = (state as? EpubReaderUiState.Ready)?.book?.publication?.readingOrder.orEmpty()
     DialogHost(alertDialogShower)
     EpubReaderScreen(
@@ -204,6 +244,10 @@ class EpubReaderActivity : BaseActivity() {
       ),
       search = search,
       previousPages = previousPages,
+      pageMode = shownPageMode,
+      pagePreviews = shownPagePreviews,
+      overviewPages = overviewPages,
+      pagePreviewLoading = previewsLoading,
       annotations = annotations,
       selectionLocator = selectionLocator,
       chromeVisible = chromeVisible,
@@ -257,8 +301,57 @@ class EpubReaderActivity : BaseActivity() {
       viewModel.updateAnnotationNote(annotation.id, note)
     },
     onCopyAnnotation = ::copyAnnotation,
+    onPageModeSelected = ::selectPageMode,
+    onCreateOverviewPage = ::createOverviewPage,
+    onDestroyOverviewPage = ::destroyOverviewPage,
     onNoteSelection = viewModel::addNote
   )
+
+  private fun createOverviewPage(container: FragmentContainerView, locator: Locator) {
+    if (supportFragmentManager.findFragmentById(container.id) != null) return
+    fun install() {
+      if (!container.isAttachedToWindow || supportFragmentManager.findFragmentById(container.id) != null) return
+      overviewAttachListeners.remove(container)?.let(container::removeOnAttachStateChangeListener)
+      installOverviewPageFragment(container, locator)
+    }
+    if (container.isAttachedToWindow) {
+      install()
+    } else {
+      val listener = object : View.OnAttachStateChangeListener {
+        override fun onViewAttachedToWindow(view: View) = install()
+        override fun onViewDetachedFromWindow(view: View) = Unit
+      }
+      overviewAttachListeners[container] = listener
+      container.addOnAttachStateChangeListener(listener)
+    }
+  }
+
+  private fun installOverviewPageFragment(container: FragmentContainerView, locator: Locator) {
+    val book = (viewModel.state.value as? EpubReaderUiState.Ready)?.book ?: return
+    val factory = EpubNavigatorFactory(book.publication).createFragmentFactory(
+      initialLocator = locator,
+      initialPreferences = viewModel.settings.value.toPreferences(darkTheme.value).copy(
+        scroll = false,
+        columnCount = ColumnCount.ONE
+      ),
+      listener = linkListener,
+      paginationListener = object : EpubNavigatorFragment.PaginationListener {
+        override fun onPageLoaded() = Unit
+      },
+      configuration = EpubNavigatorFragment.Configuration(shouldApplyInsetsPadding = false)
+    )
+    val fragment = factory.instantiate(classLoader, EpubNavigatorFragment::class.java.name)
+    supportFragmentManager.commitNow {
+      add(container.id, fragment, "epub-overview-${container.id}")
+    }
+  }
+
+  private fun destroyOverviewPage(container: FragmentContainerView) {
+    overviewAttachListeners.remove(container)?.let(container::removeOnAttachStateChangeListener)
+    supportFragmentManager.findFragmentById(container.id)?.let { fragment ->
+      supportFragmentManager.commitNow { remove(fragment) }
+    }
+  }
 
   private fun attachNavigator(book: OpenEpub) {
     val factory = EpubNavigatorFactory(book.publication).createFragmentFactory(
@@ -319,9 +412,204 @@ class EpubReaderActivity : BaseActivity() {
     )
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
-        fragment.currentLocator.collect(viewModel::onLocatorChanged)
+        fragment.currentLocator.collect { locator ->
+          if (!generatingPagePreviews) {
+            viewModel.onLocatorChanged(locator)
+            if (pageMode.value == EpubPageMode.CAROUSEL) {
+              updateCarouselPeeks(pagePreviews.value)
+              refreshCarouselPreviews(fragment)
+            }
+          }
+        }
       }
     }
+  }
+
+  private fun selectPageMode(mode: EpubPageMode) {
+    previewJob?.cancel()
+    previewRefreshJob?.cancel()
+    previewJob = lifecycleScope.launch {
+      pageMode.value = mode
+      val carousel = mode == EpubPageMode.CAROUSEL
+      setNavigatorSize(carousel)
+      if (mode == EpubPageMode.SINGLE_PAGE) {
+        pagePreviews.value = emptyList()
+        pagePreviewLoading.value = false
+        return@launch
+      }
+      if (mode == EpubPageMode.OVERVIEW) {
+        pagePreviewLoading.value = false
+        setPageEdgePeeks(false)
+        return@launch
+      }
+      pagePreviewLoading.value = true
+      setPageEdgePeeks(false)
+      delay(PREVIEW_LAYOUT_SETTLE_MS)
+      val fragment = navigator
+      val previews = fragment?.let { capturePagePreviews(it, PAGE_PREVIEW_RADIUS) }.orEmpty()
+      pagePreviews.value = previews
+      if (carousel) updateCarouselPeeks(previews)
+      pagePreviewLoading.value = false
+    }
+  }
+
+  private fun setNavigatorSize(carousel: Boolean) {
+    // Keep Readium's WebView laid out for the full display so its EPUB pagination stays stable.
+    // Android applies this transform to the rendered View; it does not trigger a smaller reflow.
+    navigatorContainer.pivotX = navigatorContainer.width / 2f
+    navigatorContainer.pivotY = navigatorContainer.height / 2f
+    navigatorContainer.scaleX = if (carousel) CAROUSEL_PAGE_WIDTH else 1f
+    navigatorContainer.scaleY = if (carousel) CAROUSEL_PAGE_HEIGHT else 1f
+    if (carousel) {
+      val peekWidth = (root.width * PAGE_PEEK_WIDTH).toInt()
+      val peekHeight = (root.height * CAROUSEL_PAGE_HEIGHT).toInt()
+      root.updateViewLayout(
+        previousPagePeek,
+        FrameLayout.LayoutParams(peekWidth, peekHeight, Gravity.START or Gravity.CENTER_VERTICAL)
+      )
+      root.updateViewLayout(
+        nextPagePeek,
+        FrameLayout.LayoutParams(peekWidth, peekHeight, Gravity.END or Gravity.CENTER_VERTICAL)
+      )
+    }
+    navigatorContainer.layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+    setPageEdgePeeks(carousel)
+  }
+
+  private fun setPageEdgePeeks(visible: Boolean) {
+    previousPagePeek.visibility = if (visible) View.VISIBLE else View.GONE
+    nextPagePeek.visibility = if (visible) View.VISIBLE else View.GONE
+  }
+
+  private fun pagePeekView(previous: Boolean) = ImageView(this).apply {
+    scaleType = ImageView.ScaleType.MATRIX
+    elevation = PAGE_PEEK_ELEVATION
+    visibility = View.GONE
+    setBackgroundColor(viewModel.settings.value.backgroundColor(darkTheme.value))
+    setOnClickListener { selectPeekPage(previous) }
+  }
+
+  private fun selectPeekPage(previous: Boolean) {
+    val fragment = navigator
+    val current = fragment?.currentLocator?.value
+    val pageOffset = if (previous) PREVIOUS_PAGE_OFFSET else NEXT_PAGE_OFFSET
+    val index = pagePreviews.value.indexOfFirst { it.locator == current }
+    val target = pagePreviews.value.getOrNull(index + pageOffset)
+    if (fragment != null && current != null && target != null) {
+      viewModel.rememberPreviousPage(current)
+      fragment.go(target.locator)
+    }
+  }
+
+  private fun updateCarouselPeeks(previews: List<EpubPagePreview>) {
+    val current = navigator?.currentLocator?.value
+    val index = previews.indexOfFirst { it.locator == current }
+    setPagePeekImage(previousPagePeek, previews.getOrNull(index - 1)?.bitmap, previous = true)
+    setPagePeekImage(nextPagePeek, previews.getOrNull(index + 1)?.bitmap, previous = false)
+    previousPagePeek.visibility = if (index > 0) View.VISIBLE else View.INVISIBLE
+    nextPagePeek.visibility = if (index in 0 until previews.lastIndex) View.VISIBLE else View.INVISIBLE
+  }
+
+  private fun setPagePeekImage(view: ImageView, bitmap: Bitmap?, previous: Boolean) {
+    view.setImageBitmap(bitmap)
+    if (bitmap == null) return
+    view.post {
+      if (view.width == 0 || view.height == 0) return@post
+      val scale = view.height.toFloat() / bitmap.height
+      val x = if (previous) view.width - bitmap.width * scale else 0f
+      view.imageMatrix = Matrix().apply {
+        setValues(floatArrayOf(scale, 0f, x, 0f, scale, 0f, 0f, 0f, 1f))
+      }
+    }
+  }
+
+  private fun refreshCarouselPreviews(fragment: EpubNavigatorFragment) {
+    if (generatingPagePreviews || pagePreviewLoading.value) return
+    val current = fragment.currentLocator.value
+    val index = pagePreviews.value.indexOfFirst { it.locator == current }
+    if (index !in 0..1 && index < pagePreviews.value.lastIndex - 1) return
+    previewRefreshJob?.cancel()
+    previewRefreshJob = lifecycleScope.launch {
+      delay(PREVIEW_REFRESH_DEBOUNCE_MS)
+      if (pageMode.value != EpubPageMode.CAROUSEL || generatingPagePreviews) return@launch
+      pagePreviewLoading.value = true
+      val previews = capturePagePreviews(fragment, PAGE_PREVIEW_RADIUS)
+      if (pageMode.value == EpubPageMode.CAROUSEL) {
+        pagePreviews.value = previews
+        updateCarouselPeeks(previews)
+      }
+      pagePreviewLoading.value = false
+    }
+  }
+
+  private suspend fun capturePagePreviews(
+    fragment: EpubNavigatorFragment,
+    radius: Int
+  ): List<EpubPagePreview> {
+    val saved = fragment.currentLocator.value
+    val before = mutableListOf<EpubPagePreview>()
+    val after = mutableListOf<EpubPagePreview>()
+    val current = capturePreview(fragment, saved)
+    generatingPagePreviews = true
+    return try {
+      var atBeginning = false
+      repeat(radius) {
+        if (!atBeginning) {
+          val preview = turnAndCapture(fragment, forward = false)
+          if (preview == null) atBeginning = true else before += preview
+        }
+      }
+      repeat(before.size) { turnAndCapture(fragment, forward = true) }
+      var atEnd = false
+      repeat(radius) {
+        if (!atEnd) {
+          val preview = turnAndCapture(fragment, forward = true)
+          if (preview == null) atEnd = true else after += preview
+        }
+      }
+      before.asReversed() + listOfNotNull(current) + after
+    } finally {
+      withContext(NonCancellable) {
+        restoreLocator(fragment, saved)
+        viewModel.onLocatorChanged(fragment.currentLocator.value)
+      }
+      generatingPagePreviews = false
+    }
+  }
+
+  private suspend fun turnAndCapture(
+    fragment: EpubNavigatorFragment,
+    forward: Boolean
+  ): EpubPagePreview? {
+    val before = fragment.currentLocator.value
+    if (forward) fragment.goForward(animated = false) else fragment.goBackward(animated = false)
+    val after = withTimeoutOrNull(PAGE_PREVIEW_TURN_TIMEOUT_MS) {
+      fragment.currentLocator.first { it != before }
+    } ?: return null
+    delay(PREVIEW_FRAME_DELAY_MS)
+    return capturePreview(fragment, after)
+  }
+
+  private suspend fun restoreLocator(fragment: EpubNavigatorFragment, locator: Locator) {
+    if (fragment.currentLocator.value != locator) {
+      fragment.go(locator)
+      withTimeoutOrNull(PAGE_PREVIEW_TURN_TIMEOUT_MS) {
+        fragment.currentLocator.first { it == locator }
+      }
+    }
+  }
+
+  private fun capturePreview(fragment: EpubNavigatorFragment, locator: Locator): EpubPagePreview? {
+    val view = fragment.publicationView
+    if (view.width <= 0 || view.height <= 0) return null
+    val width = (view.width * PAGE_PREVIEW_SCALE).toInt().coerceAtLeast(1)
+    val height = (view.height * PAGE_PREVIEW_SCALE).toInt().coerceAtLeast(1)
+    val bitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    Canvas(bitmap).apply {
+      scale(PAGE_PREVIEW_SCALE, PAGE_PREVIEW_SCALE)
+      view.draw(this)
+    }
+    return EpubPagePreview(locator, bitmap)
   }
 
   /** Names the Recents entry after the book. */
@@ -464,6 +752,18 @@ class EpubReaderActivity : BaseActivity() {
     private const val ANNOTATION_DECORATION_GROUP = "kiwix-annotations"
     private const val SELECTION_READY_RETRIES = 5
     private const val SELECTION_READY_RETRY_MS = 100L
+    private const val PAGE_PREVIEW_SCALE = 0.4f
+    private const val PAGE_PREVIEW_TURN_TIMEOUT_MS = 2_000L
+    private const val PREVIEW_FRAME_DELAY_MS = 80L
+    private const val PREVIEW_LAYOUT_SETTLE_MS = 150L
+    private const val PAGE_PREVIEW_RADIUS = 4
+    private const val CAROUSEL_PAGE_WIDTH = 0.9f
+    private const val CAROUSEL_PAGE_HEIGHT = 0.96f
+    private const val PAGE_PEEK_WIDTH = 0.1f
+    private const val PREVIEW_REFRESH_DEBOUNCE_MS = 250L
+    private const val PREVIOUS_PAGE_OFFSET = -1
+    private const val NEXT_PAGE_OFFSET = 1
+    private const val PAGE_PEEK_ELEVATION = 8f
 
     /**
      * The main activity is singleInstance, so the reader can't share its task. Each book is its

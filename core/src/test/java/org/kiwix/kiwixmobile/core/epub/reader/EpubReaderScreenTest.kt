@@ -92,6 +92,8 @@ class EpubReaderScreenTest {
     actions: EpubReaderActions = EpubReaderActions(),
     pageReady: Boolean = true,
     previousPages: List<Locator> = emptyList(),
+    pageMode: EpubPageMode = EpubPageMode.SINGLE_PAGE,
+    overviewPages: List<Locator> = emptyList(),
     panels: EpubReaderPanels = EpubReaderPanels(),
     annotations: List<EpubAnnotation> = emptyList()
   ) = composeTestRule.setContent {
@@ -104,6 +106,8 @@ class EpubReaderScreenTest {
       pageReady,
       search = search,
       previousPages = previousPages,
+      pageMode = pageMode,
+      overviewPages = overviewPages,
       panels = panels,
       annotations = annotations
     )
@@ -117,6 +121,38 @@ class EpubReaderScreenTest {
     composeTestRule.onNodeWithTag(EPUB_READER_SEARCH_BUTTON_TESTING_TAG).performClick()
 
     assertTrue(opened)
+  }
+
+  @Test
+  fun `page view menu selects the carousel renderer`() {
+    var selected: EpubPageMode? = null
+    show(actions = EpubReaderActions(onPageModeSelected = { selected = it }))
+
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).performClick()
+    composeTestRule.onNodeWithTag("epubPageMode_CAROUSEL").performClick()
+
+    assertEquals(EpubPageMode.CAROUSEL, selected)
+  }
+
+  @Test
+  fun `page overview scrolls through the book and selecting a page returns to reading`() {
+    var selected: Locator? = null
+    var mode: EpubPageMode? = null
+    val pages = (1..30).map { index -> locator.copyWithLocations(totalProgression = index / 31.0) }
+    show(
+      pageMode = EpubPageMode.OVERVIEW,
+      overviewPages = pages,
+      actions = EpubReaderActions(
+        onReturnToPreviousPage = { selected = it },
+        onPageModeSelected = { mode = it }
+      )
+    )
+
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).performScrollToIndex(29)
+    composeTestRule.onNodeWithTag("${EPUB_READER_PAGE_THUMBNAIL_TESTING_TAG}_29").performClick()
+
+    assertEquals(pages.last(), selected)
+    assertEquals(EpubPageMode.SINGLE_PAGE, mode)
   }
 
   @Test
