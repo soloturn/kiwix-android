@@ -26,6 +26,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -183,11 +184,17 @@ class EpubAnnotationRepository @Inject constructor(
 ) {
   private val directory = File(context.filesDir, "epub-annotations")
   private val writes = Mutex()
+  private val setIds = ConcurrentHashMap<String, String>()
 
   suspend fun load(bookId: String): List<EpubAnnotation> = withContext(ioDispatcher) {
     val file = annotationFile(bookId)
     if (!file.isFile) return@withContext emptyList()
-    EpubAnnotationSetCodec.decode(runCatching { file.readText() }.getOrDefault(""))
+    val content = runCatching { file.readText() }.getOrDefault("")
+    runCatching { JSONObject(content).optString("id") }
+      .getOrNull()
+      ?.takeIf(String::isNotBlank)
+      ?.let { setIds[bookId] = it }
+    EpubAnnotationSetCodec.decode(content)
   }
 
   suspend fun save(bookId: String, title: String, annotations: List<EpubAnnotation>) =
@@ -195,11 +202,12 @@ class EpubAnnotationRepository @Inject constructor(
       writes.withLock {
         if (!directory.exists() && !directory.mkdirs()) return@withLock
         val file = annotationFile(bookId)
-        val setId = if (file.isFile) {
-          runCatching { JSONObject(file.readText()).optString("id") }.getOrNull()
-        } else {
-          null
-        }.takeUnless(String?::isNullOrBlank) ?: "urn:uuid:${UUID.randomUUID()}"
+        val setId = setIds[bookId] ?: run {
+          runCatching { JSONObject(file.readText()).optString("id") }
+            .getOrNull()
+            ?.takeIf(String::isNotBlank)
+            ?: "urn:uuid:${UUID.randomUUID()}"
+        }.also { setIds[bookId] = it }
         val temporary = File(directory, "${file.name}.tmp")
         temporary.writeText(EpubAnnotationSetCodec.encode(setId, title, annotations))
         if (!temporary.renameTo(file)) {

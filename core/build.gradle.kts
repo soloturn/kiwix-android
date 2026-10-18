@@ -15,6 +15,17 @@ plugins.apply(KiwixConfigurationPlugin::class)
 android {
   defaultConfig {
     buildConfigField("long", "VERSION_CODE", "".getVersionCode().toString())
+    externalNativeBuild {
+      cmake {
+        cppFlags += "-std=c++17"
+      }
+    }
+  }
+  externalNativeBuild {
+    cmake {
+      path = file("src/main/cpp/CMakeLists.txt")
+      version = "3.22.1"
+    }
   }
   buildTypes {
     getByName("release") {

@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core.epub.reader
 
+import android.graphics.Bitmap
 import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -93,7 +95,10 @@ class EpubReaderScreenTest {
     pageReady: Boolean = true,
     previousPages: List<Locator> = emptyList(),
     pageMode: EpubPageMode = EpubPageMode.SINGLE_PAGE,
-    overviewPages: List<Locator> = emptyList(),
+    pageModesAvailable: Boolean = true,
+    overviewPages: List<EpubPagePreview> = emptyList(),
+    overviewHasPrevious: Boolean = false,
+    overviewHasNext: Boolean = false,
     panels: EpubReaderPanels = EpubReaderPanels(),
     annotations: List<EpubAnnotation> = emptyList()
   ) = composeTestRule.setContent {
@@ -107,7 +112,10 @@ class EpubReaderScreenTest {
       search = search,
       previousPages = previousPages,
       pageMode = pageMode,
+      pageModesAvailable = pageModesAvailable,
       overviewPages = overviewPages,
+      overviewHasPrevious = overviewHasPrevious,
+      overviewHasNext = overviewHasNext,
       panels = panels,
       annotations = annotations
     )
@@ -124,48 +132,93 @@ class EpubReaderScreenTest {
   }
 
   @Test
-  fun `page view menu selects the carousel renderer`() {
+  fun `page carousel button opens the carousel directly`() {
     var selected: EpubPageMode? = null
     show(actions = EpubReaderActions(onPageModeSelected = { selected = it }))
 
-    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).performClick()
-    composeTestRule.onNodeWithTag("epubPageMode_CAROUSEL").performClick()
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG).performClick()
 
     assertEquals(EpubPageMode.CAROUSEL, selected)
+    composeTestRule.onAllNodesWithText("Page view").assertCountEquals(0)
+    composeTestRule.onAllNodesWithText("Add bookmark").assertCountEquals(0)
   }
 
   @Test
-  fun `page overview scrolls through the book and selecting a page returns to reading`() {
+  fun `overview button opens overview from the reader controls`() {
+    var selected: EpubPageMode? = null
+    show(actions = EpubReaderActions(onPageModeSelected = { selected = it }))
+
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG).performClick()
+
+    assertEquals(EpubPageMode.OVERVIEW, selected)
+  }
+
+  @Test
+  fun `carousel and overview controls are hidden without Vulkan support`() {
+    show(pageMode = EpubPageMode.OVERVIEW, pageModesAvailable = false)
+
+    composeTestRule.onAllNodesWithTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG).assertCountEquals(0)
+    composeTestRule.onAllNodesWithTag(EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG)
+      .assertCountEquals(0)
+    composeTestRule.onAllNodesWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).assertCountEquals(0)
+  }
+
+  @Test
+  fun `page overview scrolls through the book and selection opens carousel`() {
     var selected: Locator? = null
     var mode: EpubPageMode? = null
-    val pages = (1..30).map { index -> locator.copyWithLocations(totalProgression = index / 31.0) }
+    var loadedLaterPages = false
+    val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+    val pages = (1..30).map { index ->
+      EpubPagePreview(
+        locator.copyWithLocations(totalProgression = index / 31.0),
+        bitmap,
+        pageIndex = index - 1,
+        chapterTitle = if (index < 11) "Chapter 1" else "Chapter 2"
+      )
+    }
     show(
       pageMode = EpubPageMode.OVERVIEW,
       overviewPages = pages,
+      overviewHasNext = true,
       actions = EpubReaderActions(
-        onReturnToPreviousPage = { selected = it },
-        onPageModeSelected = { mode = it }
+        onSelectOverviewPage = { selected = it },
+        onPageModeSelected = { mode = it },
+        onLoadMoreOverviewPages = { before -> loadedLaterPages = !before }
       )
     )
 
-    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).performScrollToIndex(29)
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).performScrollToIndex(11)
+    composeTestRule.onNodeWithText("Chapter 2").assertIsDisplayed()
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).performScrollToIndex(30)
+    composeTestRule.onNodeWithText("Page 30").assertIsDisplayed()
+    composeTestRule.onAllNodesWithText("Earlier pages").assertCountEquals(0)
+    composeTestRule.onAllNodesWithText("Later pages").assertCountEquals(0)
     composeTestRule.onNodeWithTag("${EPUB_READER_PAGE_THUMBNAIL_TESTING_TAG}_29").performClick()
 
-    assertEquals(pages.last(), selected)
-    assertEquals(EpubPageMode.SINGLE_PAGE, mode)
+    assertEquals(pages[29].locator, selected)
+    assertEquals(EpubPageMode.CAROUSEL, mode)
+    assertTrue(loadedLaterPages)
   }
 
   @Test
   fun `bookmark margin button shows saved state and toggles the current page`() {
     var toggled = false
     show(
+      chromeVisible = false,
       actions = EpubReaderActions(onBookmark = { toggled = true }),
       annotations = listOf(
         EpubAnnotation("bookmark", EpubAnnotationKind.BOOKMARK, locator, "")
       )
     )
 
-    composeTestRule.onNodeWithContentDescription("Remove bookmark")
+    val bookmark = composeTestRule.onNodeWithContentDescription("Remove bookmark")
+      .assertIsDisplayed()
+    val page = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+    val bookmarkBounds = bookmark.getUnclippedBoundsInRoot()
+    assertTrue(bookmarkBounds.top < page.top + (page.bottom - page.top) / 3)
+    assertTrue(bookmarkBounds.left > page.left + (page.right - page.left) / 2)
+    bookmark
       .assertIsDisplayed()
       .performClick()
 
@@ -328,8 +381,7 @@ class EpubReaderScreenTest {
   }
 
   @Test
-  fun `bookmark control saves current place and annotation list can delete an item`() {
-    var bookmarks = 0
+  fun `annotation list can delete and copy an item`() {
     val annotation = EpubAnnotation(
       id = "note-id",
       kind = EpubAnnotationKind.NOTE,
@@ -340,14 +392,10 @@ class EpubReaderScreenTest {
     )
     val panels = EpubReaderPanels().apply { showAnnotations = true }
     show(
-      actions = EpubReaderActions(
-        onBookmark = { bookmarks++ }
-      ),
       panels = panels,
       annotations = listOf(annotation)
     )
 
-    composeTestRule.onNodeWithTag(EPUB_READER_BOOKMARK_TESTING_TAG).performClick()
     composeTestRule.onNodeWithText("Types").assertIsDisplayed()
     composeTestRule.onNodeWithText("Colors").assertIsDisplayed()
     composeTestRule.onNodeWithText("Chapters").assertIsDisplayed()
@@ -357,8 +405,6 @@ class EpubReaderScreenTest {
       .performScrollTo().assertIsDisplayed().assertIsEnabled()
     composeTestRule.onNodeWithTag(EPUB_READER_ANNOTATION_COPY_TESTING_TAG)
       .performScrollTo().assertIsDisplayed().assertIsEnabled()
-
-    assertEquals(1, bookmarks)
   }
 
   @Test
