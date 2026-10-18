@@ -18,11 +18,10 @@
 
 package org.kiwix.kiwixmobile.core.epub.reader
 
-import android.view.View
-import android.widget.FrameLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -35,7 +34,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -49,8 +47,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -72,15 +72,20 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -94,12 +99,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.graphics.toColorInt
-import androidx.fragment.app.FragmentContainerView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
 import org.kiwix.kiwixmobile.core.ui.components.KiwixSearchView
@@ -134,20 +138,24 @@ const val EPUB_READER_BOOKMARK_TESTING_TAG = "epubReaderBookmarkTestingTag"
 const val EPUB_READER_ANNOTATIONS_TESTING_TAG = "epubReaderAnnotationsTestingTag"
 const val EPUB_READER_ANNOTATION_DELETE_TESTING_TAG = "epubReaderAnnotationDeleteTestingTag"
 const val EPUB_READER_ANNOTATION_COPY_TESTING_TAG = "epubReaderAnnotationCopyTestingTag"
+const val EPUB_READER_PAGE_CAROUSEL_TESTING_TAG = "epubReaderPageCarouselTestingTag"
 const val EPUB_READER_PAGE_OVERVIEW_TESTING_TAG = "epubReaderPageOverviewTestingTag"
+const val EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG = "epubReaderPageOverviewButtonTestingTag"
 const val EPUB_READER_PAGE_THUMBNAIL_TESTING_TAG = "epubReaderPageThumbnailTestingTag"
 
 private const val PERCENT = 100
 private const val TRACK_ALPHA = 0.24f
 private const val PAGE_OVERVIEW_GRID_COLUMNS = 3
-private const val PAGE_OVERVIEW_CARD_ASPECT_RATIO = 0.72f
+private const val PAGE_OVERVIEW_LOAD_THRESHOLD = PAGE_OVERVIEW_GRID_COLUMNS * 2
 private const val SEEK_SETTLE_MS = 800L
 private const val ANNOTATION_CONTEXT_CHARS = 48
 private val ANNOTATION_DIALOG_MAX_HEIGHT = 700.dp
 private val ANNOTATION_LIST_MAX_HEIGHT = 360.dp
 
-private class AnnotationFilterState(private val annotations: List<EpubAnnotation>) {
-  val chapters = annotations.map(EpubAnnotation::displayTitle).distinct().sorted()
+private class AnnotationFilterState(initialAnnotations: List<EpubAnnotation>) {
+  var annotations by mutableStateOf(initialAnnotations)
+    private set
+  val chapters get() = annotations.map(EpubAnnotation::displayTitle).distinct().sorted()
   var kinds by mutableStateOf(EpubAnnotationKind.entries.toSet())
   var colors by mutableStateOf(EpubHighlightColor.entries.toSet())
   var selectedChapters by mutableStateOf(chapters.toSet())
@@ -168,6 +176,14 @@ private class AnnotationFilterState(private val annotations: List<EpubAnnotation
 
   fun toggle(chapter: String) {
     selectedChapters = selectedChapters.toggle(chapter)
+  }
+
+  fun updateAnnotations(updated: List<EpubAnnotation>) {
+    if (updated == annotations) return
+    val oldChapters = chapters.toSet()
+    annotations = updated
+    val newChapters = chapters.toSet()
+    selectedChapters = selectedChapters.intersect(oldChapters) + (newChapters - oldChapters)
   }
 }
 
@@ -195,8 +211,8 @@ data class EpubReaderActions(
   val onUpdateAnnotationNote: (EpubAnnotation, String) -> Unit = { _, _ -> },
   val onCopyAnnotation: (EpubAnnotation) -> Unit = {},
   val onPageModeSelected: (EpubPageMode) -> Unit = {},
-  val onCreateOverviewPage: (FragmentContainerView, Locator) -> Unit = { _, _ -> },
-  val onDestroyOverviewPage: (FragmentContainerView) -> Unit = {},
+  val onLoadMoreOverviewPages: (Boolean) -> Unit = {},
+  val onSelectOverviewPage: (Locator) -> Unit = {},
   val onDismissSelectionMenu: () -> Unit = {},
   val onCopySelection: (String) -> Unit = {},
   val onShareSelection: (String) -> Unit = {},
@@ -210,7 +226,14 @@ data class EpubReaderActions(
 
 enum class EpubPageMode { SINGLE_PAGE, CAROUSEL, OVERVIEW }
 
-data class EpubPagePreview(val locator: Locator, val bitmap: android.graphics.Bitmap)
+data class EpubPagePreview(
+  val locator: Locator,
+  val bitmap: android.graphics.Bitmap,
+  val pageIndex: Int = -1,
+  val resourceHref: String = locator.href.toString(),
+  val totalPages: Int = -1,
+  val chapterTitle: String = ""
+)
 
 /** Where the reader is, for the progress bar and the chapter buttons. */
 data class EpubReadingState(
@@ -226,7 +249,6 @@ class EpubReaderPanels {
   var showSettings by mutableStateOf(false)
   var showSearch by mutableStateOf(false)
   var showAnnotations by mutableStateOf(false)
-  var showPageModes by mutableStateOf(false)
 }
 
 /**
@@ -247,13 +269,17 @@ fun EpubReaderScreen(
   search: EpubSearchState = EpubSearchState(),
   previousPages: List<Locator> = emptyList(),
   pageMode: EpubPageMode = EpubPageMode.SINGLE_PAGE,
+  pageModesAvailable: Boolean = true,
   pagePreviews: List<EpubPagePreview> = emptyList(),
-  overviewPages: List<Locator> = emptyList(),
-  pagePreviewLoading: Boolean = false,
+  overviewPages: List<EpubPagePreview> = emptyList(),
+  overviewPagesLoading: Boolean = false,
+  overviewHasPrevious: Boolean = false,
+  overviewHasNext: Boolean = false,
   annotations: List<EpubAnnotation> = emptyList(),
   selectionLocator: Locator? = null
 ) {
   val ready = state as? EpubReaderUiState.Ready
+  val shownPageMode = if (pageModesAvailable) pageMode else EpubPageMode.SINGLE_PAGE
   val currentPageBookmarked = reading.locator?.let { currentLocator ->
     annotations.any {
       it.kind == EpubAnnotationKind.BOOKMARK && it.locator.sameBookmarkPosition(currentLocator)
@@ -276,9 +302,9 @@ fun EpubReaderScreen(
             chromeVisible,
             pageReady,
             previousPages,
-            pageMode,
+            shownPageMode,
+            pageModesAvailable,
             pagePreviews,
-            pagePreviewLoading,
             overviewPages
           ),
           panels,
@@ -287,36 +313,52 @@ fun EpubReaderScreen(
           searchResultsListState
         )
       }
-      if (ready != null && pageReady && reading.locator != null) {
+      if (shouldShowBookmarkMargin(ready, pageReady, reading, chromeVisible, shownPageMode)) {
         BookmarkMarginButton(currentPageBookmarked, actions.onBookmark)
       }
-      if (pageMode == EpubPageMode.OVERVIEW) {
+      if (shownPageMode == EpubPageMode.OVERVIEW) {
         PageOverviewGrid(
           overviewPages,
+          overviewPagesLoading,
+          overviewHasPrevious,
+          overviewHasNext,
+          actions.onLoadMoreOverviewPages,
           actions.onPageModeSelected,
-          actions.onReturnToPreviousPage,
-          actions.onCreateOverviewPage,
-          actions.onDestroyOverviewPage
+          actions.onSelectOverviewPage
         )
       }
-      if (pagePreviewLoading) PagePreviewLoading()
     }
-    ReaderPanels(ready, reading, settings, panels, actions, annotations, pageMode)
+    ReaderPanels(ready, reading, settings, panels, actions, annotations)
     selectionLocator?.let { SelectionActionsDialog(it, actions) }
   }
 }
+
+private fun shouldShowBookmarkMargin(
+  ready: EpubReaderUiState.Ready?,
+  pageReady: Boolean,
+  reading: EpubReadingState,
+  chromeVisible: Boolean,
+  pageMode: EpubPageMode
+) = ready != null &&
+  pageReady &&
+  reading.locator != null &&
+  !chromeVisible &&
+  pageMode != EpubPageMode.OVERVIEW
 
 @Composable
 private fun BoxScope.BookmarkMarginButton(bookmarked: Boolean, onClick: () -> Unit) {
   Surface(
     modifier = Modifier
-      .align(Alignment.CenterStart)
-      .padding(start = EIGHT_DP)
+      .align(Alignment.TopEnd)
+      .padding(top = EIGHT_DP, end = EIGHT_DP)
       .shadow(EIGHT_DP, CircleShape),
     shape = CircleShape,
     color = MaterialTheme.colorScheme.surface
   ) {
-    IconButton(onClick = onClick) {
+    IconButton(
+      onClick = onClick,
+      modifier = Modifier.testTag(EPUB_READER_BOOKMARK_TESTING_TAG)
+    ) {
       Icon(
         painter = painterResource(
           if (bookmarked) R.drawable.ic_bookmark_24dp else R.drawable.ic_bookmark_border_24dp
@@ -518,9 +560,9 @@ private data class ReaderChromeState(
   val pageReady: Boolean,
   val previousPages: List<Locator>,
   val pageMode: EpubPageMode,
+  val pageModesAvailable: Boolean,
   val pagePreviews: List<EpubPagePreview>,
-  val pagePreviewLoading: Boolean,
-  val overviewPages: List<Locator>
+  val overviewPages: List<EpubPagePreview>
 )
 
 @Composable
@@ -575,9 +617,14 @@ private fun BoxScope.ReaderChrome(
     exit = fadeOut()
   ) {
     if (ready != null) {
-      BottomBar(ready.book, reading, actions, onToc = { panels.showToc = true }) {
-        panels.showPageModes = true
-      }
+      BottomBar(
+        ready.book,
+        reading,
+        actions,
+        state.pageMode,
+        state.pageModesAvailable,
+        onToc = { panels.showToc = true }
+      )
     }
   }
   val visiblePreviousPages = previousPages.takeIf { state.shouldShowPreviousPages(search.isOpen) }.orEmpty()
@@ -617,8 +664,7 @@ private fun ReaderPanels(
   settings: EpubReaderSettings,
   panels: EpubReaderPanels,
   actions: EpubReaderActions,
-  annotations: List<EpubAnnotation>,
-  pageMode: EpubPageMode
+  annotations: List<EpubAnnotation>
 ) {
   if (panels.showToc && ready != null) {
     TocDialog(ready.book.toc, reading.locator, onDismiss = { panels.showToc = false }) {
@@ -642,149 +688,205 @@ private fun ReaderPanels(
       onCopy = actions.onCopyAnnotation
     )
   }
-  if (panels.showPageModes) {
-    PageModeDialog(
-      selected = pageMode,
-      onSelect = {
-        panels.showPageModes = false
-        actions.onPageModeSelected(it)
-      },
-      onDismiss = { panels.showPageModes = false }
-    )
-  }
-}
-
-@Composable
-private fun PageModeDialog(
-  selected: EpubPageMode,
-  onSelect: (EpubPageMode) -> Unit,
-  onDismiss: () -> Unit
-) {
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = { Text(stringResource(R.string.epub_page_layout)) },
-    text = {
-      Column {
-        EpubPageMode.entries.forEach { mode ->
-          TextButton(
-            onClick = { onSelect(mode) },
-            modifier = Modifier.fillMaxWidth().testTag("epubPageMode_${mode.name}")
-          ) {
-            Text(
-              text = stringResource(mode.labelResource()),
-              fontWeight = if (mode == selected) FontWeight.Bold else FontWeight.Normal
-            )
-          }
-        }
-      }
-    },
-    confirmButton = {}
-  )
-}
-
-@androidx.annotation.StringRes
-private fun EpubPageMode.labelResource() = when (this) {
-  EpubPageMode.SINGLE_PAGE -> R.string.epub_single_page
-  EpubPageMode.CAROUSEL -> R.string.epub_page_carousel
-  EpubPageMode.OVERVIEW -> R.string.epub_page_overview
 }
 
 @Composable
 private fun PageOverviewGrid(
-  pages: List<Locator>,
+  pages: List<EpubPagePreview>,
+  loading: Boolean,
+  hasPrevious: Boolean,
+  hasNext: Boolean,
+  onLoadMore: (Boolean) -> Unit,
   onModeSelected: (EpubPageMode) -> Unit,
-  onSelect: (Locator) -> Unit,
-  onCreatePage: (FragmentContainerView, Locator) -> Unit,
-  onDestroyPage: (FragmentContainerView) -> Unit
+  onSelect: (Locator) -> Unit
 ) {
   Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
     Column(Modifier.fillMaxSize().padding(SIXTEEN_DP)) {
-      Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-          stringResource(R.string.epub_page_overview),
-          modifier = Modifier.weight(1f),
-          style = MaterialTheme.typography.titleLarge
-        )
-        TextButton(onClick = { onModeSelected(EpubPageMode.SINGLE_PAGE) }) {
-          Text(stringResource(R.string.epub_close))
-        }
-      }
+      PageOverviewHeader(onModeSelected)
       if (pages.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
           CircularProgressIndicator()
         }
       } else {
-        LazyVerticalGrid(
-          columns = GridCells.Fixed(PAGE_OVERVIEW_GRID_COLUMNS),
-          modifier = Modifier.fillMaxSize().testTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG),
-          verticalArrangement = Arrangement.spacedBy(EIGHT_DP),
-          horizontalArrangement = Arrangement.spacedBy(EIGHT_DP)
-        ) {
-          itemsIndexed(pages, key = { index, _ -> index }) { index, locator ->
-            PagePreviewCard(locator, index, onCreatePage, onDestroyPage) {
-              onSelect(locator)
-              onModeSelected(EpubPageMode.SINGLE_PAGE)
-            }
-          }
-        }
+        PageOverviewGridContent(
+          pages,
+          PageOverviewState(loading, hasPrevious, hasNext),
+          PageOverviewActions(onLoadMore, onModeSelected, onSelect),
+          Modifier.weight(1f)
+        )
       }
     }
   }
 }
 
 @Composable
-private fun PagePreviewCard(
-  locator: Locator,
+private fun PageOverviewHeader(onModeSelected: (EpubPageMode) -> Unit) {
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Text(
+      stringResource(R.string.epub_page_overview),
+      modifier = Modifier.weight(1f),
+      style = MaterialTheme.typography.titleLarge
+    )
+    TextButton(onClick = { onModeSelected(EpubPageMode.CAROUSEL) }) {
+      Text(stringResource(R.string.epub_page_carousel))
+    }
+  }
+}
+
+@Composable
+private fun PageOverviewGridContent(
+  pages: List<EpubPagePreview>,
+  state: PageOverviewState,
+  actions: PageOverviewActions,
+  modifier: Modifier
+) {
+  val gridState = rememberLazyGridState()
+  PageOverviewLoadMoreEffect(gridState, pages.size, state, actions.onLoadMore)
+  LazyVerticalGrid(
+    columns = GridCells.Fixed(PAGE_OVERVIEW_GRID_COLUMNS),
+    state = gridState,
+    modifier = modifier.testTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG),
+    horizontalArrangement = Arrangement.spacedBy(EIGHT_DP),
+    verticalArrangement = Arrangement.spacedBy(EIGHT_DP)
+  ) {
+    pages.forEachIndexed { index, preview ->
+      if (isNewPreviewChapter(pages, index, preview)) {
+        item(
+          key = "chapter-${preview.resourceHref}-${preview.chapterTitle}",
+          span = { GridItemSpan(maxLineSpan) }
+        ) {
+          Text(
+            preview.chapterTitle,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.fillMaxWidth().padding(top = EIGHT_DP, bottom = 4.dp)
+          )
+        }
+      }
+      item(key = "page-${preview.resourceHref}-${preview.pageIndex}") {
+        PagePreviewCard(preview, index, Modifier.fillMaxWidth().height(256.dp)) {
+          actions.onSelect(preview.locator)
+          actions.onModeSelected(EpubPageMode.CAROUSEL)
+        }
+      }
+    }
+    if (state.loading) {
+      item(span = { GridItemSpan(maxLineSpan) }) {
+        CircularProgressIndicator(Modifier.padding(EIGHT_DP).size(24.dp))
+      }
+    }
+  }
+}
+
+private data class PageOverviewState(
+  val loading: Boolean,
+  val hasPrevious: Boolean,
+  val hasNext: Boolean
+)
+
+private data class PageOverviewActions(
+  val onLoadMore: (Boolean) -> Unit,
+  val onModeSelected: (EpubPageMode) -> Unit,
+  val onSelect: (Locator) -> Unit
+)
+
+private fun isNewPreviewChapter(
+  pages: List<EpubPagePreview>,
   index: Int,
-  onCreatePage: (FragmentContainerView, Locator) -> Unit,
-  onDestroyPage: (FragmentContainerView) -> Unit,
+  preview: EpubPagePreview
+) = preview.chapterTitle.isNotBlank() &&
+  (index == 0 || pages[index - 1].chapterTitle != preview.chapterTitle)
+
+@Composable
+private fun PageOverviewLoadMoreEffect(
+  gridState: LazyGridState,
+  pageCount: Int,
+  state: PageOverviewState,
+  onLoadMore: (Boolean) -> Unit
+) {
+  var requestedLoad by remember { mutableStateOf<Pair<Boolean, Int>?>(null) }
+  val currentOnLoadMore by rememberUpdatedState(onLoadMore)
+  val currentLoading by rememberUpdatedState(state.loading)
+  val currentHasPrevious by rememberUpdatedState(state.hasPrevious)
+  val currentHasNext by rememberUpdatedState(state.hasNext)
+  val currentPageCount by rememberUpdatedState(pageCount)
+  LaunchedEffect(gridState) {
+    observeOverviewScroll(
+      gridState,
+      currentPageCount,
+      currentLoading,
+      currentHasPrevious,
+      currentHasNext
+    ).collect { request ->
+      if (request != null && requestedLoad != request) {
+        requestedLoad = request
+        currentOnLoadMore(request.first)
+      }
+    }
+  }
+}
+
+private fun observeOverviewScroll(
+  gridState: LazyGridState,
+  pageCount: Int,
+  loading: Boolean,
+  hasPrevious: Boolean,
+  hasNext: Boolean
+) = snapshotFlow {
+  val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+  overviewLoadRequest(
+    gridState.firstVisibleItemIndex,
+    lastVisible,
+    pageCount,
+    loading,
+    hasPrevious,
+    hasNext
+  )
+}
+
+private fun overviewLoadRequest(
+  firstVisible: Int,
+  lastVisible: Int,
+  pageCount: Int,
+  loading: Boolean,
+  hasPrevious: Boolean,
+  hasNext: Boolean
+): Pair<Boolean, Int>? = if (loading) {
+  null
+} else {
+  val direction = when {
+    firstVisible <= PAGE_OVERVIEW_LOAD_THRESHOLD && hasPrevious -> true
+    lastVisible >= pageCount - PAGE_OVERVIEW_LOAD_THRESHOLD && hasNext -> false
+    else -> null
+  }
+  direction?.let { it to pageCount }
+}
+
+@Composable
+private fun PagePreviewCard(
+  preview: EpubPagePreview,
+  index: Int,
+  modifier: Modifier,
   onClick: () -> Unit
 ) {
   Surface(
-    modifier = Modifier.fillMaxWidth().aspectRatio(PAGE_OVERVIEW_CARD_ASPECT_RATIO).clickable(onClick = onClick)
+    modifier = modifier.clickable(onClick = onClick)
       .testTag("${EPUB_READER_PAGE_THUMBNAIL_TESTING_TAG}_$index"),
     shape = MaterialTheme.shapes.small,
     color = MaterialTheme.colorScheme.surface,
     shadowElevation = EIGHT_DP
   ) {
-    AndroidView(
-      factory = { context ->
-        FrameLayout(context).apply {
-          clipChildren = true
-          val display = context.resources.displayMetrics
-          val preview = FragmentContainerView(context).apply {
-            id = View.generateViewId()
-            pivotX = 0f
-            pivotY = 0f
-            onCreatePage(this, locator)
-          }
-          addView(preview, FrameLayout.LayoutParams(display.widthPixels, display.heightPixels))
-          addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
-            preview.scaleX = (right - left).toFloat() / display.widthPixels
-            preview.scaleY = (bottom - top).toFloat() / display.heightPixels
-          }
-        }
-      },
-      onRelease = { host ->
-        (host.getChildAt(0) as? FragmentContainerView)?.let(onDestroyPage)
-      },
-      modifier = Modifier.fillMaxSize()
-    )
-  }
-}
-
-@Composable
-private fun PagePreviewLoading() {
-  Dialog(onDismissRequest = {}) {
-    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
-      Row(
-        Modifier.padding(SIXTEEN_DP),
-        horizontalArrangement = Arrangement.spacedBy(EIGHT_DP),
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        CircularProgressIndicator(Modifier.size(24.dp))
-        Text(stringResource(R.string.epub_rendering_pages))
-      }
+    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+      Image(
+        bitmap = preview.bitmap.asImageBitmap(),
+        contentDescription = stringResource(R.string.epub_page_overview),
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.weight(1f).fillMaxWidth().padding(EIGHT_DP)
+      )
+      Text(
+        stringResource(R.string.epub_page_number, preview.pageIndex + 1),
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.padding(bottom = EIGHT_DP)
+      )
     }
   }
 }
@@ -1120,8 +1222,9 @@ private fun BottomBar(
   book: OpenEpub,
   reading: EpubReadingState,
   actions: EpubReaderActions,
+  pageMode: EpubPageMode,
+  pageModesAvailable: Boolean,
   onToc: () -> Unit,
-  onPageModes: () -> Unit
 ) {
   val progress = readingProgress(reading.locator, reading.positionCount)
   val preview = rememberSeekPreview(reading.locator)
@@ -1146,19 +1249,52 @@ private fun BottomBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
-        TextButton(onClick = actions.onBookmark, modifier = Modifier.testTag(EPUB_READER_BOOKMARK_TESTING_TAG)) {
-          Text(stringResource(R.string.epub_add_bookmark))
-        }
         TextButton(
           onClick = actions.onShowAnnotations,
           modifier = Modifier.testTag(EPUB_READER_ANNOTATIONS_TESTING_TAG)
         ) {
           Text(stringResource(R.string.epub_annotations))
         }
-        TextButton(onClick = onPageModes, modifier = Modifier.testTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG)) {
-          Text(stringResource(R.string.epub_page_layout))
-        }
+        PageModeButtons(pageMode, pageModesAvailable, actions.onPageModeSelected)
       }
+    }
+  }
+}
+
+@Composable
+private fun PageModeButtons(
+  pageMode: EpubPageMode,
+  pageModesAvailable: Boolean,
+  onPageModeSelected: (EpubPageMode) -> Unit
+) {
+  if (pageModesAvailable) {
+    TextButton(
+      onClick = {
+        onPageModeSelected(
+          if (pageMode == EpubPageMode.CAROUSEL) {
+            EpubPageMode.SINGLE_PAGE
+          } else {
+            EpubPageMode.CAROUSEL
+          }
+        )
+      },
+      modifier = Modifier.testTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG)
+    ) {
+      Text(
+        stringResource(
+          if (pageMode == EpubPageMode.CAROUSEL) {
+            R.string.epub_single_page
+          } else {
+            R.string.epub_page_carousel
+          }
+        )
+      )
+    }
+    TextButton(
+      onClick = { onPageModeSelected(EpubPageMode.OVERVIEW) },
+      modifier = Modifier.testTag(EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG)
+    ) {
+      Text(stringResource(R.string.epub_page_overview))
     }
   }
 }
@@ -1330,7 +1466,8 @@ private fun AnnotationsDialog(
   onUpdateNote: (EpubAnnotation, String) -> Unit,
   onCopy: (EpubAnnotation) -> Unit
 ) {
-  val filters = remember(annotations) { AnnotationFilterState(annotations) }
+  val filters = remember { AnnotationFilterState(annotations) }
+  SideEffect { filters.updateAnnotations(annotations) }
   var noteTarget by remember { mutableStateOf<EpubAnnotation?>(null) }
   var noteText by remember { mutableStateOf("") }
   Dialog(

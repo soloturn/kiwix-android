@@ -25,13 +25,16 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import org.kiwix.kiwixmobile.core.epub.EpubLibraryManager
 import org.kiwix.kiwixmobile.core.epub.EpubOpenResult
@@ -124,6 +127,7 @@ class EpubReaderViewModel @Inject constructor(
 
   private var saveJob: Job? = null
   private var searchJob: Job? = null
+  private var searchRequestId = 0L
   private var annotationSaveJob: Job? = null
 
   init {
@@ -241,13 +245,13 @@ class EpubReaderViewModel @Inject constructor(
       locator = locator,
       text = text,
       note = note,
-      title = chapterTitle(locator),
+      title = chapterTitleFor(locator),
       color = color
     )
     persistAnnotations()
   }
 
-  private fun chapterTitle(locator: Locator): String {
+  fun chapterTitleFor(locator: Locator): String {
     val book = (_state.value as? EpubReaderUiState.Ready)?.book ?: return ""
     val locatorHref = locator.href.toString().substringBefore('#')
     val tocTitle = book.toc.firstOrNull { sameHref(it.link.href.toString(), locatorHref) }?.title
@@ -268,11 +272,10 @@ class EpubReaderViewModel @Inject constructor(
 
   private fun persistAnnotations() {
     val book = (_state.value as? EpubReaderUiState.Ready)?.book ?: return
+    val snapshot = _annotations.value.toList()
     annotationSaveJob?.cancel()
     annotationSaveJob = viewModelScope.launch {
-      withContext(NonCancellable) {
-        annotationRepository.save(book.bookId, book.title, _annotations.value)
-      }
+      annotationRepository.save(book.bookId, book.title, snapshot)
     }
   }
 
@@ -291,28 +294,34 @@ class EpubReaderViewModel @Inject constructor(
   }
 
   fun closeSearch() {
+    searchRequestId++
+    searchJob?.cancel()
+    searchJob = null
     panels.showSearch = false
-    _search.value = _search.value.copy(isOpen = false)
+    _search.value = _search.value.copy(isOpen = false, isSearching = false)
   }
 
   fun updateSearchQuery(query: String) {
     val current = _search.value
     if (current.query == query) return
     searchJob?.cancel()
+    val requestId = ++searchRequestId
     _search.value = current.copy(
       query = query,
       results = emptyList(),
       suggestions = emptyList(),
       showingSuggestions = true,
-      isSearching = query.isNotBlank(),
+      isSearching = false,
       hasSearched = false,
       failed = false,
       limited = false
     )
-    if (query.isBlank()) return
+    if (query.codePointCount(0, query.length) < MIN_SUGGESTION_QUERY_CODE_POINTS) return
     searchJob = viewModelScope.launch {
       delay(SEARCH_DEBOUNCE_MS)
-      runSearch(query, suggestionsOnly = true)
+      if (requestId == searchRequestId && _search.value.isOpen) {
+        runSearch(query, suggestionsOnly = true, requestId = requestId)
+      }
     }
   }
 
@@ -321,6 +330,9 @@ class EpubReaderViewModel @Inject constructor(
   fun searchBook(query: String) {
     val normalizedQuery = query.trim()
     if (normalizedQuery.isEmpty()) {
+      searchRequestId++
+      searchJob?.cancel()
+      searchJob = null
       _search.value = _search.value.copy(
         results = emptyList(),
         suggestions = emptyList(),
@@ -331,6 +343,7 @@ class EpubReaderViewModel @Inject constructor(
       return
     }
     searchJob?.cancel()
+    val requestId = ++searchRequestId
     _search.value = _search.value.copy(
       query = normalizedQuery,
       results = emptyList(),
@@ -341,7 +354,9 @@ class EpubReaderViewModel @Inject constructor(
       failed = false,
       limited = false
     )
-    runSearch(normalizedQuery, suggestionsOnly = false)
+    searchJob = viewModelScope.launch {
+      runSearch(normalizedQuery, suggestionsOnly = false, requestId = requestId)
+    }
   }
 
   fun selectSearchSuggestion(word: String) {
@@ -350,25 +365,47 @@ class EpubReaderViewModel @Inject constructor(
 
   /** Runs Readium search and either extracts word suggestions or gathers a bounded result page. */
   @OptIn(ExperimentalReadiumApi::class)
-  private fun runSearch(query: String, suggestionsOnly: Boolean) {
-    val publication = (_state.value as? EpubReaderUiState.Ready)?.book?.publication ?: return
+  private suspend fun runSearch(query: String, suggestionsOnly: Boolean, requestId: Long) {
+    val publication = if (requestId == searchRequestId) {
+      (_state.value as? EpubReaderUiState.Ready)?.book?.publication
+    } else {
+      null
+    }
+    if (publication != null) searchPublication(publication, query, suggestionsOnly, requestId)
+  }
+
+  @OptIn(ExperimentalReadiumApi::class)
+  private suspend fun searchPublication(
+    publication: Publication,
+    query: String,
+    suggestionsOnly: Boolean,
+    requestId: Long
+  ) {
     _search.value = _search.value.copy(
       isSearching = true,
       hasSearched = false,
       failed = false,
       limited = false
     )
-    searchJob = viewModelScope.launch {
-      try {
-        val iterator = publication.search(query)
-          ?: error("This publication does not support search")
-        val batch = try {
-          collectSearchBatch(query, suggestionsOnly) {
+    try {
+      val iterator = publication.search(query)
+        ?: error("This publication does not support search")
+      val batch = try {
+        if (suggestionsOnly) {
+          withTimeoutOrNull(MAX_AUTOMATIC_SUGGESTION_TIME_MS) {
+            collectSearchBatch(query, suggestionsOnly = true) {
+              iterator.next().getOrElse { error(it.toString()) }?.locators
+            }
+          } ?: EpubSearchBatch(limited = true)
+        } else {
+          collectSearchBatch(query, suggestionsOnly = false) {
             iterator.next().getOrElse { error(it.toString()) }?.locators
           }
-        } finally {
-          iterator.close()
         }
+      } finally {
+        iterator.close()
+      }
+      if (requestId == searchRequestId) {
         _search.value = _search.value.copy(
           results = batch.results,
           suggestions = batch.suggestions,
@@ -377,9 +414,11 @@ class EpubReaderViewModel @Inject constructor(
           limited = batch.limited,
           showingSuggestions = suggestionsOnly
         )
-      } catch (cancelled: CancellationException) {
-        throw cancelled
-      } catch (_: Exception) {
+      }
+    } catch (cancelled: CancellationException) {
+      throw cancelled
+    } catch (_: Exception) {
+      if (requestId == searchRequestId) {
         _search.value = _search.value.copy(
           isSearching = false,
           hasSearched = true,
@@ -400,8 +439,10 @@ class EpubReaderViewModel @Inject constructor(
   private suspend fun collectResults(nextPage: suspend () -> List<Locator>?): EpubSearchBatch {
     val results = mutableListOf<EpubSearchResult>()
     while (results.size < MAX_SEARCH_RESULTS) {
+      currentCoroutineContext().ensureActive()
       val locators = nextPage() ?: break
       for (locator in locators) {
+        currentCoroutineContext().ensureActive()
         results += EpubSearchResult(locator, searchSnippet(locator))
         if (results.size == MAX_SEARCH_RESULTS) break
       }
@@ -416,8 +457,10 @@ class EpubReaderViewModel @Inject constructor(
     val suggestions = linkedSetOf<String>()
     var scanned = 0
     while (scanned < MAX_SUGGESTION_MATCHES && suggestions.size < MAX_SEARCH_SUGGESTIONS) {
+      currentCoroutineContext().ensureActive()
       val locators = nextPage() ?: break
       for (locator in locators) {
+        currentCoroutineContext().ensureActive()
         searchWord(locator, query)?.let(suggestions::add)
         scanned++
         if (scanned == MAX_SUGGESTION_MATCHES || suggestions.size == MAX_SEARCH_SUGGESTIONS) break
@@ -478,6 +521,8 @@ class EpubReaderViewModel @Inject constructor(
     private const val MAX_SEARCH_RESULTS = 100
     private const val MAX_SEARCH_SUGGESTIONS = 12
     private const val MAX_SUGGESTION_MATCHES = 100
+    private const val MIN_SUGGESTION_QUERY_CODE_POINTS = 2
+    private const val MAX_AUTOMATIC_SUGGESTION_TIME_MS = 1_500L
     private const val SEARCH_DEBOUNCE_MS = 300L
     private val WORD = Regex("[\\p{L}\\p{M}\\p{N}]+(?:['’_-][\\p{L}\\p{M}\\p{N}]+)*")
     private val WHITESPACE = Regex("\\s+")

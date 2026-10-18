@@ -166,6 +166,36 @@ class EpubReaderViewModelTest {
   }
 
   @Test
+  fun `automatic search suggestions ignore a one-character query`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    vm.openSearch()
+
+    vm.updateSearchQuery("a")
+    advanceTimeBy(1_000)
+    runCurrent()
+
+    assertFalse(vm.search.value.isSearching)
+    assertFalse(vm.search.value.hasSearched)
+  }
+
+  @Test
+  fun `closing search cancels the pending automatic search`() = runTest {
+    val vm = viewModel(book().path)
+    vm.ready()
+    vm.openSearch()
+
+    vm.updateSearchQuery("bitcoin")
+    vm.closeSearch()
+    advanceTimeBy(1_000)
+    runCurrent()
+
+    assertFalse(vm.search.value.isOpen)
+    assertFalse(vm.search.value.isSearching)
+    assertFalse(vm.search.value.hasSearched)
+  }
+
+  @Test
   fun `bookmark toggle tracks the current location and removes it when tapped again`() = runTest {
     val vm = viewModel(book().path)
     vm.ready()
