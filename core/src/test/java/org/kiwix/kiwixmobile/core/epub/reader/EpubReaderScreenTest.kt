@@ -18,7 +18,6 @@
 
 package org.kiwix.kiwixmobile.core.epub.reader
 
-import android.graphics.Bitmap
 import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -132,13 +131,11 @@ class EpubReaderScreenTest {
   }
 
   @Test
-  fun `page carousel button opens the carousel directly`() {
-    var selected: EpubPageMode? = null
-    show(actions = EpubReaderActions(onPageModeSelected = { selected = it }))
+  fun `reader controls do not offer a carousel single page switch`() {
+    show()
 
-    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG).performClick()
-
-    assertEquals(EpubPageMode.CAROUSEL, selected)
+    composeTestRule.onAllNodesWithText("Page carousel").assertCountEquals(0)
+    composeTestRule.onAllNodesWithText("Single page").assertCountEquals(0)
     composeTestRule.onAllNodesWithText("Page view").assertCountEquals(0)
     composeTestRule.onAllNodesWithText("Add bookmark").assertCountEquals(0)
   }
@@ -157,7 +154,6 @@ class EpubReaderScreenTest {
   fun `carousel and overview controls are hidden without Vulkan support`() {
     show(pageMode = EpubPageMode.OVERVIEW, pageModesAvailable = false)
 
-    composeTestRule.onAllNodesWithTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG).assertCountEquals(0)
     composeTestRule.onAllNodesWithTag(EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG)
       .assertCountEquals(0)
     composeTestRule.onAllNodesWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).assertCountEquals(0)
@@ -168,11 +164,10 @@ class EpubReaderScreenTest {
     var selected: Locator? = null
     var mode: EpubPageMode? = null
     var loadedLaterPages = false
-    val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
     val pages = (1..30).map { index ->
       EpubPagePreview(
         locator.copyWithLocations(totalProgression = index / 31.0),
-        bitmap,
+        "overview-page-$index",
         pageIndex = index - 1,
         chapterTitle = if (index < 11) "Chapter 1" else "Chapter 2"
       )
@@ -199,6 +194,40 @@ class EpubReaderScreenTest {
     assertEquals(pages[29].locator, selected)
     assertEquals(EpubPageMode.CAROUSEL, mode)
     assertTrue(loadedLaterPages)
+  }
+
+  @Test
+  fun `overview loads the next batch after page count and loading state change`() {
+    val pages = (0..29).map { index ->
+      EpubPagePreview(locator, "overview-page-$index", pageIndex = index)
+    }
+    val displayedPages = mutableStateOf(pages.take(3))
+    val loading = mutableStateOf(true)
+    val requests = mutableListOf<Boolean>()
+    composeTestRule.setContent {
+      EpubReaderScreen(
+        ready,
+        EpubReaderSettings(),
+        EpubReadingState(locator = locator),
+        true,
+        EpubReaderActions(onLoadMoreOverviewPages = { requests += it }),
+        pageMode = EpubPageMode.OVERVIEW,
+        overviewPages = displayedPages.value,
+        overviewPagesLoading = loading.value,
+        overviewHasPrevious = false,
+        overviewHasNext = true
+      )
+    }
+    composeTestRule.runOnIdle { assertTrue(requests.isEmpty()) }
+    composeTestRule.runOnIdle { loading.value = false }
+    composeTestRule.runOnIdle { assertEquals(listOf(false), requests) }
+    composeTestRule.runOnIdle {
+      loading.value = true
+      displayedPages.value = pages
+    }
+    composeTestRule.runOnIdle { loading.value = false }
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).performScrollToIndex(29)
+    composeTestRule.runOnIdle { assertEquals(listOf(false, false), requests) }
   }
 
   @Test

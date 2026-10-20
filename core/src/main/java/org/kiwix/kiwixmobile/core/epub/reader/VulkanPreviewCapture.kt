@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Captures a Readium preview display into GPU-backed buffers, then scales it with Vulkan. */
-@RequiresApi(Build.VERSION_CODES.O)
+@RequiresApi(Build.VERSION_CODES.R)
 internal class VulkanPreviewCapture(
   context: Context,
   width: Int,
