@@ -138,7 +138,6 @@ const val EPUB_READER_BOOKMARK_TESTING_TAG = "epubReaderBookmarkTestingTag"
 const val EPUB_READER_ANNOTATIONS_TESTING_TAG = "epubReaderAnnotationsTestingTag"
 const val EPUB_READER_ANNOTATION_DELETE_TESTING_TAG = "epubReaderAnnotationDeleteTestingTag"
 const val EPUB_READER_ANNOTATION_COPY_TESTING_TAG = "epubReaderAnnotationCopyTestingTag"
-const val EPUB_READER_PAGE_CAROUSEL_TESTING_TAG = "epubReaderPageCarouselTestingTag"
 const val EPUB_READER_PAGE_OVERVIEW_TESTING_TAG = "epubReaderPageOverviewTestingTag"
 const val EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG = "epubReaderPageOverviewButtonTestingTag"
 const val EPUB_READER_PAGE_THUMBNAIL_TESTING_TAG = "epubReaderPageThumbnailTestingTag"
@@ -621,7 +620,6 @@ private fun BoxScope.ReaderChrome(
         ready.book,
         reading,
         actions,
-        state.pageMode,
         state.pageModesAvailable,
         onToc = { panels.showToc = true }
       )
@@ -810,37 +808,22 @@ private fun PageOverviewLoadMoreEffect(
   val currentHasNext by rememberUpdatedState(state.hasNext)
   val currentPageCount by rememberUpdatedState(pageCount)
   LaunchedEffect(gridState) {
-    observeOverviewScroll(
-      gridState,
-      currentPageCount,
-      currentLoading,
-      currentHasPrevious,
-      currentHasNext
-    ).collect { request ->
+    snapshotFlow {
+      overviewLoadRequest(
+        gridState.firstVisibleItemIndex,
+        gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0,
+        currentPageCount,
+        currentLoading,
+        currentHasPrevious,
+        currentHasNext
+      )
+    }.collect { request ->
       if (request != null && requestedLoad != request) {
         requestedLoad = request
         currentOnLoadMore(request.first)
       }
     }
   }
-}
-
-private fun observeOverviewScroll(
-  gridState: LazyGridState,
-  pageCount: Int,
-  loading: Boolean,
-  hasPrevious: Boolean,
-  hasNext: Boolean
-) = snapshotFlow {
-  val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-  overviewLoadRequest(
-    gridState.firstVisibleItemIndex,
-    lastVisible,
-    pageCount,
-    loading,
-    hasPrevious,
-    hasNext
-  )
 }
 
 private fun overviewLoadRequest(
@@ -1222,7 +1205,6 @@ private fun BottomBar(
   book: OpenEpub,
   reading: EpubReadingState,
   actions: EpubReaderActions,
-  pageMode: EpubPageMode,
   pageModesAvailable: Boolean,
   onToc: () -> Unit,
 ) {
@@ -1255,41 +1237,18 @@ private fun BottomBar(
         ) {
           Text(stringResource(R.string.epub_annotations))
         }
-        PageModeButtons(pageMode, pageModesAvailable, actions.onPageModeSelected)
+        PageOverviewButton(pageModesAvailable, actions.onPageModeSelected)
       }
     }
   }
 }
 
 @Composable
-private fun PageModeButtons(
-  pageMode: EpubPageMode,
+private fun PageOverviewButton(
   pageModesAvailable: Boolean,
   onPageModeSelected: (EpubPageMode) -> Unit
 ) {
   if (pageModesAvailable) {
-    TextButton(
-      onClick = {
-        onPageModeSelected(
-          if (pageMode == EpubPageMode.CAROUSEL) {
-            EpubPageMode.SINGLE_PAGE
-          } else {
-            EpubPageMode.CAROUSEL
-          }
-        )
-      },
-      modifier = Modifier.testTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG)
-    ) {
-      Text(
-        stringResource(
-          if (pageMode == EpubPageMode.CAROUSEL) {
-            R.string.epub_single_page
-          } else {
-            R.string.epub_page_carousel
-          }
-        )
-      )
-    }
     TextButton(
       onClick = { onPageModeSelected(EpubPageMode.OVERVIEW) },
       modifier = Modifier.testTag(EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG)
