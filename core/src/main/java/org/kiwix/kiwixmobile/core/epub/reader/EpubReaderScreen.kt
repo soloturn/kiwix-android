@@ -18,6 +18,7 @@
 
 package org.kiwix.kiwixmobile.core.epub.reader
 
+import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -75,6 +76,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -138,7 +140,6 @@ const val EPUB_READER_BOOKMARK_TESTING_TAG = "epubReaderBookmarkTestingTag"
 const val EPUB_READER_ANNOTATIONS_TESTING_TAG = "epubReaderAnnotationsTestingTag"
 const val EPUB_READER_ANNOTATION_DELETE_TESTING_TAG = "epubReaderAnnotationDeleteTestingTag"
 const val EPUB_READER_ANNOTATION_COPY_TESTING_TAG = "epubReaderAnnotationCopyTestingTag"
-const val EPUB_READER_PAGE_CAROUSEL_TESTING_TAG = "epubReaderPageCarouselTestingTag"
 const val EPUB_READER_PAGE_OVERVIEW_TESTING_TAG = "epubReaderPageOverviewTestingTag"
 const val EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG = "epubReaderPageOverviewButtonTestingTag"
 const val EPUB_READER_PAGE_THUMBNAIL_TESTING_TAG = "epubReaderPageThumbnailTestingTag"
@@ -228,7 +229,7 @@ enum class EpubPageMode { SINGLE_PAGE, CAROUSEL, OVERVIEW }
 
 data class EpubPagePreview(
   val locator: Locator,
-  val bitmap: android.graphics.Bitmap,
+  val cacheKey: String,
   val pageIndex: Int = -1,
   val resourceHref: String = locator.href.toString(),
   val totalPages: Int = -1,
@@ -275,6 +276,7 @@ fun EpubReaderScreen(
   overviewPagesLoading: Boolean = false,
   overviewHasPrevious: Boolean = false,
   overviewHasNext: Boolean = false,
+  loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap? = { null },
   annotations: List<EpubAnnotation> = emptyList(),
   selectionLocator: Locator? = null
 ) {
@@ -319,12 +321,17 @@ fun EpubReaderScreen(
       if (shownPageMode == EpubPageMode.OVERVIEW) {
         PageOverviewGrid(
           overviewPages,
-          overviewPagesLoading,
-          overviewHasPrevious,
-          overviewHasNext,
-          actions.onLoadMoreOverviewPages,
-          actions.onPageModeSelected,
-          actions.onSelectOverviewPage
+          PageOverviewState(
+            overviewPagesLoading,
+            overviewHasPrevious,
+            overviewHasNext
+          ),
+          PageOverviewActions(
+            actions.onLoadMoreOverviewPages,
+            actions.onPageModeSelected,
+            actions.onSelectOverviewPage,
+            loadPreviewBitmap
+          )
         )
       }
     }
@@ -621,7 +628,6 @@ private fun BoxScope.ReaderChrome(
         ready.book,
         reading,
         actions,
-        state.pageMode,
         state.pageModesAvailable,
         onToc = { panels.showToc = true }
       )
@@ -693,16 +699,12 @@ private fun ReaderPanels(
 @Composable
 private fun PageOverviewGrid(
   pages: List<EpubPagePreview>,
-  loading: Boolean,
-  hasPrevious: Boolean,
-  hasNext: Boolean,
-  onLoadMore: (Boolean) -> Unit,
-  onModeSelected: (EpubPageMode) -> Unit,
-  onSelect: (Locator) -> Unit
+  state: PageOverviewState,
+  actions: PageOverviewActions
 ) {
   Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
     Column(Modifier.fillMaxSize().padding(SIXTEEN_DP)) {
-      PageOverviewHeader(onModeSelected)
+      PageOverviewHeader(actions.onModeSelected)
       if (pages.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
           CircularProgressIndicator()
@@ -710,8 +712,8 @@ private fun PageOverviewGrid(
       } else {
         PageOverviewGridContent(
           pages,
-          PageOverviewState(loading, hasPrevious, hasNext),
-          PageOverviewActions(onLoadMore, onModeSelected, onSelect),
+          state,
+          actions,
           Modifier.weight(1f)
         )
       }
@@ -763,7 +765,12 @@ private fun PageOverviewGridContent(
         }
       }
       item(key = "page-${preview.resourceHref}-${preview.pageIndex}") {
-        PagePreviewCard(preview, index, Modifier.fillMaxWidth().height(256.dp)) {
+        PagePreviewCard(
+          preview,
+          index,
+          actions.loadPreviewBitmap,
+          Modifier.fillMaxWidth().height(256.dp)
+        ) {
           actions.onSelect(preview.locator)
           actions.onModeSelected(EpubPageMode.CAROUSEL)
         }
@@ -786,7 +793,8 @@ private data class PageOverviewState(
 private data class PageOverviewActions(
   val onLoadMore: (Boolean) -> Unit,
   val onModeSelected: (EpubPageMode) -> Unit,
-  val onSelect: (Locator) -> Unit
+  val onSelect: (Locator) -> Unit,
+  val loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?
 )
 
 private fun isNewPreviewChapter(
@@ -810,37 +818,22 @@ private fun PageOverviewLoadMoreEffect(
   val currentHasNext by rememberUpdatedState(state.hasNext)
   val currentPageCount by rememberUpdatedState(pageCount)
   LaunchedEffect(gridState) {
-    observeOverviewScroll(
-      gridState,
-      currentPageCount,
-      currentLoading,
-      currentHasPrevious,
-      currentHasNext
-    ).collect { request ->
+    snapshotFlow {
+      overviewLoadRequest(
+        gridState.firstVisibleItemIndex,
+        gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0,
+        currentPageCount,
+        currentLoading,
+        currentHasPrevious,
+        currentHasNext
+      )
+    }.collect { request ->
       if (request != null && requestedLoad != request) {
         requestedLoad = request
         currentOnLoadMore(request.first)
       }
     }
   }
-}
-
-private fun observeOverviewScroll(
-  gridState: LazyGridState,
-  pageCount: Int,
-  loading: Boolean,
-  hasPrevious: Boolean,
-  hasNext: Boolean
-) = snapshotFlow {
-  val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-  overviewLoadRequest(
-    gridState.firstVisibleItemIndex,
-    lastVisible,
-    pageCount,
-    loading,
-    hasPrevious,
-    hasNext
-  )
 }
 
 private fun overviewLoadRequest(
@@ -865,9 +858,13 @@ private fun overviewLoadRequest(
 private fun PagePreviewCard(
   preview: EpubPagePreview,
   index: Int,
+  loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?,
   modifier: Modifier,
   onClick: () -> Unit
 ) {
+  val bitmap by produceState<Bitmap?>(null, preview.cacheKey) {
+    value = loadPreviewBitmap(preview)
+  }
   Surface(
     modifier = modifier.clickable(onClick = onClick)
       .testTag("${EPUB_READER_PAGE_THUMBNAIL_TESTING_TAG}_$index"),
@@ -876,12 +873,16 @@ private fun PagePreviewCard(
     shadowElevation = EIGHT_DP
   ) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-      Image(
-        bitmap = preview.bitmap.asImageBitmap(),
-        contentDescription = stringResource(R.string.epub_page_overview),
-        contentScale = ContentScale.Fit,
-        modifier = Modifier.weight(1f).fillMaxWidth().padding(EIGHT_DP)
-      )
+      if (bitmap != null) {
+        Image(
+          bitmap = bitmap!!.asImageBitmap(),
+          contentDescription = stringResource(R.string.epub_page_overview),
+          contentScale = ContentScale.Fit,
+          modifier = Modifier.weight(1f).fillMaxWidth().padding(EIGHT_DP)
+        )
+      } else {
+        Box(Modifier.weight(1f).fillMaxWidth())
+      }
       Text(
         stringResource(R.string.epub_page_number, preview.pageIndex + 1),
         style = MaterialTheme.typography.titleSmall,
@@ -1222,7 +1223,6 @@ private fun BottomBar(
   book: OpenEpub,
   reading: EpubReadingState,
   actions: EpubReaderActions,
-  pageMode: EpubPageMode,
   pageModesAvailable: Boolean,
   onToc: () -> Unit,
 ) {
@@ -1255,41 +1255,18 @@ private fun BottomBar(
         ) {
           Text(stringResource(R.string.epub_annotations))
         }
-        PageModeButtons(pageMode, pageModesAvailable, actions.onPageModeSelected)
+        PageOverviewButton(pageModesAvailable, actions.onPageModeSelected)
       }
     }
   }
 }
 
 @Composable
-private fun PageModeButtons(
-  pageMode: EpubPageMode,
+private fun PageOverviewButton(
   pageModesAvailable: Boolean,
   onPageModeSelected: (EpubPageMode) -> Unit
 ) {
   if (pageModesAvailable) {
-    TextButton(
-      onClick = {
-        onPageModeSelected(
-          if (pageMode == EpubPageMode.CAROUSEL) {
-            EpubPageMode.SINGLE_PAGE
-          } else {
-            EpubPageMode.CAROUSEL
-          }
-        )
-      },
-      modifier = Modifier.testTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG)
-    ) {
-      Text(
-        stringResource(
-          if (pageMode == EpubPageMode.CAROUSEL) {
-            R.string.epub_single_page
-          } else {
-            R.string.epub_page_carousel
-          }
-        )
-      )
-    }
     TextButton(
       onClick = { onPageModeSelected(EpubPageMode.OVERVIEW) },
       modifier = Modifier.testTag(EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG)

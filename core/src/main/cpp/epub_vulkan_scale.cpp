@@ -602,11 +602,14 @@ bool importHardwareBuffer(AHardwareBuffer* buffer, ImportedImage* imported,
              "vkGetAndroidHardwareBufferPropertiesANDROID")) {
     return false;
   }
-  if (formatProperties.format != kFormat || properties.allocationSize == 0 ||
-      properties.memoryTypeBits == 0) {
+  if (formatProperties.format != kFormat || properties.memoryTypeBits == 0) {
     __android_log_print(ANDROID_LOG_INFO, kLogTag,
-                        "Preview AHardwareBuffer format is not importable as RGBA8 (%d)",
-                        formatProperties.format);
+                        "Preview AHardwareBuffer import unsupported format=%d expected=%d "
+                        "externalFormat=%llu allocationSize=%llu memoryTypeBits=0x%x",
+                        formatProperties.format, kFormat,
+                        static_cast<unsigned long long>(formatProperties.externalFormat),
+                        static_cast<unsigned long long>(properties.allocationSize),
+                        properties.memoryTypeBits);
     return false;
   }
 
@@ -646,6 +649,7 @@ bool importHardwareBuffer(AHardwareBuffer* buffer, ImportedImage* imported,
   dedicatedInfo.image = imported->image;
   VkMemoryAllocateInfo allocation{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
   allocation.pNext = &dedicatedInfo;
+  // AHardwareBuffer imports must preserve the reported size, including zero on Goldfish.
   allocation.allocationSize = properties.allocationSize;
   allocation.memoryTypeIndex = memoryType;
   if (!check(vkAllocateMemory(gVulkan.device, &allocation, nullptr, &imported->memory),
@@ -943,27 +947,87 @@ Java_org_kiwix_kiwixmobile_core_epub_reader_VulkanPreviewCapture_nativeCaptureAf
     jlong timeoutMillis) {
   auto* capture = reinterpret_cast<PreviewCapture*>(handle);
   if (capture == nullptr || width <= 0 || height <= 0 || timeoutMillis <= 0) return nullptr;
-  AImage* image = nullptr;
-  {
-    std::unique_lock<std::mutex> lock(capture->mutex);
-    const auto deadline = std::chrono::steady_clock::now() +
-                          std::chrono::milliseconds(timeoutMillis);
-    if (!capture->frameAvailable.wait_until(lock, deadline, [capture, sequence] {
-          return capture->closing || capture->frameSequence > static_cast<uint64_t>(sequence);
-        }) || capture->closing) {
-      return nullptr;
-    }
-    capture->captureInProgress = true;
-  }
   using AcquireLatestAsync = media_status_t (*)(AImageReader*, AImage**, int*);
   const auto acquireLatestAsync =
       api26Symbol<AcquireLatestAsync>("AImageReader_acquireLatestImageAsync");
+  if (acquireLatestAsync == nullptr) return nullptr;
+
+  AImage* image = nullptr;
   int acquireFenceFd = -1;
-  if (acquireLatestAsync == nullptr ||
-      acquireLatestAsync(capture->reader, &image, &acquireFenceFd) != AMEDIA_OK || image == nullptr) {
+  media_status_t acquireStatus = AMEDIA_OK;
+  const auto deadline = std::chrono::steady_clock::now() +
+                        std::chrono::milliseconds(timeoutMillis);
+  {
+    std::unique_lock<std::mutex> lock(capture->mutex);
+    if (capture->closing) return nullptr;
+    capture->captureInProgress = true;
+  }
+  const auto finishCapture = [capture] {
     std::lock_guard<std::mutex> lock(capture->mutex);
     capture->captureInProgress = false;
     capture->frameAvailable.notify_all();
+  };
+
+  // Page turns pass a watermark captured before navigation, so they must wait for a newer
+  // frame. A fresh preview navigator passes -1: its current page is already the target, and
+  // its first frame may have been queued before capture starts.
+  uint64_t observedSequence = sequence < 0 ? 0 : static_cast<uint64_t>(sequence);
+  while (std::chrono::steady_clock::now() < deadline) {
+    if (sequence < 0) {
+      acquireStatus = acquireLatestAsync(capture->reader, &image, &acquireFenceFd);
+      if (acquireStatus == AMEDIA_OK && image != nullptr) break;
+      if (acquireStatus != AMEDIA_IMGREADER_NO_BUFFER_AVAILABLE) {
+        __android_log_print(ANDROID_LOG_ERROR, kLogTag,
+                            "ImageReader acquisition failed watermark=%lld status=%d",
+                            static_cast<long long>(sequence), static_cast<int>(acquireStatus));
+        finishCapture();
+        return nullptr;
+      }
+    }
+
+    std::unique_lock<std::mutex> lock(capture->mutex);
+    if (capture->closing) {
+      capture->captureInProgress = false;
+      capture->frameAvailable.notify_all();
+      return nullptr;
+    }
+    const bool newFrameAvailable = capture->frameAvailable.wait_until(
+        lock, deadline, [capture, observedSequence] {
+          return capture->closing || capture->frameSequence > observedSequence;
+        });
+    if (!newFrameAvailable) {
+      __android_log_print(ANDROID_LOG_ERROR, kLogTag,
+                          "ImageReader frame timeout watermark=%lld observed=%llu status=%d",
+                          static_cast<long long>(sequence),
+                          static_cast<unsigned long long>(observedSequence),
+                          static_cast<int>(acquireStatus));
+      capture->captureInProgress = false;
+      capture->frameAvailable.notify_all();
+      return nullptr;
+    }
+    if (capture->closing) {
+      capture->captureInProgress = false;
+      capture->frameAvailable.notify_all();
+      return nullptr;
+    }
+    observedSequence = capture->frameSequence;
+    lock.unlock();
+
+    acquireStatus = acquireLatestAsync(capture->reader, &image, &acquireFenceFd);
+    if (acquireStatus == AMEDIA_OK && image != nullptr) break;
+    if (acquireStatus != AMEDIA_IMGREADER_NO_BUFFER_AVAILABLE) {
+      __android_log_print(ANDROID_LOG_ERROR, kLogTag,
+                          "ImageReader acquisition failed watermark=%lld status=%d",
+                          static_cast<long long>(sequence), static_cast<int>(acquireStatus));
+      finishCapture();
+      return nullptr;
+    }
+  }
+  if (image == nullptr) {
+    __android_log_print(ANDROID_LOG_ERROR, kLogTag,
+                        "ImageReader acquisition failed watermark=%lld status=%d",
+                        static_cast<long long>(sequence), static_cast<int>(acquireStatus));
+    finishCapture();
     return nullptr;
   }
   if (acquireFenceFd >= 0) {
@@ -972,9 +1036,10 @@ Java_org_kiwix_kiwixmobile_core_epub_reader_VulkanPreviewCapture_nativeCaptureAf
     close(acquireFenceFd);
     if (ready <= 0 || (fence.revents & (POLLERR | POLLNVAL)) != 0) {
       AImage_delete(image);
-      std::lock_guard<std::mutex> lock(capture->mutex);
-      capture->captureInProgress = false;
-      capture->frameAvailable.notify_all();
+      __android_log_print(ANDROID_LOG_ERROR, kLogTag,
+                          "ImageReader producer fence failed poll=%d events=%d",
+                          ready, fence.revents);
+      finishCapture();
       return nullptr;
     }
   }
@@ -995,11 +1060,7 @@ Java_org_kiwix_kiwixmobile_core_epub_reader_VulkanPreviewCapture_nativeCaptureAf
   }
   if (env->ExceptionCheck()) env->ExceptionClear();
   AImage_delete(image);
-  {
-    std::lock_guard<std::mutex> lock(capture->mutex);
-    capture->captureInProgress = false;
-    capture->frameAvailable.notify_all();
-  }
+  finishCapture();
   if (!success) {
     __android_log_print(ANDROID_LOG_WARN, kLogTag, "GPU preview capture failed; disabling previews");
     if (bitmap != nullptr) env->DeleteLocalRef(bitmap);

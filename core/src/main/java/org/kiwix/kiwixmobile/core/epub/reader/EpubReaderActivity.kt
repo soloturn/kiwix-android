@@ -29,8 +29,8 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.ActionMode
-import android.view.Display
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -101,6 +101,7 @@ class EpubReaderActivity : BaseActivity() {
   internal val pageMode = MutableStateFlow(EpubPageMode.SINGLE_PAGE)
   internal val pagePreviews = MutableStateFlow<List<EpubPagePreview>>(emptyList())
   internal val overviewPages = MutableStateFlow<List<EpubPagePreview>>(emptyList())
+  internal val previewCache by lazy { EpubPreviewCache(cacheDir) }
   internal val overviewPagesLoading = MutableStateFlow(false)
   internal val overviewHasPrevious = MutableStateFlow(true)
   internal val overviewHasNext = MutableStateFlow(true)
@@ -202,7 +203,7 @@ class EpubReaderActivity : BaseActivity() {
     size.first > 0 && size.second > 0 && previewCapture == null && !previewCaptureInitializing
 
   private fun initializePreviewCapture(width: Int, height: Int) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
       previewCapture != null ||
       previewCaptureInitializing
     ) {
@@ -255,7 +256,7 @@ class EpubReaderActivity : BaseActivity() {
 
   private fun showPreviewProbe(
     capture: VulkanPreviewCapture
-  ): Boolean = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+  ): Boolean = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
     false
   } else {
     val presentation = capture.display
@@ -277,8 +278,17 @@ class EpubReaderActivity : BaseActivity() {
     shown
   }
 
-  internal fun disablePreviewModes(capture: VulkanPreviewCapture) {
+  internal fun disablePreviewModes(
+    capture: VulkanPreviewCapture,
+    reason: String = "preview capture unavailable"
+  ) {
     if (previewCapture !== capture) return
+    Log.e(PREVIEW_LOG_TAG, "Disabling page previews: $reason")
+    previewGeneration++
+    previewJob?.cancel()
+    previewRefreshJob?.cancel()
+    overviewLoadJob?.cancel()
+    previewInvalidationJob?.cancel()
     previewNavigator?.let { fragment ->
       supportFragmentManager.commitNow { remove(fragment) }
     }
@@ -286,11 +296,13 @@ class EpubReaderActivity : BaseActivity() {
     previewNavigatorContainer = null
     previewPresentation?.dismiss()
     previewPresentation = null
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) capture.close()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) capture.close()
     previewCapture = null
     previewCaptureInitializing = false
     pageModesAvailable.value = false
     pageMode.value = EpubPageMode.SINGLE_PAGE
+    previewPageKey.value = null
+    overviewPagesLoading.value = false
     if (::navigatorContainer.isInitialized) setNavigatorSize(carousel = false)
     pagePreviews.value = emptyList()
     overviewPages.value = emptyList()
@@ -308,13 +320,20 @@ class EpubReaderActivity : BaseActivity() {
     previewRefreshJob?.cancel()
     previewInvalidationJob?.cancel()
     navigator = null
+    supportFragmentManager.findFragmentByTag(PREVIEW_NAVIGATOR_TAG)?.let { fragment ->
+      supportFragmentManager.beginTransaction()
+        .remove(fragment)
+        .commitNowAllowingStateLoss()
+    }
     previewNavigator = null
     previewNavigatorContainer = null
     previewPresentation?.dismiss()
     previewPresentation = null
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) previewCapture?.close()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) previewCapture?.close()
     previewCapture = null
     pagePreviews.value = emptyList()
+    if (::previousPagePeek.isInitialized) previousPagePeek.setImageDrawable(null)
+    if (::nextPagePeek.isInitialized) nextPagePeek.setImageDrawable(null)
     super.onDestroy()
   }
 
@@ -401,6 +420,7 @@ class EpubReaderActivity : BaseActivity() {
       overviewPagesLoading = overviewLoading,
       overviewHasPrevious = hasEarlierPages,
       overviewHasNext = hasLaterPages,
+      loadPreviewBitmap = { loadPreviewBitmap(it) },
       annotations = annotations,
       selectionLocator = selectionLocator,
       chromeVisible = chromeVisible,
@@ -547,15 +567,12 @@ class EpubReaderActivity : BaseActivity() {
     }
   }
 
-  internal fun ensurePreviewNavigator(initialLocator: Locator): EpubNavigatorFragment? = previewNavigator ?: run {
-    val container = ensurePreviewPresentation()
-    val book = (viewModel.state.value as? EpubReaderUiState.Ready)?.book
-    if (container == null || book == null) {
-      null
-    } else {
-      createPreviewNavigator(container, book, initialLocator)
+  internal fun ensurePreviewNavigator(initialLocator: Locator): EpubNavigatorFragment? =
+    previewNavigator ?: ensurePreviewPresentation()?.let { container ->
+      (viewModel.state.value as? EpubReaderUiState.Ready)?.book?.let { book ->
+        createPreviewNavigator(container, book, initialLocator)
+      }
     }
-  }
 
   private fun createPreviewNavigator(
     container: FragmentContainerView,
@@ -581,35 +598,10 @@ class EpubReaderActivity : BaseActivity() {
     )
     val fragment = factory.instantiate(classLoader, EpubNavigatorFragment::class.java.name)
       as EpubNavigatorFragment
-    supportFragmentManager.commitNow { add(container.id, fragment, PREVIEW_NAVIGATOR_TAG) }
     previewNavigator = fragment
+    supportFragmentManager.commitNow { add(container, fragment, PREVIEW_NAVIGATOR_TAG) }
     observeHighlightAnnotations(fragment)
     return fragment
-  }
-
-  private fun ensurePreviewPresentation(): FragmentContainerView? =
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-      null
-    } else {
-      previewNavigatorContainer ?: previewCapture?.display?.let(::showPreviewPresentation)
-    }
-
-  private fun showPreviewPresentation(display: Display): FragmentContainerView? {
-    val presentation = previewPresentation
-      ?: runCatching { Presentation(this, display) }.getOrNull()
-    return presentation?.let { shownPresentation ->
-      val container = createPreviewContainer()
-      shownPresentation.setContentView(container, ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-      val isShowing = shownPresentation.isShowing ||
-        runCatching { shownPresentation.show() }.isSuccess
-      if (isShowing) {
-        previewPresentation = shownPresentation
-        previewNavigatorContainer = container
-        container
-      } else {
-        null
-      }
-    }
   }
 
   private fun observePageLoading(fragment: EpubNavigatorFragment) {
@@ -722,8 +714,11 @@ class EpubReaderActivity : BaseActivity() {
     when (action) {
       TapAction.PREVIOUS_PAGE -> fragment.goBackward(animated = true)
       TapAction.NEXT_PAGE -> fragment.goForward(animated = true)
-      TapAction.SHOW_OVERLAY -> viewModel.setChromeVisible(true)
-      TapAction.HIDE_OVERLAY -> Unit
+      TapAction.SHOW_OVERLAY -> {
+        viewModel.setChromeVisible(true)
+        selectPageMode(EpubPageMode.CAROUSEL)
+      }
+      TapAction.HIDE_OVERLAY -> selectPageMode(EpubPageMode.SINGLE_PAGE)
     }
     return true
   }
@@ -778,13 +773,14 @@ class EpubReaderActivity : BaseActivity() {
     private const val SELECTION_READY_RETRIES = 5
     private const val SELECTION_READY_RETRY_MS = 100L
     internal const val PAGE_PREVIEW_SCALE = 0.3f
+    internal const val PAGE_PREVIEW_INITIAL_READY_TIMEOUT_MS = 15_000L
     internal const val PAGE_PREVIEW_TURN_TIMEOUT_MS = 2_000L
     internal const val PREVIEW_FRAME_TIMEOUT_MS = 2_000L
     private const val PREVIEW_PROBE_BITMAP_SIZE = 8
     internal const val PAGE_CAROUSEL_RADIUS = 1
     internal const val PAGE_OVERVIEW_PAGE_COUNT = 9
-    internal const val CAROUSEL_PAGE_WIDTH = 0.9f
-    internal const val CAROUSEL_PAGE_HEIGHT = 0.96f
+    internal const val CAROUSEL_PAGE_WIDTH = 0.82f
+    internal const val CAROUSEL_PAGE_HEIGHT = 0.76f
     internal const val CAROUSEL_PEEK_HEIGHT = 0.72f
     internal const val CAROUSEL_PEEK_SCALE = 0.72f
     internal const val PAGE_PEEK_WIDTH = 0.1f
