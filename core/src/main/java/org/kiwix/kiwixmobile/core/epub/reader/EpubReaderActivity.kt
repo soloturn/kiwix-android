@@ -33,6 +33,7 @@ import android.util.Log
 import android.view.ActionMode
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.WindowManager
@@ -75,7 +76,6 @@ import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
-import org.readium.r2.navigator.preferences.ReadingProgression
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.util.AbsoluteUrl
@@ -95,7 +95,7 @@ class EpubReaderActivity : BaseActivity() {
 
   internal val viewModel: EpubReaderViewModel by viewModels()
   internal val darkTheme = MutableStateFlow(false)
-  private val pageReady = MutableStateFlow(false)
+  internal val pageReady = MutableStateFlow(false)
   internal val pageModesAvailable = MutableStateFlow(false)
   private val selectionMenuLocator = MutableStateFlow<Locator?>(null)
   internal val pageMode = MutableStateFlow(EpubPageMode.SINGLE_PAGE)
@@ -111,6 +111,9 @@ class EpubReaderActivity : BaseActivity() {
   internal val previewMutex = Mutex()
   private var selectionActionMode: ActionMode? = null
   private var selectionMenuOpening = false
+  internal val carouselDoubleTapTimeout = ViewConfiguration.getDoubleTapTimeout().toLong()
+  internal val carouselTapDetector = DoubleTapDetector(carouselDoubleTapTimeout)
+  internal var carouselTapJob: Job? = null
   internal var navigator: EpubNavigatorFragment? = null
   internal var previewNavigator: EpubNavigatorFragment? = null
   internal var previewCapture: VulkanPreviewCapture? = null
@@ -283,6 +286,7 @@ class EpubReaderActivity : BaseActivity() {
     reason: String = "preview capture unavailable"
   ) {
     if (previewCapture !== capture) return
+    cancelCarouselTap()
     Log.e(PREVIEW_LOG_TAG, "Disabling page previews: $reason")
     previewGeneration++
     previewJob?.cancel()
@@ -315,6 +319,7 @@ class EpubReaderActivity : BaseActivity() {
   }
 
   override fun onDestroy() {
+    cancelCarouselTap()
     previewGeneration++
     previewJob?.cancel()
     previewRefreshJob?.cancel()
@@ -695,34 +700,6 @@ class EpubReaderActivity : BaseActivity() {
   }
 
   /** Links never reach here; Readium follows them itself. Scrolling books have no edge zones. */
-  private fun handleTap(fragment: EpubNavigatorFragment, event: TapEvent): Boolean {
-    // Taps reach the book through the loading screen, which must not act on them.
-    if (!pageReady.value) return true
-    val overflow = fragment.overflow.value
-    val zone = if (overflow.scroll) {
-      TapZone.CENTER
-    } else {
-      EpubTapZones.classify(
-        event.point.x,
-        fragment.publicationView.width.toFloat(),
-        overflow.readingProgression == ReadingProgression.RTL
-      )
-    }
-    val overlayVisible = viewModel.chromeVisible.value
-    val action = EpubTapZones.actionFor(zone, overlayVisible)
-    if (EpubTapZones.dismissesOverlay(action, overlayVisible)) viewModel.setChromeVisible(false)
-    when (action) {
-      TapAction.PREVIOUS_PAGE -> fragment.goBackward(animated = true)
-      TapAction.NEXT_PAGE -> fragment.goForward(animated = true)
-      TapAction.SHOW_OVERLAY -> {
-        viewModel.setChromeVisible(true)
-        selectPageMode(EpubPageMode.CAROUSEL)
-      }
-      TapAction.HIDE_OVERLAY -> selectPageMode(EpubPageMode.SINGLE_PAGE)
-    }
-    return true
-  }
-
   private fun goToAdjacentChapter(next: Boolean) {
     val book = (viewModel.state.value as? EpubReaderUiState.Ready)?.book ?: return
     val current = navigator?.currentLocator?.value ?: return
@@ -742,6 +719,7 @@ class EpubReaderActivity : BaseActivity() {
   }
 
   override fun onStop() {
+    cancelCarouselTap()
     previewGeneration++
     previewJob?.cancel()
     previewRefreshJob?.cancel()
