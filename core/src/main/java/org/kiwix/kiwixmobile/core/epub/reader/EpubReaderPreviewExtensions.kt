@@ -74,6 +74,7 @@ internal fun EpubReaderActivity.navigatorPreferences(
 
 internal fun EpubReaderActivity.selectPageMode(mode: EpubPageMode) {
   if (mode != EpubPageMode.SINGLE_PAGE && !pageModesAvailable.value) return
+  cancelCarouselTap()
   pageMode.value = mode
   setNavigatorSize(mode == EpubPageMode.CAROUSEL)
   if (mode == EpubPageMode.SINGLE_PAGE) {
