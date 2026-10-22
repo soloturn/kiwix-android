@@ -41,6 +41,7 @@ class EpubAnnotationRepositoryTest {
       override fun getFilesDir() = filesDirectory
     }
     val repository = EpubAnnotationRepository(context, Dispatchers.Unconfined)
+    val epubFile = temporaryFolder.newFile("book.epub")
     val locator = Locator(
       href = Url("chapter.xhtml")!!,
       mediaType = MediaType.XHTML,
@@ -49,14 +50,14 @@ class EpubAnnotationRepositoryTest {
     val bookmark = EpubAnnotation("bookmark", EpubAnnotationKind.BOOKMARK, locator, "")
     val note = EpubAnnotation("note", EpubAnnotationKind.NOTE, locator, "quote", "note text")
 
-    repository.save("book-id", "Title", listOf(bookmark))
-    val file = repository.annotationFile("book-id")
+    repository.save("book-id", "Title", listOf(bookmark), epubFile)
+    val file = repository.annotationFile(epubFile)
     val initialSetId = JSONObject(file.readText()).getString("id")
-    repository.save("book-id", "Title", listOf(bookmark, note))
+    repository.save("book-id", "Title", listOf(bookmark, note), epubFile)
 
     assertTrue(file.isFile)
     assertTrue(file.name.endsWith(".annotation"))
     assertEquals(initialSetId, JSONObject(file.readText()).getString("id"))
-    assertEquals(listOf("bookmark", "note"), repository.load("book-id").map { it.id })
+    assertEquals(listOf("bookmark", "note"), repository.load("book-id", epubFile).map { it.id })
   }
 }

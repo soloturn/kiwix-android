@@ -49,6 +49,7 @@ import org.kiwix.kiwixmobile.core.main.PAGE_URL_KEY
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel
 import org.kiwix.kiwixmobile.core.main.reader.ReaderMenuState
 import org.kiwix.kiwixmobile.core.main.reader.RestoreOrigin
+import org.kiwix.kiwixmobile.core.main.reader.ZimHighlightRepository
 import org.kiwix.kiwixmobile.core.main.reader.helper.BookmarkManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.PendingSearchItemManager
@@ -104,7 +105,8 @@ class BrandedReaderViewModel @Inject constructor(
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
   @MainDispatcher mainDispatcher: MainCoroutineDispatcher,
-  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
+  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  zimHighlightRepository: ZimHighlightRepository
 ) : CoreReaderViewModel(
     context,
     kiwixDataStore,
@@ -124,7 +126,8 @@ class BrandedReaderViewModel @Inject constructor(
     readAloudManager,
     donationDialogHandler,
     findInPageManager,
-    mainDispatcher
+    mainDispatcher,
+    zimHighlightRepository
   ) {
   override suspend fun initialize(
     coreMainActivity: CoreMainActivity,

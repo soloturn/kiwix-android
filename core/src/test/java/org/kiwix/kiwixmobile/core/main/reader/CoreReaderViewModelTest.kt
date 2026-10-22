@@ -65,6 +65,7 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
+import org.kiwix.kiwixmobile.core.epub.reader.EpubHighlightColor
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -74,6 +75,8 @@ import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.MainRepositoryActions
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderEffect
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.SelectionMenuAction
+import org.kiwix.kiwixmobile.core.main.reader.ZimHighlightRepository
 import org.kiwix.kiwixmobile.core.main.reader.helper.BookmarkManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.PendingSearchItemManager
@@ -133,6 +136,7 @@ internal class CoreReaderViewModelTest {
   private val readAloudManager = mockk<ReadAloudManager>()
   private val donationDialogHandler = mockk<DonationDialogHandler>()
   private val findInPageManager = mockk<FindInPageManager>(relaxed = true)
+  private val zimHighlightRepository = mockk<ZimHighlightRepository>(relaxed = true)
 
   companion object {
     private const val TEST_TTS_SPEED = 1.25f
@@ -194,7 +198,8 @@ internal class CoreReaderViewModelTest {
       readAloudManager,
       donationDialogHandler,
       findInPageManager,
-      mainDispatcherRule.mainDispatcher
+      mainDispatcherRule.mainDispatcher,
+      zimHighlightRepository
     )
   }
 
@@ -1483,6 +1488,79 @@ internal class CoreReaderViewModelTest {
 
     // calls configureWebViewSelectionHandler()
     verify { mockMenu.findItem(R.id.menu_speak_text) }
+  }
+
+  @Test
+  fun onSelectionActionModeStarted_waitsForReleaseBeforeReadingSelection() {
+    val actionMode = mockk<ActionMode>(relaxed = true)
+    val menu = mockk<Menu>(relaxed = true)
+    val inflater = mockk<MenuInflater>()
+    every { actionMode.menu } returns menu
+    every { coreMainActivity.menuInflater } returns inflater
+    every { inflater.inflate(R.menu.menu_webview_action, menu) } just Runs
+
+    viewModel.onSelectionActionModeStarted(actionMode, coreMainActivity)
+
+    verify(exactly = 0) {
+      mockWebView.evaluateJavascript(match { it.contains("encodeURIComponent(selection.toString())") }, any())
+    }
+    viewModel.onSelectionTouchReleased()
+    verify(exactly = 1) {
+      mockWebView.evaluateJavascript(match { it.contains("encodeURIComponent(selection.toString())") }, any())
+    }
+  }
+
+  @Test
+  fun dismissSelectionMenu_keepsWebViewSelection() {
+    viewModel.updateUiStateForTest { copy(selectionText = "Selected passage") }
+
+    viewModel.dismissSelectionMenu()
+
+    assertThat(viewModel.uiState.value.selectionText).isNull()
+    verify(exactly = 0) { mockWebView.evaluateJavascript(any(), any()) }
+  }
+
+  @Test
+  fun onHighlightSelection_appliesSelectedColorToWebViewSelection() {
+    viewModel.updateUiStateForTest { copy(selectionText = "Selected passage") }
+    every { zimReaderContainer.id } returns null
+    every { zimReaderContainer.zimReaderSource } returns null
+    every { mockWebView.url } returns "zim://book/article"
+
+    viewModel.onHighlightSelection(EpubHighlightColor.LIGHT_GREEN)
+
+    verify {
+      mockWebView.evaluateJavascript(
+        match {
+          it.contains("data-kiwix-highlight") &&
+            it.contains("highlight.style.backgroundColor = \"#A5D6A7\";")
+        },
+        any()
+      )
+    }
+    assertThat(viewModel.uiState.value.selectionText).isNull()
+  }
+
+  @Test
+  fun onSelectionMenuAction_deleteAnnotationUnwrapsSelectedHighlight() {
+    viewModel.updateUiStateForTest {
+      copy(selectionText = "Selected passage", selectionHasAnnotation = true)
+    }
+
+    viewModel.onSelectionMenuAction(SelectionMenuAction.DELETE_ANNOTATION)
+
+    verify {
+      mockWebView.evaluateJavascript(
+        match {
+          it.contains("[data-kiwix-highlight]") &&
+            it.contains("parent.insertBefore(highlight.firstChild, highlight)") &&
+            it.contains("parent.removeChild(highlight)")
+        },
+        any()
+      )
+    }
+    assertThat(viewModel.uiState.value.selectionText).isNull()
+    assertThat(viewModel.uiState.value.selectionHasAnnotation).isFalse()
   }
 
   @Test
@@ -3393,7 +3471,8 @@ internal class CoreReaderViewModelTest {
     readAloudManager: ReadAloudManager,
     donationDialogHandler: DonationDialogHandler,
     findInPageManager: FindInPageManager,
-    mainDispatcher: MainCoroutineDispatcher
+    mainDispatcher: MainCoroutineDispatcher,
+    zimHighlightRepository: ZimHighlightRepository
   ) : CoreReaderViewModel(
       context,
       kiwixDataStore,
@@ -3413,7 +3492,8 @@ internal class CoreReaderViewModelTest {
       readAloudManager,
       donationDialogHandler,
       findInPageManager,
-      mainDispatcher
+      mainDispatcher,
+      zimHighlightRepository
     ) {
     override fun openLocalLibrary() {}
     override fun openSearch(

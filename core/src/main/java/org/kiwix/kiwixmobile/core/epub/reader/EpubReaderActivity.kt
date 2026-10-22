@@ -63,7 +63,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
@@ -473,7 +472,6 @@ class EpubReaderActivity : BaseActivity() {
     onSearchSelection = ::searchSelection,
     onSelectAll = ::selectAll,
     onBookmarkSelection = { viewModel.toggleBookmark(it) },
-    onFavoriteSelection = viewModel::addFavorite,
     onHighlightSelection = viewModel::addHighlight,
     onUpdateAnnotationNote = { annotation, note ->
       viewModel.updateAnnotationNote(annotation.id, note)
@@ -485,6 +483,10 @@ class EpubReaderActivity : BaseActivity() {
       viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
       navigator?.go(target)
       viewModel.setChromeVisible(true)
+    },
+    onSelectCarouselPage = { target ->
+      viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
+      navigator?.go(target)
     },
     onNoteSelection = viewModel::addNote
   )
@@ -542,20 +544,24 @@ class EpubReaderActivity : BaseActivity() {
   ) {
     lifecycleScope.launch {
       var previousHighlights: List<org.readium.r2.navigator.Decoration>? = null
-      viewModel.annotations
-        .map { annotations ->
-          annotations
-            .filter { it.kind == EpubAnnotationKind.HIGHLIGHT }
-            .map { annotation ->
-              org.readium.r2.navigator.Decoration(
-                id = annotation.id,
-                locator = annotation.locator,
-                style = org.readium.r2.navigator.Decoration.Style.Highlight(
-                  tint = annotation.color?.tint ?: EpubHighlightColor.LIGHT_YELLOW.tint
-                )
+      combine(viewModel.annotations, viewModel.settings, darkTheme) { annotations, settings, nightMode ->
+        val darkReadingTheme = settings.effectivePreset(nightMode) in setOf(
+          EpubThemePreset.DARK,
+          EpubThemePreset.BLACK
+        )
+        annotations
+          .filter { it.kind == EpubAnnotationKind.HIGHLIGHT }
+          .map { annotation ->
+            org.readium.r2.navigator.Decoration(
+              id = annotation.id,
+              locator = annotation.locator,
+              style = org.readium.r2.navigator.Decoration.Style.Highlight(
+                tint = annotation.color?.tintFor(darkReadingTheme)
+                  ?: EpubHighlightColor.LIGHT_YELLOW.tintFor(darkReadingTheme)
               )
-            }
-        }
+            )
+          }
+      }
         .distinctUntilChanged()
         .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
         .collectLatest { highlights ->
@@ -640,6 +646,9 @@ class EpubReaderActivity : BaseActivity() {
       selectionActionMode = mode
       selectionMenuOpening = false
       menu.clear()
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        mode.hide(SELECTION_ACTION_MODE_HIDE_MS)
+      }
       return true
     }
 
@@ -750,6 +759,7 @@ class EpubReaderActivity : BaseActivity() {
     private const val ANNOTATION_DECORATION_GROUP = "kiwix-annotations"
     private const val SELECTION_READY_RETRIES = 5
     private const val SELECTION_READY_RETRY_MS = 100L
+    private const val SELECTION_ACTION_MODE_HIDE_MS = 600_000L
     internal const val PAGE_PREVIEW_SCALE = 0.3f
     internal const val PAGE_PREVIEW_INITIAL_READY_TIMEOUT_MS = 15_000L
     internal const val PAGE_PREVIEW_TURN_TIMEOUT_MS = 2_000L

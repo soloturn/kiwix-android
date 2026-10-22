@@ -24,10 +24,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -42,8 +44,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
+import org.kiwix.kiwixmobile.core.epub.reader.EpubHighlightColor
 import org.kiwix.kiwixmobile.core.main.KiwixWebView
 import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.ReaderAction
+import org.kiwix.kiwixmobile.core.main.reader.CoreReaderViewModel.SelectionMenuAction
 import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.TabsManager
 import org.kiwix.kiwixmobile.core.ui.components.CONTENT_LOADING_PROGRESS_BAR_TESTING_TAG
@@ -102,6 +106,9 @@ class ReaderScreenComposablesTest {
     tableOfContentTitle: String = "Contents",
     documentSections: List<DocumentSection> = emptyList(),
     showDonationPopup: Boolean = false,
+    selectionText: String? = null,
+    canReadSelectedText: Boolean = false,
+    selectionHasAnnotation: Boolean = false,
     findInPageUiState: FindInPageManager.FindInPageUiState =
       FindInPageManager.FindInPageUiState()
   ): CoreReaderViewModel.ReaderUiState = CoreReaderViewModel.ReaderUiState(
@@ -126,6 +133,9 @@ class ReaderScreenComposablesTest {
     tableOfContentTitle = tableOfContentTitle,
     documentSections = documentSections,
     showDonationPopup = showDonationPopup,
+    selectionText = selectionText,
+    canReadSelectedText = canReadSelectedText,
+    selectionHasAnnotation = selectionHasAnnotation,
     findInPageUiState = findInPageUiState
   )
 
@@ -143,7 +153,9 @@ class ReaderScreenComposablesTest {
    */
   private fun renderReaderScreen(
     state: CoreReaderViewModel.ReaderUiState,
-    onReaderAction: (ReaderAction) -> Unit = {}
+    onReaderAction: (ReaderAction) -> Unit = {},
+    onSelectionMenuAction: (SelectionMenuAction) -> Unit = {},
+    onHighlightSelection: (EpubHighlightColor) -> Unit = {}
   ) {
     composeTestRule.setContent {
       val navController = rememberNavController()
@@ -156,9 +168,72 @@ class ReaderScreenComposablesTest {
         onUserBackPressed = { BackPressActivityExtensions.Super.ShouldCall },
         navHostController = navController,
         mainActivityBottomAppBarScrollBehaviour = null,
-        navigationIcon = {}
+        navigationIcon = {},
+        onSelectionMenuAction = onSelectionMenuAction,
+        onHighlightSelection = onHighlightSelection
       )
     }
+  }
+
+  @Test
+  fun readerScreen_textSelection_displaysReaderActionGrid() {
+    var selectedAction: SelectionMenuAction? = null
+    renderReaderScreen(
+      createTestState(selectionText = "Selected passage", canReadSelectedText = true),
+      onSelectionMenuAction = { selectedAction = it }
+    )
+
+    composeTestRule.onNodeWithText("Selected passage").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Copy").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Share").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Search web").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Select all").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Highlight").assertIsDisplayed()
+    composeTestRule.onAllNodesWithText("Bookmark").assertCountEquals(0)
+    composeTestRule.onAllNodesWithText("Delete").assertCountEquals(0)
+    composeTestRule.onNodeWithText("Add note").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Read aloud").performClick()
+    assertEquals(SelectionMenuAction.READ_ALOUD, selectedAction)
+  }
+
+  @Test
+  fun readerScreen_unhighlightedSelectionHasNoDeleteAndOffersHighlightColors() {
+    var selectedColor: EpubHighlightColor? = null
+    renderReaderScreen(
+      createTestState(
+        selectionText = "Selected passage",
+        bookmarkButtonItem = CoreReaderViewModel.BookmarkButtonItem(
+          IconItem.Drawable(R.drawable.ic_bookmark_24dp),
+          true
+        )
+      ),
+      onHighlightSelection = { selectedColor = it }
+    )
+
+    composeTestRule.onAllNodesWithText("Bookmark").assertCountEquals(0)
+    composeTestRule.onAllNodesWithText("Delete").assertCountEquals(0)
+    composeTestRule.onNodeWithText("Highlight").performClick()
+    composeTestRule.onNodeWithText("Light green").performTouchInput { click() }
+
+    assertEquals(EpubHighlightColor.LIGHT_GREEN, selectedColor)
+    composeTestRule.onAllNodesWithText("Light green").assertCountEquals(0)
+    composeTestRule.onAllNodesWithText("Selected passage").assertCountEquals(0)
+  }
+
+  @Test
+  fun readerScreen_highlightedSelectionCanDeleteAnnotation() {
+    var selectedAction: SelectionMenuAction? = null
+    renderReaderScreen(
+      createTestState(
+        selectionText = "Selected passage",
+        selectionHasAnnotation = true
+      ),
+      onSelectionMenuAction = { selectedAction = it }
+    )
+
+    composeTestRule.onNodeWithText("Delete").assertIsDisplayed().performClick()
+
+    assertEquals(SelectionMenuAction.DELETE_ANNOTATION, selectedAction)
   }
 
   @Test

@@ -31,19 +31,27 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 enum class EpubAnnotationKind(val motivation: String) {
-  FAVORITE("tagging"),
   BOOKMARK("bookmarking"),
   NOTE("commenting"),
   HIGHLIGHT("highlighting")
 }
 
 @Suppress("MagicNumber")
-enum class EpubHighlightColor(val tint: Int, val hex: String) {
-  LIGHT_YELLOW(0x66FFF59D, "#FFF59D"),
-  LIGHT_GREEN(0x66A5D6A7, "#A5D6A7"),
-  LIGHT_BLUE(0x6690CAF9, "#90CAF9"),
-  LIGHT_PINK(0x66F48FB1, "#F48FB1"),
-  LIGHT_PURPLE(0x66CE93D8, "#CE93D8")
+enum class EpubHighlightColor(
+  val tint: Int,
+  val hex: String,
+  val darkTint: Int,
+  val darkHex: String
+) {
+  LIGHT_YELLOW(0x66FFF59D, "#FFF59D", 0x997A6500.toInt(), "#7A6500"),
+  LIGHT_GREEN(0x66A5D6A7, "#A5D6A7", 0x99587A3F.toInt(), "#587A3F"),
+  LIGHT_BLUE(0x6690CAF9, "#90CAF9", 0x99516F99.toInt(), "#516F99"),
+  LIGHT_PINK(0x66F48FB1, "#F48FB1", 0x99864E61.toInt(), "#864E61"),
+  LIGHT_PURPLE(0x66CE93D8, "#CE93D8", 0x9973548B.toInt(), "#73548B");
+
+  fun tintFor(darkTheme: Boolean) = if (darkTheme) darkTint else tint
+
+  fun hexFor(darkTheme: Boolean) = if (darkTheme) darkHex else hex
 }
 
 /** One annotation in the Readium AnnotationSet, with its Readium locator for navigation. */
@@ -59,11 +67,20 @@ data class EpubAnnotation(
 ) {
   val label: String
     get() = when (kind) {
-      EpubAnnotationKind.FAVORITE -> text.ifBlank { "Favorite" }
       EpubAnnotationKind.BOOKMARK -> "Bookmark"
       EpubAnnotationKind.NOTE -> note?.takeIf(String::isNotBlank) ?: text.ifBlank { "Note" }
       EpubAnnotationKind.HIGHLIGHT -> text.ifBlank { "Highlight" }
     }
+}
+
+internal fun EpubAnnotation.matchesSelection(selection: Locator): Boolean = when {
+  locator.href != selection.href -> false
+  kind == EpubAnnotationKind.BOOKMARK -> locator.sameBookmarkPosition(selection)
+  else -> {
+    val selectedText = selection.text.highlight.orEmpty().trim()
+    val annotationText = text.ifBlank { locator.text.highlight.orEmpty() }.trim()
+    selectedText.isNotEmpty() && annotationText.contains(selectedText, ignoreCase = true)
+  }
 }
 
 /** Readium AnnotationSet JSON serialization and parsing for bookmark, note and highlight. */
@@ -125,7 +142,6 @@ object EpubAnnotationSetCodec {
       .put("motivation", kind.motivation)
       .put("created", created)
       .put("target", target)
-    if (kind == EpubAnnotationKind.FAVORITE) annotation.put("kiwix:kind", "favorite")
     if (title.isNotBlank()) annotation.put("kiwix:title", title)
     color?.let { annotation.put("kiwix:color", it.name) }
     if (note != null || kind == EpubAnnotationKind.NOTE) {
@@ -136,7 +152,8 @@ object EpubAnnotationSetCodec {
 
   private fun JSONObject.toAnnotation(): EpubAnnotation? {
     val kind = when {
-      optString("kiwix:kind") == "favorite" -> EpubAnnotationKind.FAVORITE
+      // Older app versions saved passage favorites; keep them as navigable bookmarks.
+      optString("kiwix:kind") == "favorite" -> EpubAnnotationKind.BOOKMARK
       optString("motivation") == "bookmarking" -> EpubAnnotationKind.BOOKMARK
       optString("motivation") == "commenting" -> EpubAnnotationKind.NOTE
       optString("motivation") in setOf("highlighting", "hightlighting") -> EpubAnnotationKind.HIGHLIGHT
@@ -176,18 +193,19 @@ object EpubAnnotationSetCodec {
   }
 }
 
-/** Keeps a separate Readium `.annotation` sidecar in app-private storage; EPUB files are untouched. */
+/** Keeps a separate Readium `.annotation` sidecar beside the EPUB; EPUB files are untouched. */
 @Singleton
 class EpubAnnotationRepository @Inject constructor(
   @ApplicationContext context: Context,
   @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
-  private val directory = File(context.filesDir, "epub-annotations")
+  private val legacyDirectory = File(context.filesDir, "epub-annotations")
   private val writes = Mutex()
   private val setIds = ConcurrentHashMap<String, String>()
 
-  suspend fun load(bookId: String): List<EpubAnnotation> = withContext(ioDispatcher) {
-    val file = annotationFile(bookId)
+  suspend fun load(bookId: String, epubFile: File): List<EpubAnnotation> = withContext(ioDispatcher) {
+    val file = annotationFile(epubFile)
+    if (!file.isFile) migrateLegacySidecar(bookId, file)
     if (!file.isFile) return@withContext emptyList()
     val content = runCatching { file.readText() }.getOrDefault("")
     runCatching { JSONObject(content).optString("id") }
@@ -197,18 +215,24 @@ class EpubAnnotationRepository @Inject constructor(
     EpubAnnotationSetCodec.decode(content)
   }
 
-  suspend fun save(bookId: String, title: String, annotations: List<EpubAnnotation>) =
+  suspend fun save(
+    bookId: String,
+    title: String,
+    annotations: List<EpubAnnotation>,
+    epubFile: File
+  ) =
     withContext(ioDispatcher) {
       writes.withLock {
-        if (!directory.exists() && !directory.mkdirs()) return@withLock
-        val file = annotationFile(bookId)
+        val file = annotationFile(epubFile)
+        val parent = file.parentFile ?: return@withLock
+        if (!parent.isDirectory && !parent.mkdirs()) return@withLock
         val setId = setIds[bookId] ?: run {
           runCatching { JSONObject(file.readText()).optString("id") }
             .getOrNull()
             ?.takeIf(String::isNotBlank)
             ?: "urn:uuid:${UUID.randomUUID()}"
         }.also { setIds[bookId] = it }
-        val temporary = File(directory, "${file.name}.tmp")
+        val temporary = File(parent, "${file.name}.tmp")
         temporary.writeText(EpubAnnotationSetCodec.encode(setId, title, annotations))
         if (!temporary.renameTo(file)) {
           temporary.copyTo(file, overwrite = true)
@@ -218,10 +242,22 @@ class EpubAnnotationRepository @Inject constructor(
     }
 
   @VisibleForTesting
-  internal fun annotationFile(bookId: String): File {
+  internal fun annotationFile(epubFile: File): File =
+    File(epubFile.parentFile, "${epubFile.name}.annotation")
+
+  private fun migrateLegacySidecar(bookId: String, destination: File) {
+    val legacy = legacyAnnotationFile(bookId)
+    if (!legacy.isFile) return
+    runCatching {
+      destination.parentFile?.let { if (!it.isDirectory) it.mkdirs() }
+      legacy.copyTo(destination, overwrite = false)
+    }
+  }
+
+  private fun legacyAnnotationFile(bookId: String): File {
     val digest = MessageDigest.getInstance("SHA-256")
       .digest(bookId.toByteArray())
       .joinToString("") { "%02x".format(it) }
-    return File(directory, "$digest.annotation")
+    return File(legacyDirectory, "$digest.annotation")
   }
 }
