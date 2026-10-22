@@ -60,6 +60,7 @@ import org.kiwix.kiwixmobile.ui.KiwixDestination
 import org.kiwix.kiwixmobile.ui.KiwixNavGraph
 
 const val BOTTOM_NAV_READER_ITEM_TESTING_TAG = "bottomNavReaderItemTestingTag"
+const val BOTTOM_NAV_HOME_ITEM_TESTING_TAG = "bottomNavHomeItemTestingTag"
 const val BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG = "bottomNavLibraryItemTestingTag"
 const val BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG = "bottomNavDownloadsItemTestingTag"
 
@@ -160,26 +161,7 @@ fun BottomNavigationBar(
   bottomAppBarScrollBehaviour: BottomAppBarScrollBehavior?,
   navBackStackEntry: NavBackStackEntry?
 ) {
-  val bottomNavItems = listOf(
-    BottomNavItem(
-      route = KiwixDestination.Reader.route,
-      title = stringResource(id = R.string.reader),
-      iconRes = drawable.ic_reader_navigation_white_24px,
-      testingTag = BOTTOM_NAV_READER_ITEM_TESTING_TAG
-    ),
-    BottomNavItem(
-      route = KiwixDestination.Library.route,
-      title = stringResource(id = R.string.library),
-      iconRes = drawable.ic_library_navigation_white_24dp,
-      testingTag = BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG
-    ),
-    BottomNavItem(
-      route = KiwixDestination.Downloads.route,
-      title = stringResource(id = R.string.download),
-      iconRes = drawable.ic_download_navigation_white_24dp,
-      testingTag = BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG
-    )
-  )
+  val bottomNavItems = bottomNavigationItems()
   val currentDestinationRoute = navBackStackEntry?.destination?.route
   BottomAppBar(
     containerColor = MaterialTheme.colorScheme.onPrimary,
@@ -220,3 +202,31 @@ fun BottomNavigationBar(
     }
   }
 }
+
+@Composable
+private fun bottomNavigationItems() = listOf(
+  BottomNavItem(
+    route = KiwixDestination.Home.route,
+    title = stringResource(id = R.string.home),
+    iconRes = R.drawable.action_home,
+    testingTag = BOTTOM_NAV_HOME_ITEM_TESTING_TAG
+  ),
+  BottomNavItem(
+    route = KiwixDestination.Reader.route,
+    title = stringResource(id = R.string.reader),
+    iconRes = drawable.ic_reader_navigation_white_24px,
+    testingTag = BOTTOM_NAV_READER_ITEM_TESTING_TAG
+  ),
+  BottomNavItem(
+    route = KiwixDestination.Library.route,
+    title = stringResource(id = R.string.library),
+    iconRes = drawable.ic_library_navigation_white_24dp,
+    testingTag = BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG
+  ),
+  BottomNavItem(
+    route = KiwixDestination.Downloads.route,
+    title = stringResource(id = R.string.download),
+    iconRes = drawable.ic_download_navigation_white_24dp,
+    testingTag = BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG
+  )
+)
