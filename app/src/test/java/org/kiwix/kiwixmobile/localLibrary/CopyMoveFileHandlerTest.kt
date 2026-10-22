@@ -1240,7 +1240,9 @@ class CopyMoveFileHandlerTest {
       val file = mockk<File>()
       every { file.name } returns "test.zim"
       every { FileUtils.isSplittedZimFile("test.zim") } returns false
-      coEvery { anyConstructed<ZimReaderSource>().createArchive(mainDispatcherRule.dispatcher) } throws RuntimeException()
+      coEvery {
+        anyConstructed<ZimReaderSource>().createArchive(mainDispatcherRule.dispatcher)
+      } throws RuntimeException()
 
       assertFalse(fileHandler.isValidZimFile(file))
     }
