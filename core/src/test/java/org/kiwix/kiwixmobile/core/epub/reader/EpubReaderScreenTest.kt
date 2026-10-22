@@ -47,6 +47,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.text.TextLayoutResult
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -95,11 +96,13 @@ class EpubReaderScreenTest {
     previousPages: List<Locator> = emptyList(),
     pageMode: EpubPageMode = EpubPageMode.SINGLE_PAGE,
     pageModesAvailable: Boolean = true,
+    pagePreviews: List<EpubPagePreview> = emptyList(),
     overviewPages: List<EpubPagePreview> = emptyList(),
     overviewHasPrevious: Boolean = false,
     overviewHasNext: Boolean = false,
     panels: EpubReaderPanels = EpubReaderPanels(),
-    annotations: List<EpubAnnotation> = emptyList()
+    annotations: List<EpubAnnotation> = emptyList(),
+    selectionLocator: Locator? = null
   ) = composeTestRule.setContent {
     EpubReaderScreen(
       state,
@@ -112,11 +115,13 @@ class EpubReaderScreenTest {
       previousPages = previousPages,
       pageMode = pageMode,
       pageModesAvailable = pageModesAvailable,
+      pagePreviews = pagePreviews,
       overviewPages = overviewPages,
       overviewHasPrevious = overviewHasPrevious,
       overviewHasNext = overviewHasNext,
       panels = panels,
-      annotations = annotations
+      annotations = annotations,
+      selectionLocator = selectionLocator
     )
   }
 
@@ -252,6 +257,59 @@ class EpubReaderScreenTest {
       .performClick()
 
     assertTrue(toggled)
+  }
+
+  @Test
+  fun `carousel bookmark is centered on the current page even with reader controls visible`() {
+    show(
+      chromeVisible = true,
+      pageMode = EpubPageMode.CAROUSEL,
+      annotations = listOf(EpubAnnotation("bookmark", EpubAnnotationKind.BOOKMARK, locator, ""))
+    )
+
+    val page = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+    val bookmark = composeTestRule.onNodeWithContentDescription("Remove bookmark")
+      .assertIsDisplayed()
+      .getUnclippedBoundsInRoot()
+
+    val bookmarkCenterX = (bookmark.left + bookmark.right) / 2
+    val pageCenterX = (page.left + page.right) / 2
+    val pageWidth = page.right - page.left
+    val pageHeight = page.bottom - page.top
+    assertTrue(kotlin.math.abs((bookmarkCenterX - pageCenterX).value) < pageWidth.value / 10)
+    assertTrue(bookmark.top > page.top + pageHeight / 10)
+    assertTrue(bookmark.top < page.top + pageHeight / 3)
+  }
+
+  @Test
+  fun `carousel pages can be swiped horizontally and open the selected page`() {
+    val nextLocator = Locator(href = Url("c2.xhtml")!!, mediaType = MediaType.XHTML)
+      .copyWithLocations(totalProgression = 0.4)
+    var selected: Locator? = null
+    var selectedMode: EpubPageMode? = null
+    show(
+      pageMode = EpubPageMode.CAROUSEL,
+      pagePreviews = listOf(
+        EpubPagePreview(locator, "page-1", pageIndex = 0),
+        EpubPagePreview(nextLocator, "page-2", pageIndex = 1)
+      ),
+      actions = EpubReaderActions(
+        onSelectCarouselPage = { selected = it },
+        onPageModeSelected = { selectedMode = it }
+      )
+    )
+
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG + "_0")
+      .assertIsDisplayed()
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG + "_0")
+      .performTouchInput { swipeLeft() }
+    composeTestRule.waitForIdle()
+
+    assertEquals(nextLocator, selected)
+    assertEquals(null, selectedMode)
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG + "_1")
+      .performClick()
+    assertEquals(EpubPageMode.SINGLE_PAGE, selectedMode)
   }
 
   @Test
@@ -408,13 +466,78 @@ class EpubReaderScreenTest {
     assertEquals(pages[1], selected)
     composeTestRule.onNodeWithText("Back to page 40").assertIsDisplayed()
   }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [Build.VERSION_CODES.R])
+class EpubReaderReaderControlsTest {
+  @get:Rule
+  val composeTestRule = createComposeRule()
+
+  private val toc = listOf(
+    EpubTocItem("Chapter One", Link(href = Url("c1.xhtml")!!), 0),
+    EpubTocItem("Section 1.1", Link(href = Url("c1.xhtml#s1")!!), 1)
+  )
+  private val ready = EpubReaderUiState.Ready(
+    OpenEpub(mockk(relaxed = true), "id", "A Book", toc, null)
+  )
+
+  private val locator = Locator(href = Url("c1.xhtml")!!, mediaType = MediaType.XHTML)
+    .copyWithLocations(totalProgression = 0.25)
+
+  private fun show(
+    state: EpubReaderUiState = ready,
+    settings: EpubReaderSettings = EpubReaderSettings(),
+    chromeVisible: Boolean = true,
+    reading: EpubReadingState = EpubReadingState(
+      locator = locator,
+      positionCount = 100,
+      hasPreviousChapter = true,
+      hasNextChapter = true
+    ),
+    search: EpubSearchState = EpubSearchState(),
+    actions: EpubReaderActions = EpubReaderActions(),
+    pageReady: Boolean = true,
+    previousPages: List<Locator> = emptyList(),
+    pageMode: EpubPageMode = EpubPageMode.SINGLE_PAGE,
+    pageModesAvailable: Boolean = true,
+    pagePreviews: List<EpubPagePreview> = emptyList(),
+    overviewPages: List<EpubPagePreview> = emptyList(),
+    overviewHasPrevious: Boolean = false,
+    overviewHasNext: Boolean = false,
+    panels: EpubReaderPanels = EpubReaderPanels(),
+    annotations: List<EpubAnnotation> = emptyList(),
+    selectionLocator: Locator? = null
+  ) = composeTestRule.setContent {
+    EpubReaderScreen(
+      state,
+      settings,
+      reading,
+      chromeVisible,
+      actions,
+      pageReady,
+      search = search,
+      previousPages = previousPages,
+      pageMode = pageMode,
+      pageModesAvailable = pageModesAvailable,
+      pagePreviews = pagePreviews,
+      overviewPages = overviewPages,
+      overviewHasPrevious = overviewHasPrevious,
+      overviewHasNext = overviewHasNext,
+      panels = panels,
+      annotations = annotations,
+      selectionLocator = selectionLocator
+    )
+  }
 
   @Test
   fun `annotation list can delete and copy an item`() {
     val annotation = EpubAnnotation(
       id = "note-id",
       kind = EpubAnnotationKind.NOTE,
-      locator = locator.copy(text = Locator.Text("before context", "selected text", "after context")),
+      locator = locator.copyWithLocations(position = 25).copy(
+        text = Locator.Text("before context", "selected text", "after context")
+      ),
       text = "selected text",
       note = "My note",
       title = "Chapter One"
@@ -428,12 +551,39 @@ class EpubReaderScreenTest {
     composeTestRule.onNodeWithText("Types").assertIsDisplayed()
     composeTestRule.onNodeWithText("Colors").assertIsDisplayed()
     composeTestRule.onNodeWithText("Chapters").assertIsDisplayed()
-    assertTrue(composeTestRule.onAllNodesWithText("Chapter One").fetchSemanticsNodes().isNotEmpty())
+    composeTestRule.onAllNodesWithText("Chapter One").assertCountEquals(3)
+    composeTestRule.onNodeWithText("Page 25").assertIsDisplayed()
     composeTestRule.onNodeWithText("My note").assertIsDisplayed()
     composeTestRule.onNodeWithTag(EPUB_READER_ANNOTATION_DELETE_TESTING_TAG)
       .performScrollTo().assertIsDisplayed().assertIsEnabled()
     composeTestRule.onNodeWithTag(EPUB_READER_ANNOTATION_COPY_TESTING_TAG)
       .performScrollTo().assertIsDisplayed().assertIsEnabled()
+  }
+
+  @Test
+  fun `selection on a saved annotation offers delete`() {
+    val annotatedLocator = locator.copyWithLocations(position = 25).copy(
+      text = Locator.Text("before context", "selected passage", "after context")
+    )
+    val annotation = EpubAnnotation(
+      id = "highlight-id",
+      kind = EpubAnnotationKind.HIGHLIGHT,
+      locator = annotatedLocator,
+      text = "selected passage"
+    )
+    val selection = locator.copyWithLocations(position = 25).copy(
+      text = Locator.Text(highlight = "selected passage")
+    )
+    assertTrue(annotation.matchesSelection(selection))
+    show(
+      annotations = listOf(annotation),
+      selectionLocator = selection,
+      actions = EpubReaderActions()
+    )
+
+    composeTestRule.onNodeWithTag(EPUB_READER_SELECTION_DELETE_TESTING_TAG)
+      .assertIsDisplayed()
+      .assertIsEnabled()
   }
 
   @Test

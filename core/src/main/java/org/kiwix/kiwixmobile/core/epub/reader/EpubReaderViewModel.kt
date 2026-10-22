@@ -129,6 +129,7 @@ class EpubReaderViewModel @Inject constructor(
   private var searchJob: Job? = null
   private var searchRequestId = 0L
   private var annotationSaveJob: Job? = null
+  private var currentEpubFile: File? = null
 
   init {
     open(savedStateHandle.get<String>(EXTRA_PATH))
@@ -141,6 +142,7 @@ class EpubReaderViewModel @Inject constructor(
         _state.value = EpubReaderUiState.Failed
         return@launch
       }
+      currentEpubFile = file
       _settings.value = EpubReaderSettings.fromJson(kiwixDataStore.epubReaderSettingsJson.first())
       // Idempotent: the launcher already added the book, but a restored task skips the launcher.
       val prepared = openUseCase.prepare(EpubSource.Path(file), markOpened = false)
@@ -151,7 +153,7 @@ class EpubReaderViewModel @Inject constructor(
           val title = publication.metadata.title?.takeIf { it.isNotBlank() }
             ?: file.nameWithoutExtension
           _currentLocator.value = locator
-          _annotations.value = annotationRepository.load(bookId)
+          _annotations.value = annotationRepository.load(bookId, file)
           _state.value = EpubReaderUiState.Ready(
             OpenEpub(
               publication,
@@ -200,10 +202,6 @@ class EpubReaderViewModel @Inject constructor(
 
   fun isBookmarked(locator: Locator): Boolean = _annotations.value.any {
     it.kind == EpubAnnotationKind.BOOKMARK && it.locator.sameBookmarkPosition(locator)
-  }
-
-  fun addFavorite(locator: Locator) {
-    addAnnotation(EpubAnnotationKind.FAVORITE, locator)
   }
 
   fun addHighlight(
@@ -273,9 +271,10 @@ class EpubReaderViewModel @Inject constructor(
   private fun persistAnnotations() {
     val book = (_state.value as? EpubReaderUiState.Ready)?.book ?: return
     val snapshot = _annotations.value.toList()
+    val epubFile = currentEpubFile ?: return
     annotationSaveJob?.cancel()
     annotationSaveJob = viewModelScope.launch {
-      annotationRepository.save(book.bookId, book.title, snapshot)
+      annotationRepository.save(book.bookId, book.title, snapshot, epubFile)
     }
   }
 

@@ -86,8 +86,8 @@ class EpubReaderViewModelTest {
     every { store.epubReaderSettingsJson } returns flowOf(settings.toJson())
     coEvery { library.locator(BOOK_ID) } returns savedLocator
     coEvery { library.saveLocator(any(), any()) } just Runs
-    coEvery { annotations.load(any()) } returns emptyList()
-    coEvery { annotations.save(any(), any(), any()) } just Runs
+    coEvery { annotations.load(any(), any()) } returns emptyList()
+    coEvery { annotations.save(any(), any(), any(), any()) } just Runs
     coEvery { store.setEpubReaderSettingsJson(any()) } just Runs
     coEvery { openUseCase.prepare(any(), any()) } answers {
       EpubOpenResult.Ready((firstArg<EpubSource>() as EpubSource.Path).file, BOOK_ID)
@@ -143,7 +143,6 @@ class EpubReaderViewModelTest {
 
     vm.addBookmark()
     vm.addNote(selected, "My note")
-    vm.addFavorite(selected)
     vm.addHighlight(selected, EpubHighlightColor.LIGHT_BLUE)
     vm.updateAnnotationNote(vm.annotations.value.last().id, "Highlight note")
     runCurrent()
@@ -152,7 +151,6 @@ class EpubReaderViewModelTest {
       listOf(
         EpubAnnotationKind.BOOKMARK,
         EpubAnnotationKind.NOTE,
-        EpubAnnotationKind.FAVORITE,
         EpubAnnotationKind.HIGHLIGHT
       ),
       vm.annotations.value.map { it.kind }
@@ -162,7 +160,7 @@ class EpubReaderViewModelTest {
     assertEquals("Chapter One", vm.annotations.value.last().title)
     assertEquals(EpubHighlightColor.LIGHT_BLUE, vm.annotations.value.last().color)
     assertEquals("Highlight note", vm.annotations.value.last().note)
-    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, match { it.size == 4 }) }
+    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, match { it.size == 3 }, any()) }
   }
 
   @Test
@@ -209,7 +207,7 @@ class EpubReaderViewModelTest {
 
     assertFalse(vm.isBookmarked(page))
     assertTrue(vm.annotations.value.isEmpty())
-    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, emptyList()) }
+    coVerify { annotations.save(BOOK_ID, EpubFixture.TITLE, emptyList(), any()) }
   }
 
   @Test
