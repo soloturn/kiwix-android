@@ -45,7 +45,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import kotlinx.coroutines.CoroutineScope
@@ -172,18 +171,22 @@ fun BottomNavigationBar(
       NavigationBarItem(
         selected = currentDestinationRoute == item.route,
         onClick = {
-          navController.navigate(item.route) {
-            // Avoid multiple copies of the same destination
-            launchSingleTop = true
-
-            // Pop up to the start destination of the graph to avoid building up a large stack
-            popUpTo(navController.graph.findStartDestination().id) {
-              // Bug fix #4392
-              saveState = item.route != KiwixDestination.Reader.route
+          if (item.route == KiwixDestination.Home.route) {
+            if (currentDestinationRoute != KiwixDestination.Home.route &&
+              !navController.popBackStack(KiwixDestination.Home.route, inclusive = false)
+            ) {
+              navController.navigate(KiwixDestination.Home.route) {
+                launchSingleTop = true
+              }
             }
-
-            // Restore state when reselecting a previously selected tab
-            restoreState = item.route != KiwixDestination.Reader.route
+          } else {
+            navController.navigate(item.route) {
+              launchSingleTop = true
+              popUpTo(KiwixDestination.Home.route) {
+                saveState = item.route != KiwixDestination.Reader.route
+              }
+              restoreState = item.route != KiwixDestination.Reader.route
+            }
           }
         },
         icon = {

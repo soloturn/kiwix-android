@@ -12,6 +12,8 @@ package org.kiwix.kiwixmobile.nav.destination.home
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -228,17 +230,19 @@ private fun LocalBooksShelf(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun CategoryPicker(state: HomeViewModel.UiState, onToggle: (Category) -> Unit) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     ShelfHeading(stringResource(CoreR.string.home_categories))
     if (state.loadingCategories && state.categories.isEmpty()) {
       Text(stringResource(CoreR.string.home_loading_categories), modifier = Modifier.padding(horizontal = 16.dp))
     } else {
-      LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+      FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
       ) {
-        items(state.categories, key = { it.category }) { category ->
+        state.categories.forEach { category ->
           FilterChip(
             selected = category.category in state.selectedCategories,
             onClick = { onToggle(category) },
