@@ -61,6 +61,7 @@ import org.kiwix.kiwixmobile.core.ui.theme.KiwixTheme
 import org.kiwix.kiwixmobile.core.utils.LanguageUtils
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
+import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.SelectionMode
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.nav.destination.home.HomeScreen
@@ -151,11 +152,19 @@ fun LocalLibraryRoute(
           onLocalBookClick = localLibraryViewModel::onBookItemClick,
           onEpubBookClick = localLibraryViewModel::onEpubItemClick,
           onCatalogBookClick = { book, category ->
-            coroutineScope.launch {
-              onlineVm.kiwixDataStore.setSelectedOnlineContentCategory(category.orEmpty())
-              onlineVm.onSearchQueryChanged(book.title)
-              onlineVm.openSearchView()
-              navController.navigate(KiwixDestination.Downloads.route)
+            val downloadedBook = uiState.value.fileSelectListState.bookOnDiskListItems
+              .filterIsInstance<BookOnDisk>()
+              .firstOrNull { it.id == book.id }
+            if (downloadedBook != null) {
+              localLibraryViewModel.onBookItemClick(downloadedBook)
+            } else {
+              coroutineScope.launch {
+                onlineVm.kiwixDataStore.setSelectedOnlineContentCategory(category.orEmpty())
+                onlineVm.onSearchQueryChanged(book.title)
+                onlineVm.openSearchView()
+                onlineVm.queueHomeBookDownload(book)
+                navController.navigate(KiwixDestination.Downloads.route)
+              }
             }
           },
           onUserBackPressed = localLibraryViewModel::handleUserBackPressed,
