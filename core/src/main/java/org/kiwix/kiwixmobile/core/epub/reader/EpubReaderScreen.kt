@@ -839,11 +839,12 @@ private fun PageCarousel(
   onPageClick: (Locator) -> Unit
 ) {
   val currentIndex = currentLocator?.let { current ->
-    pages.indexOfFirst { it.locator.sameBookmarkPosition(current) }.coerceAtLeast(0)
+    pages.indexOfFirst { it.locator.sameBookmarkPosition(current) }
+      .coerceIn(0, (pages.size - 1).coerceAtLeast(0))
   } ?: 0
   val pagerState = rememberPagerState(initialPage = currentIndex) { pages.size }
   LaunchedEffect(currentIndex, pages) {
-    if (!pagerState.isScrollInProgress && pagerState.currentPage != currentIndex) {
+    if (pagerState.currentPage != currentIndex) {
       pagerState.scrollToPage(currentIndex)
     }
   }

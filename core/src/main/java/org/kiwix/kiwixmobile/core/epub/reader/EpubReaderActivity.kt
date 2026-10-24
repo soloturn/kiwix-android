@@ -530,6 +530,12 @@ class EpubReaderActivity : BaseActivity() {
         .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
         .collect { locator ->
           viewModel.onLocatorChanged(locator)
+        }
+    }
+    lifecycleScope.launch {
+      visiblePageKey
+        .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+        .collect {
           if (pageMode.value == EpubPageMode.CAROUSEL) {
             updateCarouselPeeks(pagePreviews.value)
             refreshCarouselPreviews(mainFragment)
