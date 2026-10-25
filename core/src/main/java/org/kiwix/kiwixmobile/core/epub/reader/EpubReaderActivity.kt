@@ -124,7 +124,6 @@ class EpubReaderActivity : BaseActivity() {
   internal var previewInvalidationJob: Job? = null
   internal var previewGeneration = 0L
   private var previewViewport = 0 to 0
-  internal var lastVisiblePageKey: PageKey? = null
   internal lateinit var root: FrameLayout
   internal var previewNavigatorContainer: FragmentContainerView? = null
   internal lateinit var navigatorContainer: FragmentContainerView
@@ -195,8 +194,7 @@ class EpubReaderActivity : BaseActivity() {
       addView(navigatorContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
       addView(previousCarouselContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
       addView(nextCarouselContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-      // Keep the live Readium page at its normal size; the cached neighboring pages sit over
-      // only the outer edge strips, where the page margin normally is.
+      // Place each live Readium page over the full reader area; carousel transforms size them.
       addView(previousPagePeek)
       addView(nextPagePeek)
       addView(
