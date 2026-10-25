@@ -124,7 +124,6 @@ class EpubReaderActivity : BaseActivity() {
   internal var previewInvalidationJob: Job? = null
   internal var previewGeneration = 0L
   private var previewViewport = 0 to 0
-  internal var lastVisiblePageKey: PageKey? = null
   internal lateinit var root: FrameLayout
   internal var previewNavigatorContainer: FragmentContainerView? = null
   internal lateinit var navigatorContainer: FragmentContainerView
