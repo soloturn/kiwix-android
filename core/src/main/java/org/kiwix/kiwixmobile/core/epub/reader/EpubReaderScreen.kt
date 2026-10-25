@@ -215,6 +215,7 @@ data class EpubReaderActions(
   val onSearchResult: (Locator) -> Unit = {},
   val onReturnToPreviousPage: (Locator) -> Unit = {},
   val onBookmark: () -> Unit = {},
+  val onToggleBookmark: (Locator) -> Unit = {},
   val onShowAnnotations: () -> Unit = {},
   val onAnnotationSelected: (EpubAnnotation) -> Unit = {},
   val onDeleteAnnotation: (EpubAnnotation) -> Unit = {},
@@ -293,6 +294,9 @@ fun EpubReaderScreen(
   val ready = state as? EpubReaderUiState.Ready
   val shownPageMode = if (pageModesAvailable) pageMode else EpubPageMode.SINGLE_PAGE
   val currentPageBookmarked = isCurrentPageBookmarked(reading, annotations)
+  val bookmarkedLocators = annotations
+    .filter { it.kind == EpubAnnotationKind.BOOKMARK }
+    .map { it.locator }
   val selectedAnnotation = selectionLocator?.let { selected ->
     annotations.firstOrNull { it.matchesSelection(selected) }
   }
@@ -324,6 +328,7 @@ fun EpubReaderScreen(
     pagePreviews = pagePreviews,
     loadPreviewBitmap = loadPreviewBitmap,
     currentPageBookmarked = currentPageBookmarked,
+    bookmarkedLocators = bookmarkedLocators,
     showBookmark = showBookmark,
     overlay = overlay,
     chrome = chromeState,
@@ -363,6 +368,7 @@ private data class EpubReaderMainLayoutState(
   val pagePreviews: List<EpubPagePreview>,
   val loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?,
   val currentPageBookmarked: Boolean,
+  val bookmarkedLocators: List<Locator>,
   val showBookmark: Boolean,
   val overlay: EpubOverlayColors,
   val chrome: ReaderChromeState,
@@ -401,10 +407,9 @@ private fun BoxWithConstraintsScope.EpubReaderPageLayers(
     ReaderChrome(state.chrome, panels, search, actions, searchResultsListState)
   }
   PageBookmarkToggle(
-    state.showBookmark,
+    state.showBookmark && state.pageMode == EpubPageMode.SINGLE_PAGE,
     state.currentPageBookmarked,
-    actions.onBookmark,
-    state.pageMode
+    actions.onBookmark
   )
   PageOverviewLayer(state)
 }
@@ -417,6 +422,8 @@ private fun CarouselPageLayer(state: EpubReaderMainLayoutState, actions: EpubRea
   PageCarousel(
     pages = state.pagePreviews,
     currentLocator = state.reading.locator,
+    bookmarkedLocators = state.bookmarkedLocators,
+    onBookmarkToggle = actions.onToggleBookmark,
     onPositionChanged = actions.onCarouselPositionChanged,
     onPageSettled = actions.onSelectCarouselPage,
   )
@@ -437,44 +444,59 @@ private fun shouldShowBookmarkMargin(
 ) = ready != null &&
   pageReady &&
   reading.locator != null &&
-  (pageMode == EpubPageMode.CAROUSEL || (!chromeVisible && pageMode == EpubPageMode.SINGLE_PAGE))
+  pageMode == EpubPageMode.SINGLE_PAGE &&
+  !chromeVisible
 
 @Composable
 private fun BoxWithConstraintsScope.PageBookmarkToggle(
   visible: Boolean,
   bookmarked: Boolean,
-  onClick: () -> Unit,
-  pageMode: EpubPageMode
+  onClick: () -> Unit
 ) {
   if (!visible) return
-  val centered = pageMode == EpubPageMode.CAROUSEL
-  val topOffset = if (centered) {
-    maxHeight * ((1f - EpubReaderActivity.CAROUSEL_PAGE_HEIGHT) / 2f) + EIGHT_DP
-  } else {
-    EIGHT_DP
-  }
-  BookmarkMarginButton(bookmarked, onClick, centered, topOffset)
+  BookmarkMarginButton(bookmarked, onClick, BookmarkButtonPlacement.SINGLE_PAGE, EIGHT_DP)
 }
+
+private enum class BookmarkButtonPlacement { SINGLE_PAGE, CENTER, PREVIOUS_PAGE, NEXT_PAGE }
 
 @Composable
 private fun BoxScope.BookmarkMarginButton(
   bookmarked: Boolean,
   onClick: () -> Unit,
-  centered: Boolean,
-  topOffset: Dp
+  placement: BookmarkButtonPlacement,
+  topOffset: Dp,
+  testTag: String = EPUB_READER_BOOKMARK_TESTING_TAG
 ) {
+  val alignment = when (placement) {
+    BookmarkButtonPlacement.SINGLE_PAGE -> Alignment.TopEnd
+    BookmarkButtonPlacement.NEXT_PAGE -> Alignment.TopStart
+    BookmarkButtonPlacement.CENTER -> Alignment.TopCenter
+    BookmarkButtonPlacement.PREVIOUS_PAGE -> Alignment.TopEnd
+  }
+  val horizontalOffset = when (placement) {
+    BookmarkButtonPlacement.PREVIOUS_PAGE -> SIXTEEN_DP
+    BookmarkButtonPlacement.NEXT_PAGE -> -SIXTEEN_DP
+    BookmarkButtonPlacement.SINGLE_PAGE,
+    BookmarkButtonPlacement.CENTER -> 0.dp
+  }
   Surface(
     modifier = Modifier
-      .align(if (centered) Alignment.TopCenter else Alignment.TopEnd)
-      .offset(y = topOffset)
-      .then(if (centered) Modifier else Modifier.padding(end = EIGHT_DP))
+      .align(alignment)
+      .offset(x = horizontalOffset, y = topOffset)
+      .then(
+        if (placement == BookmarkButtonPlacement.SINGLE_PAGE) {
+          Modifier.padding(end = EIGHT_DP)
+        } else {
+          Modifier
+        }
+      )
       .shadow(EIGHT_DP, CircleShape),
     shape = CircleShape,
     color = MaterialTheme.colorScheme.surface
   ) {
     IconButton(
       onClick = onClick,
-      modifier = Modifier.testTag(EPUB_READER_BOOKMARK_TESTING_TAG)
+      modifier = Modifier.testTag(testTag)
     ) {
       Icon(
         painter = painterResource(
@@ -829,10 +851,14 @@ private fun ReaderChromeState.shouldShowPreviousPages(searchOpen: Boolean) =
 private fun PageCarousel(
   pages: List<EpubPagePreview>,
   currentLocator: Locator?,
+  bookmarkedLocators: List<Locator>,
+  onBookmarkToggle: (Locator) -> Unit,
   onPositionChanged: (Float) -> Unit,
   onPageSettled: (Locator) -> Unit,
 ) {
   val currentPages by rememberUpdatedState(pages)
+  val currentBookmarkedLocators by rememberUpdatedState(bookmarkedLocators)
+  val currentOnBookmarkToggle by rememberUpdatedState(onBookmarkToggle)
   val currentOnPageSettled by rememberUpdatedState(onPageSettled)
   val currentOnPositionChanged by rememberUpdatedState(onPositionChanged)
   val currentIndex = currentLocator?.let { current ->
@@ -870,8 +896,45 @@ private fun PageCarousel(
     key = { page -> pages[page].cacheKey },
     verticalAlignment = Alignment.CenterVertically
   ) { page ->
-    Box(Modifier.fillMaxSize().testTag("${EPUB_READER_PAGE_CAROUSEL_TESTING_TAG}_$page"))
+    val preview = pages[page]
+    val placement = when {
+      page < pagerState.currentPage -> BookmarkButtonPlacement.PREVIOUS_PAGE
+      page > pagerState.currentPage -> BookmarkButtonPlacement.NEXT_PAGE
+      else -> BookmarkButtonPlacement.CENTER
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().testTag("${EPUB_READER_PAGE_CAROUSEL_TESTING_TAG}_$page")) {
+      CarouselPageBookmarkToggle(
+        locator = preview.locator,
+        page = page,
+        placement = placement,
+        bookmarkedLocators = currentBookmarkedLocators,
+        onBookmarkToggle = currentOnBookmarkToggle,
+        topOffset = maxHeight * ((1f - EpubReaderActivity.CAROUSEL_PAGE_HEIGHT) / 2f) + EIGHT_DP
+      )
+    }
   }
+}
+
+@Composable
+private fun BoxWithConstraintsScope.CarouselPageBookmarkToggle(
+  locator: Locator,
+  page: Int,
+  placement: BookmarkButtonPlacement,
+  bookmarkedLocators: List<Locator>,
+  onBookmarkToggle: (Locator) -> Unit,
+  topOffset: Dp
+) {
+  BookmarkMarginButton(
+    bookmarked = bookmarkedLocators.any { it.sameBookmarkPosition(locator) },
+    onClick = { onBookmarkToggle(locator) },
+    placement = placement,
+    topOffset = topOffset,
+    testTag = if (placement == BookmarkButtonPlacement.CENTER) {
+      EPUB_READER_BOOKMARK_TESTING_TAG
+    } else {
+      "${EPUB_READER_BOOKMARK_TESTING_TAG}_$page"
+    }
+  )
 }
 
 @Composable
