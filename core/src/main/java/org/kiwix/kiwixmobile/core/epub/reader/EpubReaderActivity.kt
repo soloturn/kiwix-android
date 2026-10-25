@@ -73,8 +73,6 @@ import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
-import org.readium.r2.navigator.input.InputListener
-import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.util.AbsoluteUrl
@@ -115,6 +113,8 @@ class EpubReaderActivity : BaseActivity() {
   internal var carouselTapJob: Job? = null
   internal var navigator: EpubNavigatorFragment? = null
   internal var previewNavigator: EpubNavigatorFragment? = null
+  internal var previousCarouselNavigator: EpubNavigatorFragment? = null
+  internal var nextCarouselNavigator: EpubNavigatorFragment? = null
   internal var previewCapture: VulkanPreviewCapture? = null
   internal var previewCaptureInitializing = false
   internal var previewPresentation: Presentation? = null
@@ -128,6 +128,8 @@ class EpubReaderActivity : BaseActivity() {
   internal lateinit var root: FrameLayout
   internal var previewNavigatorContainer: FragmentContainerView? = null
   internal lateinit var navigatorContainer: FragmentContainerView
+  internal lateinit var previousCarouselContainer: FragmentContainerView
+  internal lateinit var nextCarouselContainer: FragmentContainerView
   internal lateinit var previousPagePeek: ImageView
   internal lateinit var nextPagePeek: ImageView
 
@@ -162,12 +164,24 @@ class EpubReaderActivity : BaseActivity() {
         val preferences = navigatorPreferences(settings, dark, mode)
         navigator?.submitPreferences(preferences)
         previewNavigator?.submitPreferences(preferences)
+        previousCarouselNavigator?.submitPreferences(preferences)
+        nextCarouselNavigator?.submitPreferences(preferences)
       }
     }
   }
 
   private fun setupReaderViews() {
     navigatorContainer = FragmentContainerView(this).apply { id = View.generateViewId() }
+    previousCarouselContainer = FragmentContainerView(this).apply {
+      id = View.generateViewId()
+      visibility = View.GONE
+      isClickable = false
+    }
+    nextCarouselContainer = FragmentContainerView(this).apply {
+      id = View.generateViewId()
+      visibility = View.GONE
+      isClickable = false
+    }
     previousPagePeek = pagePeekView(previous = true)
     nextPagePeek = pagePeekView(previous = false)
     // Immersive: the book fills the screen and the bars and overlay float above it. Only the
@@ -179,6 +193,8 @@ class EpubReaderActivity : BaseActivity() {
     }
     root = FrameLayout(this).apply {
       addView(navigatorContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+      addView(previousCarouselContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+      addView(nextCarouselContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
       // Keep the live Readium page at its normal size; the cached neighboring pages sit over
       // only the outer edge strips, where the page margin normally is.
       addView(previousPagePeek)
@@ -297,6 +313,10 @@ class EpubReaderActivity : BaseActivity() {
     }
     previewNavigator = null
     previewNavigatorContainer = null
+    previousCarouselNavigator = null
+    nextCarouselNavigator = null
+    if (::previousCarouselContainer.isInitialized) previousCarouselContainer.visibility = View.GONE
+    if (::nextCarouselContainer.isInitialized) nextCarouselContainer.visibility = View.GONE
     previewPresentation?.dismiss()
     previewPresentation = null
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) capture.close()
@@ -329,6 +349,14 @@ class EpubReaderActivity : BaseActivity() {
         .remove(fragment)
         .commitNowAllowingStateLoss()
     }
+    supportFragmentManager.findFragmentByTag(LIVE_PREVIOUS_TAG)?.let { fragment ->
+      supportFragmentManager.beginTransaction().remove(fragment).commitNowAllowingStateLoss()
+    }
+    supportFragmentManager.findFragmentByTag(LIVE_NEXT_TAG)?.let { fragment ->
+      supportFragmentManager.beginTransaction().remove(fragment).commitNowAllowingStateLoss()
+    }
+    previousCarouselNavigator = null
+    nextCarouselNavigator = null
     previewNavigator = null
     previewNavigatorContainer = null
     previewPresentation?.dismiss()
@@ -488,6 +516,7 @@ class EpubReaderActivity : BaseActivity() {
       viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
       navigator?.go(target)
     },
+    onCarouselPositionChanged = ::setLiveCarouselPosition,
     onNoteSelection = viewModel::addNote
   )
 
@@ -503,7 +532,9 @@ class EpubReaderActivity : BaseActivity() {
       initialPreferences = initialPreferences,
       listener = linkListener,
       paginationListener = object : EpubNavigatorFragment.PaginationListener {
-        override fun onPageLoaded() = revealBook()
+        override fun onPageLoaded() {
+          pageReady.value = true
+        }
 
         override fun onPageChanged(pageIndex: Int, totalPages: Int, locator: Locator) {
           visiblePageKey.value = pageKey(locator, pageIndex, totalPages)
@@ -537,7 +568,7 @@ class EpubReaderActivity : BaseActivity() {
         .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
         .collect {
           if (pageMode.value == EpubPageMode.CAROUSEL) {
-            updateCarouselPeeks(pagePreviews.value)
+            syncLiveCarouselNeighbors(pagePreviews.value, it)
             refreshCarouselPreviews(mainFragment)
           }
         }
@@ -621,18 +652,6 @@ class EpubReaderActivity : BaseActivity() {
     return fragment
   }
 
-  private fun observePageLoading(fragment: EpubNavigatorFragment) {
-    lifecycleScope.launch {
-      delay(REVEAL_TIMEOUT_MS)
-      revealBook()
-    }
-    fragment.addInputListener(
-      object : InputListener {
-        override fun onTap(event: TapEvent) = handleTap(fragment, event)
-      }
-    )
-  }
-
   /** Names the Recents entry after the book. */
   private fun setTaskTitle(title: String) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -641,10 +660,6 @@ class EpubReaderActivity : BaseActivity() {
       @Suppress("DEPRECATION")
       setTaskDescription(ActivityManager.TaskDescription(title))
     }
-  }
-
-  private fun revealBook() {
-    pageReady.value = true
   }
 
   private val selectionActionModeCallback = object : ActionMode.Callback {
@@ -721,7 +736,7 @@ class EpubReaderActivity : BaseActivity() {
     adjacentChapter(book.publication.readingOrder, current, next)?.let { navigator?.go(it) }
   }
 
-  private val linkListener = object : EpubNavigatorFragment.Listener {
+  internal val linkListener = object : EpubNavigatorFragment.Listener {
     override fun onExternalLinkActivated(url: AbsoluteUrl) {
       val intent = EpubExternalLinks.intentFor(url.toString()) ?: return
       lifecycleScope.launch { externalLinkOpener.openExternalUrl(intent) }
@@ -755,10 +770,11 @@ class EpubReaderActivity : BaseActivity() {
 
   companion object {
     private const val NAVIGATOR_TAG = "epubNavigator"
+    internal const val LIVE_PREVIOUS_TAG = "epubLiveCarouselPrevious"
+    internal const val LIVE_NEXT_TAG = "epubLiveCarouselNext"
     internal const val PREVIEW_NAVIGATOR_TAG = "epubPreviewNavigator"
     internal const val PREVIEW_LOG_TAG = "EpubPreview"
     private const val BOOK_SCHEME = "epub"
-    private const val REVEAL_TIMEOUT_MS = 5_000L
 
     // Constant top and bottom margin around the page, so the overlay toggling never reflows it.
     internal const val READING_MARGIN_DP = 32
@@ -775,6 +791,8 @@ class EpubReaderActivity : BaseActivity() {
     internal const val PAGE_OVERVIEW_PAGE_COUNT = 9
     internal const val CAROUSEL_PAGE_WIDTH = 0.82f
     internal const val CAROUSEL_PAGE_HEIGHT = 0.76f
+    internal const val LIVE_CAROUSEL_PAGE_WIDTH = 0.77f
+    internal const val LIVE_CAROUSEL_PAGE_STEP_INSET_DP = 80
     internal const val CAROUSEL_PEEK_HEIGHT = 0.72f
     internal const val CAROUSEL_PEEK_SCALE = 0.72f
     internal const val PAGE_PEEK_WIDTH = 0.1f

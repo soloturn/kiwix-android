@@ -38,7 +38,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -149,7 +148,6 @@ const val EPUB_READER_ANNOTATIONS_TESTING_TAG = "epubReaderAnnotationsTestingTag
 const val EPUB_READER_ANNOTATION_DELETE_TESTING_TAG = "epubReaderAnnotationDeleteTestingTag"
 const val EPUB_READER_ANNOTATION_COPY_TESTING_TAG = "epubReaderAnnotationCopyTestingTag"
 const val EPUB_READER_SELECTION_DELETE_TESTING_TAG = "epubReaderSelectionDeleteTestingTag"
-private const val PAGE_CAROUSEL_HEIGHT_FRACTION = 0.88f
 const val EPUB_READER_PAGE_OVERVIEW_TESTING_TAG = "epubReaderPageOverviewTestingTag"
 const val EPUB_READER_PAGE_CAROUSEL_TESTING_TAG = "epubReaderPageCarouselTestingTag"
 const val EPUB_READER_PAGE_OVERVIEW_BUTTON_TESTING_TAG = "epubReaderPageOverviewButtonTestingTag"
@@ -226,6 +224,7 @@ data class EpubReaderActions(
   val onLoadMoreOverviewPages: (Boolean) -> Unit = {},
   val onSelectOverviewPage: (Locator) -> Unit = {},
   val onSelectCarouselPage: (Locator) -> Unit = {},
+  val onCarouselPositionChanged: (Float) -> Unit = {},
   val onDismissSelectionMenu: () -> Unit = {},
   val onCopySelection: (String) -> Unit = {},
   val onShareSelection: (String) -> Unit = {},
@@ -418,12 +417,8 @@ private fun CarouselPageLayer(state: EpubReaderMainLayoutState, actions: EpubRea
   PageCarousel(
     pages = state.pagePreviews,
     currentLocator = state.reading.locator,
-    loadPreviewBitmap = state.loadPreviewBitmap,
+    onPositionChanged = actions.onCarouselPositionChanged,
     onPageSettled = actions.onSelectCarouselPage,
-    onPageClick = { locator ->
-      actions.onSelectCarouselPage(locator)
-      actions.onPageModeSelected(EpubPageMode.SINGLE_PAGE)
-    }
   )
 }
 
@@ -834,21 +829,23 @@ private fun ReaderChromeState.shouldShowPreviousPages(searchOpen: Boolean) =
 private fun PageCarousel(
   pages: List<EpubPagePreview>,
   currentLocator: Locator?,
-  loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?,
+  onPositionChanged: (Float) -> Unit,
   onPageSettled: (Locator) -> Unit,
-  onPageClick: (Locator) -> Unit
 ) {
+  val currentPages by rememberUpdatedState(pages)
+  val currentOnPageSettled by rememberUpdatedState(onPageSettled)
+  val currentOnPositionChanged by rememberUpdatedState(onPositionChanged)
   val currentIndex = currentLocator?.let { current ->
     pages.indexOfFirst { it.locator.sameBookmarkPosition(current) }
       .coerceIn(0, (pages.size - 1).coerceAtLeast(0))
   } ?: 0
   val pagerState = rememberPagerState(initialPage = currentIndex) { pages.size }
-  LaunchedEffect(currentIndex, pages) {
+  LaunchedEffect(currentIndex) {
     if (pagerState.currentPage != currentIndex) {
       pagerState.scrollToPage(currentIndex)
     }
   }
-  LaunchedEffect(pagerState, pages) {
+  LaunchedEffect(pagerState) {
     var wasScrolling = false
     snapshotFlow { pagerState.isScrollInProgress to pagerState.settledPage }
       .collect { (scrolling, page) ->
@@ -856,65 +853,24 @@ private fun PageCarousel(
           wasScrolling = true
         } else if (wasScrolling) {
           wasScrolling = false
-          pages.getOrNull(page)?.let { onPageSettled(it.locator) }
+          currentPages.getOrNull(page)?.let { currentOnPageSettled(it.locator) }
         }
       }
   }
-  Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-    HorizontalPager(
-      state = pagerState,
-      modifier = Modifier.fillMaxSize(),
-      contentPadding = PaddingValues(horizontal = 48.dp),
-      pageSpacing = SIXTEEN_DP,
-      beyondViewportPageCount = 1,
-      key = { page -> pages[page].cacheKey },
-      verticalAlignment = Alignment.CenterVertically
-    ) { page ->
-      PageCarouselCard(
-        preview = pages[page],
-        loadPreviewBitmap = loadPreviewBitmap,
-        onClick = { onPageClick(pages[page].locator) },
-        pageIndex = page
-      )
-    }
+  LaunchedEffect(pagerState) {
+    snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }
+      .collect { currentOnPositionChanged(it) }
   }
-}
-
-@Composable
-private fun PageCarouselCard(
-  preview: EpubPagePreview,
-  loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?,
-  onClick: () -> Unit,
-  pageIndex: Int
-) {
-  val bitmap by produceState<Bitmap?>(null, preview.cacheKey) {
-    value = loadPreviewBitmap(preview)
-  }
-  Surface(
-    modifier = Modifier.fillMaxWidth().fillMaxHeight(PAGE_CAROUSEL_HEIGHT_FRACTION)
-      .clickable(onClick = onClick)
-      .testTag("${EPUB_READER_PAGE_CAROUSEL_TESTING_TAG}_$pageIndex"),
-    shape = MaterialTheme.shapes.small,
-    color = MaterialTheme.colorScheme.surface,
-    shadowElevation = EIGHT_DP
-  ) {
-    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-      if (bitmap != null) {
-        Image(
-          bitmap = bitmap!!.asImageBitmap(),
-          contentDescription = stringResource(R.string.epub_page_carousel),
-          contentScale = ContentScale.Fit,
-          modifier = Modifier.weight(1f).fillMaxWidth().padding(EIGHT_DP)
-        )
-      } else {
-        Box(Modifier.weight(1f).fillMaxWidth())
-      }
-      Text(
-        stringResource(R.string.epub_page_number, preview.pageIndex + 1),
-        style = MaterialTheme.typography.titleSmall,
-        modifier = Modifier.padding(bottom = EIGHT_DP)
-      )
-    }
+  HorizontalPager(
+    state = pagerState,
+    modifier = Modifier.fillMaxSize(),
+    contentPadding = PaddingValues(horizontal = 48.dp),
+    pageSpacing = SIXTEEN_DP,
+    beyondViewportPageCount = 1,
+    key = { page -> pages[page].cacheKey },
+    verticalAlignment = Alignment.CenterVertically
+  ) { page ->
+    Box(Modifier.fillMaxSize().testTag("${EPUB_READER_PAGE_CAROUSEL_TESTING_TAG}_$page"))
   }
 }
 
