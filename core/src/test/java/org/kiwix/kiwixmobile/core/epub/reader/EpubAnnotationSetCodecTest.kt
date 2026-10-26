@@ -25,6 +25,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.R])
 class EpubAnnotationSetCodecTest {
+  @Test
+  fun `highlight colors use a darker opaque shade in dark mode`() {
+    EpubHighlightColor.entries.forEach { color ->
+      assertTrue(color.hexFor(darkTheme = true) != color.hexFor(darkTheme = false))
+      assertTrue(color.tintFor(darkTheme = true) != color.tintFor(darkTheme = false))
+    }
+  }
+
   private val selection = Locator(
     href = requireNotNull(Url("Text/chapter.xhtml")),
     mediaType = MediaType.XHTML,
@@ -44,8 +52,7 @@ class EpubAnnotationSetCodecTest {
         "selected words",
         title = "Chapter 1",
         color = EpubHighlightColor.LIGHT_BLUE
-      ),
-      EpubAnnotation("favorite-id", EpubAnnotationKind.FAVORITE, selection, "selected words")
+      )
     )
 
     val encoded = EpubAnnotationSetCodec.encode("set-id", "Book title", annotations)
@@ -58,7 +65,7 @@ class EpubAnnotationSetCodecTest {
     )
     assertEquals("AnnotationSet", set.getString("type"))
     assertEquals("Book title", set.getJSONObject("about").getString("dc:title"))
-    assertEquals(4, items.length())
+    assertEquals(3, items.length())
     assertEquals("bookmarking", items.getJSONObject(0).getString("motivation"))
     assertFalse(items.getJSONObject(0).has("body"))
     assertEquals("commenting", items.getJSONObject(1).getString("motivation"))
@@ -67,7 +74,6 @@ class EpubAnnotationSetCodecTest {
     assertFalse(items.getJSONObject(2).has("body"))
     assertEquals("LIGHT_BLUE", items.getJSONObject(2).getString("kiwix:color"))
     assertEquals("Chapter 1", items.getJSONObject(2).getString("kiwix:title"))
-    assertEquals("favorite", items.getJSONObject(3).getString("kiwix:kind"))
     assertEquals(
       "TextQuoteSelector",
       items.getJSONObject(2).getJSONObject("target").getJSONArray("selector")
@@ -82,7 +88,21 @@ class EpubAnnotationSetCodecTest {
     assertEquals("My note", restored[1].note)
     assertEquals(EpubHighlightColor.LIGHT_BLUE, restored[2].color)
     assertEquals("Chapter 1", restored[2].title)
-    assertEquals(EpubAnnotationKind.FAVORITE, restored[3].kind)
+  }
+
+  @Test
+  fun `converts saved passage favorites from older versions to bookmarks`() {
+    val legacyFavorite = """
+      {"items":[{"id":"urn:uuid:old-favorite","type":"Annotation","motivation":"tagging",
+      "kiwix:kind":"favorite","target":{"source":"Text/chapter.xhtml","selector":[
+      {"type":"ProgressionSelector","value":0.25},
+      {"type":"TextQuoteSelector","exact":"selected words"}]}}]}
+    """.trimIndent()
+
+    val restored = EpubAnnotationSetCodec.decode(legacyFavorite)
+
+    assertEquals(1, restored.size)
+    assertEquals(EpubAnnotationKind.BOOKMARK, restored.single().kind)
   }
 
   @Test

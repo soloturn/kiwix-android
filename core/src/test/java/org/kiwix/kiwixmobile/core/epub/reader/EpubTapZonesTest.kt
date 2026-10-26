@@ -70,4 +70,21 @@ class EpubTapZonesTest {
     assertEquals(TapAction.NEXT_PAGE, EpubTapZones.actionFor(TapZone.NEXT_PAGE, false))
     assertEquals(TapAction.SHOW_OVERLAY, EpubTapZones.actionFor(TapZone.CENTER, false))
   }
+
+  @Test
+  fun `double tap detector recognizes two taps inside the timeout`() {
+    val detector = DoubleTapDetector(timeoutMillis = 300)
+
+    assertEquals(false, detector.registerTap(1_000))
+    assertEquals(true, detector.registerTap(1_300))
+  }
+
+  @Test
+  fun `double tap detector treats a late tap as the start of a new pair`() {
+    val detector = DoubleTapDetector(timeoutMillis = 300)
+
+    assertEquals(false, detector.registerTap(1_000))
+    assertEquals(false, detector.registerTap(1_301))
+    assertEquals(true, detector.registerTap(1_500))
+  }
 }

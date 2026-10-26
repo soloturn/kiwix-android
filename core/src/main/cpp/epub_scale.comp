@@ -1,0 +1,16 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(binding = 0) uniform sampler2D sourceImage;
+layout(binding = 1, rgba8) writeonly uniform image2D destinationImage;
+
+void main() {
+  ivec2 destination = ivec2(gl_GlobalInvocationID.xy);
+  ivec2 destinationSize = imageSize(destinationImage);
+  if (any(greaterThanEqual(destination, destinationSize))) {
+    return;
+  }
+
+  vec2 uv = (vec2(destination) + vec2(0.5)) / vec2(destinationSize);
+  imageStore(destinationImage, destination, texture(sourceImage, uv));
+}
