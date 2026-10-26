@@ -58,6 +58,7 @@ import org.kiwix.kiwixmobile.core.page.history.viewmodel.HistoryViewModel
 import org.kiwix.kiwixmobile.core.page.notes.NotesScreenRoute
 import org.kiwix.kiwixmobile.core.page.notes.viewmodel.NotesViewModel
 import org.kiwix.kiwixmobile.core.reader.integrity.ValidateZimViewModel
+import org.kiwix.kiwixmobile.core.search.NAV_ARG_SEARCH_ALL_BOOKS
 import org.kiwix.kiwixmobile.core.search.NAV_ARG_SEARCH_STRING
 import org.kiwix.kiwixmobile.core.search.SearchScreenRoute
 import org.kiwix.kiwixmobile.core.settings.SettingsScreenRoute
@@ -229,6 +230,10 @@ fun KiwixNavGraph(
         navArgument(EXTRA_IS_WIDGET_VOICE) {
           type = NavType.BoolType
           defaultValue = false
+        },
+        navArgument(NAV_ARG_SEARCH_ALL_BOOKS) {
+          type = NavType.BoolType
+          defaultValue = false
         }
       )
     ) { backStackEntry ->
@@ -292,17 +297,20 @@ sealed class KiwixDestination(val route: String) {
     SEARCH_SCREEN +
       "?$NAV_ARG_SEARCH_STRING={$NAV_ARG_SEARCH_STRING}" +
       "&$TAG_FROM_TAB_SWITCHER={$TAG_FROM_TAB_SWITCHER}" +
-      "&$EXTRA_IS_WIDGET_VOICE={$EXTRA_IS_WIDGET_VOICE}"
+      "&$EXTRA_IS_WIDGET_VOICE={$EXTRA_IS_WIDGET_VOICE}" +
+      "&$NAV_ARG_SEARCH_ALL_BOOKS={$NAV_ARG_SEARCH_ALL_BOOKS}"
   ) {
     fun createRoute(
       searchString: String = "",
       isOpenedFromTabView: Boolean = false,
-      isVoice: Boolean = false
+      isVoice: Boolean = false,
+      searchAllBooks: Boolean = false
     ): String =
       SEARCH_SCREEN +
         "?$NAV_ARG_SEARCH_STRING=$searchString" +
         "&$TAG_FROM_TAB_SWITCHER=$isOpenedFromTabView" +
-        "&$EXTRA_IS_WIDGET_VOICE=$isVoice"
+        "&$EXTRA_IS_WIDGET_VOICE=$isVoice" +
+        "&$NAV_ARG_SEARCH_ALL_BOOKS=$searchAllBooks"
   }
 
   object LocalFileTransfer : KiwixDestination("$LOCAL_FILE_TRANSFER_SCREEN?$URIS_KEY={$URIS_KEY}") {
