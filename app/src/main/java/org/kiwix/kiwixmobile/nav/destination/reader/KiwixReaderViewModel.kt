@@ -42,6 +42,7 @@ import org.kiwix.kiwixmobile.core.main.reader.RestoreOrigin
 import org.kiwix.kiwixmobile.core.main.reader.RestoreOrigin.FromExternalLaunch
 import org.kiwix.kiwixmobile.core.main.reader.RestoreOrigin.FromSearchScreen
 import org.kiwix.kiwixmobile.core.main.reader.SEARCH_ITEM_TITLE_KEY
+import org.kiwix.kiwixmobile.core.main.reader.ZimHighlightRepository
 import org.kiwix.kiwixmobile.core.main.reader.helper.BookmarkManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.FindInPageManager
 import org.kiwix.kiwixmobile.core.main.reader.helper.PendingSearchItemManager
@@ -92,7 +93,8 @@ class KiwixReaderViewModel @Inject constructor(
   donationDialogHandler: DonationDialogHandler,
   findInPageManager: FindInPageManager,
   @MainDispatcher mainDispatcher: MainCoroutineDispatcher,
-  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher
+  @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+  zimHighlightRepository: ZimHighlightRepository
 ) : CoreReaderViewModel(
     context,
     kiwixDataStore,
@@ -112,7 +114,8 @@ class KiwixReaderViewModel @Inject constructor(
     readAloudManager,
     donationDialogHandler,
     findInPageManager,
-    mainDispatcher
+    mainDispatcher,
+    zimHighlightRepository
   ) {
   override fun shouldShowSpellCheckedSuggestions(): Boolean = false
   override fun isBrandedApp(): Boolean = false

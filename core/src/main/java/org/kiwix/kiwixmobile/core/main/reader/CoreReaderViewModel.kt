@@ -21,7 +21,12 @@ package org.kiwix.kiwixmobile.core.main.reader
 import android.Manifest.permission.POST_NOTIFICATIONS
 import android.app.Activity
 import android.app.Application
+import android.app.SearchManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.view.ActionMode
 import android.view.Menu
 import android.view.ViewGroup
@@ -62,10 +67,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import org.json.JSONTokener
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
 import org.kiwix.kiwixmobile.core.di.MainDispatcher
+import org.kiwix.kiwixmobile.core.epub.reader.EpubHighlightColor
 import org.kiwix.kiwixmobile.core.extensions.browserIntent
 import org.kiwix.kiwixmobile.core.extensions.navigateToAppSettings
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
@@ -136,6 +145,9 @@ import org.kiwix.kiwixmobile.core.utils.files.Log
 import org.kiwix.kiwixmobile.core.utils.titleToUrl
 import org.kiwix.kiwixmobile.core.utils.urlSuffixToParsableUrl
 import java.io.File
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -143,6 +155,138 @@ const val TOC_SHOWING_WAITING_TIME = 500L
 const val SEARCH_ITEM_TITLE_KEY = "searchItemTitle"
 const val HIDE_TAB_SWITCHER_DELAY: Long = 300
 const val OPEN_HOME_SCREEN_DELAY: Long = 300
+
+private const val HIGHLIGHT_CONTEXT_LENGTH = 80
+private const val MIN_CONTROL_CHARACTER_CODE = 0x20
+private const val UNICODE_ESCAPE_LENGTH = 4
+private const val UNICODE_HEX_RADIX = 16
+private const val ZIM_HIGHLIGHT_RESTORE_SCRIPT = """(function(highlights) {
+  if (!document.body) return;
+  function collectTextNodes() {
+    var nodes = [];
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(node) {
+        var parent = node.parentElement;
+        if (!parent || !node.nodeValue ||
+            parent.closest('script, style, noscript, [data-kiwix-ignore]')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    return nodes;
+  }
+  function pointAt(nodes, offset) {
+    var consumed = 0;
+    for (var index = 0; index < nodes.length; index++) {
+      var length = nodes[index].nodeValue.length;
+      if (offset <= consumed + length || index === nodes.length - 1) {
+        return { node: nodes[index], offset: Math.min(length, offset - consumed) };
+      }
+      consumed += length;
+    }
+    return null;
+  }
+  highlights.forEach(function(item) {
+    var existing = Array.prototype.some.call(
+      document.querySelectorAll('[data-kiwix-highlight-id]'),
+      function(node) { return node.getAttribute('data-kiwix-highlight-id') === item.id; }
+    );
+    if (existing || !item.text) return;
+    var nodes = collectTextNodes();
+    var content = nodes.map(function(node) { return node.nodeValue; }).join('');
+    var candidates = [];
+    var from = 0;
+    while (true) {
+      var start = content.indexOf(item.text, from);
+      if (start < 0) break;
+      candidates.push(start);
+      from = start + Math.max(1, item.text.length);
+    }
+    var contextual = candidates.filter(function(start) {
+      var prefix = content.slice(Math.max(0, start - item.prefix.length), start);
+      var suffix = content.slice(start + item.text.length, start + item.text.length + item.suffix.length);
+      return (!item.prefix || prefix === item.prefix) && (!item.suffix || suffix === item.suffix);
+    });
+    var match = contextual.length === 1 ? contextual[0] :
+      (candidates.length === 1 ? candidates[0] : -1);
+    if (match < 0) return;
+    var startPoint = pointAt(nodes, match);
+    var endPoint = pointAt(nodes, match + item.text.length);
+    if (!startPoint || !endPoint) return;
+    var range = document.createRange();
+    range.setStart(startPoint.node, startPoint.offset);
+    range.setEnd(endPoint.node, endPoint.offset);
+    var mark = document.createElement('span');
+    mark.style.backgroundColor = item.color;
+    mark.setAttribute('data-kiwix-highlight', 'true');
+    mark.setAttribute('data-kiwix-highlight-id', item.id);
+    mark.appendChild(range.extractContents());
+    range.insertNode(mark);
+  });
+})(JSON.parse(__HIGHLIGHTS__));"""
+
+private const val SELECTION_RANGE_RECOVERY_SCRIPT = """function contextMatches(candidate) {
+  if (!snapshot || !snapshot.text || candidate.toString() !== snapshot.text) return false;
+  try {
+    var before = document.createRange();
+    before.selectNodeContents(document.body);
+    before.setEnd(candidate.startContainer, candidate.startOffset);
+    var after = document.createRange();
+    after.selectNodeContents(document.body);
+    after.setStart(candidate.endContainer, candidate.endOffset);
+    return (!snapshot.prefix ||
+      before.toString().slice(-snapshot.prefix.length) === snapshot.prefix) &&
+      (!snapshot.suffix ||
+        after.toString().slice(0, snapshot.suffix.length) === snapshot.suffix);
+  } catch (error) {
+    return false;
+  }
+}
+if (!range || !contextMatches(range)) {
+  range = null;
+  if (snapshot && snapshot.text && document.body) {
+    var nodes = [];
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    var content = nodes.map(function(node) { return node.nodeValue; }).join('');
+    var candidates = [];
+    var from = 0;
+    while (true) {
+      var start = content.indexOf(snapshot.text, from);
+      if (start < 0) break;
+      var prefix = content.slice(Math.max(0, start - snapshot.prefix.length), start);
+      var suffix = content.slice(start + snapshot.text.length,
+        start + snapshot.text.length + snapshot.suffix.length);
+      if (prefix === snapshot.prefix && suffix === snapshot.suffix) candidates.push(start);
+      from = start + Math.max(1, snapshot.text.length);
+    }
+    if (candidates.length === 1 ||
+        (!snapshot.prefix && !snapshot.suffix && content.indexOf(snapshot.text) ===
+          content.lastIndexOf(snapshot.text))) {
+      var offset = candidates.length === 1 ? candidates[0] : content.indexOf(snapshot.text);
+      function pointAt(target) {
+        var consumed = 0;
+        for (var index = 0; index < nodes.length; index++) {
+          var length = nodes[index].nodeValue.length;
+          if (target <= consumed + length || index === nodes.length - 1) {
+            return { node: nodes[index], offset: Math.min(length, target - consumed) };
+          }
+          consumed += length;
+        }
+        return null;
+      }
+      var startPoint = pointAt(offset);
+      var endPoint = pointAt(offset + snapshot.text.length);
+      if (startPoint && endPoint) {
+        range = document.createRange();
+        range.setStart(startPoint.node, startPoint.offset);
+        range.setEnd(endPoint.node, endPoint.offset);
+      }
+    }
+  }
+}"""
 
 @Suppress("LongParameterList", "LargeClass")
 abstract class CoreReaderViewModel(
@@ -164,7 +308,8 @@ abstract class CoreReaderViewModel(
   private val readAloudManager: ReadAloudManager,
   private val donationDialogHandler: DonationDialogHandler,
   private val findInPageManager: FindInPageManager,
-  @param:MainDispatcher private val mainDispatcher: MainCoroutineDispatcher
+  @param:MainDispatcher private val mainDispatcher: MainCoroutineDispatcher,
+  private val zimHighlightRepository: ZimHighlightRepository
 ) : ViewModel(),
   SectionsListener,
   WebViewCallback,
@@ -214,8 +359,22 @@ abstract class CoreReaderViewModel(
     val tableOfContentTitle: String = "",
     val documentSections: List<DocumentSection> = emptyList(),
     val showDonationPopup: Boolean = false,
+    val selectionText: String? = null,
+    val canReadSelectedText: Boolean = false,
+    val selectionHasAnnotation: Boolean = false,
     val findInPageUiState: FindInPageManager.FindInPageUiState = FindInPageManager.FindInPageUiState()
   )
+
+  enum class SelectionMenuAction {
+    COPY,
+    SHARE,
+    SEARCH_WEB,
+    SELECT_ALL,
+    HIGHLIGHT,
+    DELETE_ANNOTATION,
+    ADD_NOTE,
+    READ_ALOUD
+  }
 
   sealed interface ReaderAction {
     data object BackToTopButtonClick : ReaderAction
@@ -271,7 +430,10 @@ abstract class CoreReaderViewModel(
       val snackBarResult: (SnackbarResult) -> Unit = {}
     ) : ReaderEffect
 
-    data class ShowAddNoteDialog(val kiwixWebView: KiwixWebView?) : ReaderEffect
+    data class ShowAddNoteDialog(
+      val kiwixWebView: KiwixWebView?,
+      val initialNoteText: String? = null
+    ) : ReaderEffect
     data class ShowToast(val message: String) : ReaderEffect
     data class ShowKiwixDialog(val kiwixDialog: KiwixDialog, val onClick: () -> Unit) : ReaderEffect
     data class ShowNavigationHistoryDialog(val result: HistoryFound) : ReaderEffect
@@ -300,6 +462,7 @@ abstract class CoreReaderViewModel(
   private var documentParser: DocumentParser? = null
   private var hideBackToTopJob: Job? = null
   private var actionMode: ActionMode? = null
+  private var selectionAwaitingRelease = false
 
   val isAndroid13OrAbove = kiwixPermissionChecker.isAndroid13orAbove()
 
@@ -701,6 +864,7 @@ abstract class CoreReaderViewModel(
 
   @Volatile var isWebViewHistoryRestoring = false
   protected var zimReaderSource: ZimReaderSource? = null
+  private var currentZimAnnotationBookId: String? = null
 
   /**
    * Returns true if user enables the backToTop setting from setting screen.
@@ -918,6 +1082,249 @@ abstract class CoreReaderViewModel(
       // Inflate custom menu icon.
       activity.menuInflater.inflate(R.menu.menu_webview_action, menu)
       configureWebViewSelectionHandler(menu)
+      selectionAwaitingRelease = true
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        actionMode.hide(SELECTION_ACTION_MODE_HIDE_MS)
+      }
+    }
+  }
+
+  fun onSelectionTouchReleased() {
+    val mode = actionMode ?: return
+    if (!selectionAwaitingRelease) return
+    selectionAwaitingRelease = false
+    val canReadSelectedText = mode.menu.findItem(R.id.menu_speak_text)?.isVisible == true
+    readerWebViewManager.getCurrentWebView()?.evaluateJavascript(
+      """(function() {
+        var selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return '';
+        var range = selection.getRangeAt(0);
+        window.__kiwixSelectionRange = range.cloneRange();
+        var before = document.createRange();
+        before.selectNodeContents(document.body);
+        before.setEnd(range.startContainer, range.startOffset);
+        var after = document.createRange();
+        after.selectNodeContents(document.body);
+        after.setStart(range.endContainer, range.endOffset);
+        window.__kiwixSelectionSnapshot = {
+          text: range.toString(),
+          prefix: before.toString().slice(-${HIGHLIGHT_CONTEXT_LENGTH}),
+          suffix: after.toString().slice(0, ${HIGHLIGHT_CONTEXT_LENGTH})
+        };
+        var hasHighlight = Array.prototype.some.call(
+          document.querySelectorAll('[data-kiwix-highlight]'),
+          function(highlight) { return range.intersectsNode(highlight); }
+        );
+        return encodeURIComponent(selection.toString()) + '|' + (hasHighlight ? '1' : '0');
+      })();"""
+    ) {
+      val result = runCatching { JSONTokener(it).nextValue() as? String }.getOrNull().orEmpty()
+      val encodedText = result.substringBeforeLast('|', "")
+      val selectedText = Uri.decode(encodedText)
+      val selectionHasAnnotation = result.substringAfterLast('|', "0") == "1"
+      if (!selectedText.isNullOrBlank() && actionMode === mode) {
+        updateState {
+          copy(
+            selectionText = selectedText,
+            canReadSelectedText = canReadSelectedText,
+            selectionHasAnnotation = selectionHasAnnotation
+          )
+        }
+        mode.finish()
+      }
+    }
+  }
+
+  fun onSelectionMenuAction(action: SelectionMenuAction) {
+    if (handleSelectionActionWithoutMenu(action)) return
+    val selectedText = uiState.value.selectionText.orEmpty()
+    val webView = readerWebViewManager.getCurrentWebView()
+    updateState {
+      copy(selectionText = null, canReadSelectedText = false, selectionHasAnnotation = false)
+    }
+    performSelectionMenuAction(action, selectedText, webView)
+    webView?.evaluateJavascript(
+      """window.__kiwixSelectionRange = null;
+        window.__kiwixSelectionSnapshot = null;
+        window.getSelection()?.removeAllRanges()""",
+      null
+    )
+  }
+
+  private fun handleSelectionActionWithoutMenu(action: SelectionMenuAction): Boolean =
+    when (action) {
+      SelectionMenuAction.HIGHLIGHT -> true
+      SelectionMenuAction.DELETE_ANNOTATION -> {
+        deleteSelectedAnnotation()
+        true
+      }
+      SelectionMenuAction.READ_ALOUD -> {
+        startReadAloudWithWebViewSelection()
+        true
+      }
+      else -> false
+    }
+
+  private fun deleteSelectedAnnotation() {
+    val source = zimReaderSource
+    val bookId = zimAnnotationBookId(source)
+    val title = uiState.value.title
+    val webView = readerWebViewManager.getCurrentWebView()
+    webView?.evaluateJavascript(
+      """(function() {
+          var selection = window.getSelection();
+          var range = window.__kiwixSelectionRange;
+          if (!range && selection && selection.rangeCount) range = selection.getRangeAt(0);
+          if (!range) return '';
+          var highlights = Array.prototype.filter.call(
+            document.querySelectorAll('[data-kiwix-highlight]'),
+            function(highlight) { return range.intersectsNode(highlight); }
+          );
+          var ids = highlights.map(function(highlight) {
+            return highlight.getAttribute('data-kiwix-highlight-id');
+          }).filter(Boolean);
+          highlights.forEach(function(highlight) {
+            var parent = highlight.parentNode;
+            while (highlight.firstChild) parent.insertBefore(highlight.firstChild, highlight);
+            parent.removeChild(highlight);
+            parent.normalize();
+          });
+          window.__kiwixSelectionRange = null;
+          window.__kiwixSelectionSnapshot = null;
+          if (selection) selection.removeAllRanges();
+          return ids.join(',');
+        })();"""
+    ) { result ->
+      val ids = result.orEmpty().removeSurrounding("\"")
+        .split(',')
+        .filter(String::isNotBlank)
+        .toSet()
+      if (bookId != null && ids.isNotEmpty()) {
+        launchInViewModelScope { zimHighlightRepository.remove(bookId, title, ids, source) }
+      }
+    }
+    dismissSelectionMenu()
+  }
+
+  private fun performSelectionMenuAction(
+    action: SelectionMenuAction,
+    selectedText: String,
+    webView: KiwixWebView?
+  ) {
+    when (action) {
+      SelectionMenuAction.COPY -> {
+        val clipboard = context.getSystemService(Application.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(
+          ClipData.newPlainText(context.getString(R.string.epub_selected_text), selectedText)
+        )
+      }
+
+      SelectionMenuAction.SHARE -> context.startActivity(
+        Intent.createChooser(
+          Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, selectedText),
+          context.getString(R.string.share)
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      )
+
+      SelectionMenuAction.SEARCH_WEB -> context.startActivity(
+        Intent(Intent.ACTION_WEB_SEARCH)
+          .putExtra(SearchManager.QUERY, selectedText)
+          .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      )
+
+      SelectionMenuAction.SELECT_ALL -> webView?.evaluateJavascript(
+        "window.getSelection()?.selectAllChildren(document.body)",
+        null
+      )
+      SelectionMenuAction.ADD_NOTE -> launchInViewModelScope {
+        emitEffect(ReaderEffect.ShowAddNoteDialog(webView, selectedText))
+      }
+      SelectionMenuAction.HIGHLIGHT,
+      SelectionMenuAction.DELETE_ANNOTATION,
+      SelectionMenuAction.READ_ALOUD -> Unit
+    }
+  }
+
+  fun onHighlightSelection(color: EpubHighlightColor) {
+    val webView = readerWebViewManager.getCurrentWebView()
+    val source = zimReaderSource
+    val bookId = zimAnnotationBookId(source)
+    val title = uiState.value.title
+    updateState {
+      copy(selectionText = null, canReadSelectedText = false, selectionHasAnnotation = false)
+    }
+    val pageUrl = webView?.url?.substringBefore('#')
+    val highlightId = UUID.randomUUID().toString()
+    webView?.evaluateJavascript(createSelectionHighlightScript(highlightId, color)) { result ->
+      persistSelectionHighlight(result, bookId, title, highlightId, pageUrl, color, source)
+    }
+  }
+
+  private fun createSelectionHighlightScript(highlightId: String, color: EpubHighlightColor) =
+    """(function() {
+        var selection = window.getSelection();
+        var range = window.__kiwixSelectionRange;
+        var snapshot = window.__kiwixSelectionSnapshot;
+        if (!snapshot && selection && selection.rangeCount) {
+          range = selection.getRangeAt(0);
+          snapshot = { text: range.toString(), prefix: '', suffix: '' };
+        }
+        $SELECTION_RANGE_RECOVERY_SCRIPT
+        if (!range || !document.body) return '';
+        var before = document.createRange();
+        before.selectNodeContents(document.body);
+        before.setEnd(range.startContainer, range.startOffset);
+        var after = document.createRange();
+        after.selectNodeContents(document.body);
+        after.setStart(range.endContainer, range.endOffset);
+        var details = {
+          text: range.toString(),
+          prefix: before.toString().slice(-${HIGHLIGHT_CONTEXT_LENGTH}),
+          suffix: after.toString().slice(0, ${HIGHLIGHT_CONTEXT_LENGTH})
+        };
+        var highlight = document.createElement('span');
+        highlight.style.backgroundColor = ${color.hex.asJavascriptString()};
+        highlight.setAttribute('data-kiwix-highlight', 'true');
+        highlight.setAttribute('data-kiwix-highlight-id', ${highlightId.asJavascriptString()});
+        highlight.appendChild(range.extractContents());
+        range.insertNode(highlight);
+        window.__kiwixSelectionRange = null;
+        window.__kiwixSelectionSnapshot = null;
+        if (selection) selection.removeAllRanges();
+        return [details.text, details.prefix, details.suffix]
+          .map(encodeURIComponent).join('|');
+      })();"""
+
+  private fun persistSelectionHighlight(
+    result: String?,
+    bookId: String?,
+    title: String,
+    highlightId: String,
+    pageUrl: String?,
+    color: EpubHighlightColor,
+    source: ZimReaderSource?
+  ) {
+    val details = result.orEmpty().removeSurrounding("\"").split('|')
+    val text = details.getOrNull(0).decodeJavascriptValue()
+    if (bookId == null || pageUrl.isNullOrBlank() || text.isBlank()) return
+    val highlight = ZimHighlight(
+      id = highlightId,
+      pageUrl = pageUrl,
+      text = text,
+      prefix = details.getOrNull(1).decodeJavascriptValue(),
+      suffix = details.getOrNull(2).decodeJavascriptValue(),
+      color = color
+    )
+    launchInViewModelScope {
+      zimHighlightRepository.add(bookId, title, highlight, source)
+    }
+  }
+
+  fun dismissSelectionMenu() {
+    updateState {
+      copy(selectionText = null, canReadSelectedText = false, selectionHasAnnotation = false)
     }
   }
 
@@ -926,7 +1333,10 @@ abstract class CoreReaderViewModel(
     // Android creates a new ActionMode per selection; clear the reference so
     // onSelectionActionModeStarted's null-check inflates the custom menu again
     // next time, instead of only on the first selection of the session.
-    this.actionMode = null
+    if (this.actionMode === actionMode) {
+      this.actionMode = null
+      selectionAwaitingRelease = false
+    }
   }
 
   override fun onSearchMenuClickedMenuClicked() {
@@ -1049,6 +1459,78 @@ abstract class CoreReaderViewModel(
     }
   }
 
+  private fun zimAnnotationBookId(source: ZimReaderSource? = zimReaderSource): String? =
+    if (source == zimReaderSource) {
+      currentZimAnnotationBookId?.takeIf(String::isNotBlank)
+        ?: source?.toDatabase()?.takeIf(String::isNotBlank)
+    } else {
+      source?.toDatabase()?.takeIf(String::isNotBlank)
+    }
+
+  private suspend fun restoreZimHighlights(webView: KiwixWebView) {
+    val source = zimReaderSource
+    val bookId = zimAnnotationBookId(source)
+    val pageUrl = webView.url?.substringBefore('#')
+    if (bookId == null || pageUrl.isNullOrBlank()) return
+    val highlights = zimHighlightRepository.load(bookId, source).filter { it.pageUrl == pageUrl }
+    if (highlights.isNotEmpty() && webView.url?.substringBefore('#') == pageUrl) {
+      webView.evaluateJavascript(
+        restoreZimHighlightsScript(highlights),
+        null
+      )
+    }
+  }
+
+  private fun restoreZimHighlightsScript(highlights: List<ZimHighlight>): String {
+    val highlightJson = JSONArray().apply {
+      highlights.forEach { highlight ->
+        put(
+          JSONObject()
+            .put("id", highlight.id)
+            .put("text", highlight.text)
+            .put("prefix", highlight.prefix)
+            .put("suffix", highlight.suffix)
+            .put("color", highlight.color.hex)
+        )
+      }
+    }.toString().asJavascriptString()
+    return ZIM_HIGHLIGHT_RESTORE_SCRIPT.replace("__HIGHLIGHTS__", highlightJson)
+  }
+
+  private fun String?.decodeJavascriptValue(): String = runCatching {
+    URLDecoder.decode(this.orEmpty(), StandardCharsets.UTF_8.name())
+  }.getOrDefault("")
+
+  private fun String.asJavascriptString(): String {
+    val input = this
+    return buildString {
+      append('"')
+      input.forEach { character ->
+        when (character) {
+          '\\' -> append("\\\\")
+          '"' -> append("\\\"")
+          '\b' -> append("\\b")
+          '\u000C' -> append("\\f")
+          '\n' -> append("\\n")
+          '\r' -> append("\\r")
+          '\t' -> append("\\t")
+          else -> if (
+            character.code < MIN_CONTROL_CHARACTER_CODE ||
+            character == '\u2028' ||
+            character == '\u2029'
+          ) {
+            append("\\u").append(
+              character.code.toString(UNICODE_HEX_RADIX).padStart(UNICODE_ESCAPE_LENGTH, '0')
+            )
+          } else {
+            append(character)
+          }
+        }
+      }
+      append('"')
+    }
+  }
+
   private suspend fun contentsDrawerHint() {
     emitEffect(
       ReaderEffect.ShowKiwixDialog(
@@ -1065,6 +1547,7 @@ abstract class CoreReaderViewModel(
       updateTableOfContents()
       updateBottomToolbarArrowsAlpha()
       val currentWebView = getCurrentWebView()
+      restoreZimHighlights(currentWebView)
       readerHistoryManager.saveHistory(
         currentWebView.url,
         currentWebView.title,
@@ -1288,6 +1771,8 @@ abstract class CoreReaderViewModel(
         zimFileManager.openZimFileInReader(zimReaderSource, shouldShowSpellCheckedSuggestions())
       when (result) {
         is Success -> {
+          this.zimReaderSource = zimReaderSource
+          currentZimAnnotationBookId = result.id
           // Show content if there is `Open Library` button showing
           // and we are opening the ZIM file
           hideNoBookOpenViews()
@@ -2059,6 +2544,7 @@ abstract class CoreReaderViewModel(
     readAloudManager.stopReadAloudSafely()
     documentParser = null
     zimReaderSource = null
+    currentZimAnnotationBookId = null
     donationDialogHandler.setDonationDialogCallBack(null)
     hideBackToTopJob?.cancel()
     hideBackToTopJob = null
@@ -2071,6 +2557,7 @@ abstract class CoreReaderViewModel(
 }
 
 private const val TTS_TICKER_INTERVAL_MS = 250L
+private const val SELECTION_ACTION_MODE_HIDE_MS = 600_000L
 private val CYCLIC_TTS_SPEEDS = listOf(1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 0.5f, 0.75f)
 private const val TTS_SPEED_TOLERANCE = 0.01f
 
