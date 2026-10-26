@@ -70,6 +70,7 @@ import org.kiwix.kiwixmobile.localFileTransfer.LocalFileTransferScreenRoute
 import org.kiwix.kiwixmobile.localFileTransfer.LocalFileTransferViewModel
 import org.kiwix.kiwixmobile.localFileTransfer.URIS_KEY
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
+import org.kiwix.kiwixmobile.nav.destination.home.HomeViewModel
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryRoute
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel
 import org.kiwix.kiwixmobile.nav.destination.library.online.OnlineLibraryRoute
@@ -93,6 +94,24 @@ fun KiwixNavGraph(
     startDestination = startDestination,
     modifier = modifier
   ) {
+    composable(route = KiwixDestination.Home.route) {
+      val activity = LocalActivity.current as KiwixMainActivity
+      val localLibraryViewModel: LocalLibraryViewModel = hiltViewModel()
+      val homeViewModel: HomeViewModel = hiltViewModel()
+      val validateZimViewModel: ValidateZimViewModel = hiltViewModel()
+      val onlineLibraryViewModel: OnlineLibraryViewModel =
+        hiltViewModel(viewModelStoreOwner = activity)
+      LocalLibraryRoute(
+        localLibraryViewModel = localLibraryViewModel,
+        validateZimViewModel = validateZimViewModel,
+        navController = navController,
+        zimFileUriArg = "",
+        snackBarHostState = snackBarHostState,
+        homeViewModel = homeViewModel,
+        onlineLibraryViewModel = onlineLibraryViewModel,
+        isHomeScreen = true
+      )
+    }
     composable(route = KiwixDestination.Reader.route) {
       val activity = LocalActivity.current as CoreMainActivity
       val addNoteViewModel: AddNoteViewModel = hiltViewModel()
@@ -158,7 +177,7 @@ fun KiwixNavGraph(
             .Builder()
             .setPopUpTo(KiwixDestination.Intro.route, inclusive = true)
             .build()
-          navController.navigate(KiwixDestination.Library.route, navOptions)
+          navController.navigate(KiwixDestination.Home.route, navOptions)
         }
       )
     }
@@ -250,6 +269,8 @@ fun KiwixNavGraph(
 }
 
 sealed class KiwixDestination(val route: String) {
+  object Home : KiwixDestination("home")
+
   object Reader : KiwixDestination(READER_SCREEN)
 
   object Library :
