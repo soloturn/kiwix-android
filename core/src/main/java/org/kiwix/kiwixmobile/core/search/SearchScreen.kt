@@ -175,9 +175,14 @@ private fun SearchScreenContent(
   ) {
     SearchModeChips(
       searchMode = state.searchMode,
-      onSearchModeChanged = { searchViewModel.onSearchModeChanged(it) },
-      searchAllBooks = state.searchAllBooks,
-      onSearchAllBooksChanged = { searchViewModel.onSearchAllBooksChanged(it) }
+      onSearchModeChanged = { searchViewModel.onSearchModeChanged(it) }
+    )
+    Text(
+      text = stringResource(
+        if (state.searchAllBooks) R.string.search_in_downloaded_books else R.string.search_in_open_tabs
+      ),
+      style = MaterialTheme.typography.labelLarge,
+      modifier = Modifier.padding(horizontal = EIGHT_DP, vertical = FOUR_DP)
     )
     SearchResults(
       state,
@@ -193,9 +198,7 @@ private fun SearchScreenContent(
 @Composable
 private fun SearchModeChips(
   searchMode: SearchMode,
-  onSearchModeChanged: (SearchMode) -> Unit,
-  searchAllBooks: Boolean,
-  onSearchAllBooksChanged: (Boolean) -> Unit
+  onSearchModeChanged: (SearchMode) -> Unit
 ) {
   Row(
     modifier = Modifier
@@ -215,12 +218,6 @@ private fun SearchModeChips(
       onClick = { onSearchModeChanged(SearchMode.PAGE_CONTENT) },
       label = stringResource(R.string.search_in_page_content),
       testTag = SEARCH_IN_PAGE_CONTENT_CHIP_TESTING_TAG
-    )
-    SearchModeChip(
-      selected = searchAllBooks,
-      onClick = { onSearchAllBooksChanged(!searchAllBooks) },
-      label = stringResource(R.string.search_in_all_books),
-      testTag = SEARCH_IN_ALL_BOOKS_CHIP_TESTING_TAG
     )
   }
 }

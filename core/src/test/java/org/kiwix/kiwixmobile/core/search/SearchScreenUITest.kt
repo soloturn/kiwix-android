@@ -359,12 +359,14 @@ class SearchScreenUITest {
   }
 
   @Test
-  fun searchScreen_whenAllBooksChipClicked_onSearchAllBooksChangedToggled() {
+  fun searchScreen_readerSearchIsScopedToOpenTabs() {
     mockSearchScreenContent(state = SearchScreenUiState(searchAllBooks = false))
     composeTestRule
       .onNodeWithTag(SEARCH_IN_ALL_BOOKS_CHIP_TESTING_TAG)
-      .performClick()
-    verify { mockViewModel.onSearchAllBooksChanged(true) }
+      .assertDoesNotExist()
+    composeTestRule
+      .onNodeWithText(context.getString(R.string.search_in_open_tabs))
+      .assertIsDisplayed()
   }
 
   @Test
