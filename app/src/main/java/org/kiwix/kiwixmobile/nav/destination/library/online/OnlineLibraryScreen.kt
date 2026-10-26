@@ -52,6 +52,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
@@ -91,6 +92,7 @@ import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R.drawable
 import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.base.BackPressActivityExtensions
+import org.kiwix.kiwixmobile.core.entity.LibkiwixBook
 import org.kiwix.kiwixmobile.core.extensions.hideKeyboardOnLazyColumnScroll
 import org.kiwix.kiwixmobile.core.main.reader.OnBackPressed
 import org.kiwix.kiwixmobile.core.ui.components.ContentLoadingProgressBar
@@ -110,6 +112,7 @@ import org.kiwix.kiwixmobile.core.utils.ComposeDimens.DOWNLOADING_LIBRARY_PROGRE
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.DOWNLOADING_LIBRARY_PROGRESS_CARD_VIEW_WIDTH
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.EIGHT_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FORTY_EIGHT_DP
+import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FIVE_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FOUR_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.ONE_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.SIXTEEN_DP
@@ -120,6 +123,8 @@ import org.kiwix.kiwixmobile.core.utils.FIVE
 import org.kiwix.kiwixmobile.core.utils.ZERO
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel
 import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel.OnlineLibraryUiState
+import org.kiwix.kiwixmobile.ui.BookIcon
+import org.kiwix.kiwixmobile.ui.BookTitle
 import org.kiwix.kiwixmobile.zimManager.libraryView.LibraryListItem
 import org.kiwix.kiwixmobile.zimManager.libraryView.LibraryListItem.DividerItem
 import kotlin.time.Duration.Companion.milliseconds
@@ -356,10 +361,15 @@ private fun OnlineLibraryScreenContent(
     modifier = Modifier.fillMaxSize(),
     contentAlignment = Alignment.Center
   ) {
-    if (uiState.showNoContent) {
+    if (uiState.showNoContent && uiState.pendingHomeDownload == null) {
       NoContentView(uiState.noContentMessage)
     } else {
-      OnlineLibraryList(uiState, lazyListState, onlineLibraryViewModel)
+      OnlineLibraryList(
+        state = uiState,
+        lazyListState = lazyListState,
+        onlineLibraryViewModel = onlineLibraryViewModel,
+        pendingHomeDownload = uiState.pendingHomeDownload
+      )
     }
     if (uiState.showScanningProgressBar) {
       ShowFetchingLibraryLayout(uiState.scanningProgressBarMessage)
@@ -372,7 +382,8 @@ private fun OnlineLibraryScreenContent(
 private fun OnlineLibraryList(
   state: OnlineLibraryUiState,
   lazyListState: LazyListState,
-  onlineLibraryViewModel: OnlineLibraryViewModel
+  onlineLibraryViewModel: OnlineLibraryViewModel,
+  pendingHomeDownload: LibkiwixBook?
 ) {
   LazyColumn(
     modifier = Modifier
@@ -381,6 +392,11 @@ private fun OnlineLibraryList(
       .hideKeyboardOnLazyColumnScroll(lazyListState),
     state = lazyListState
   ) {
+    pendingHomeDownload?.let { book ->
+      item(key = "pending-download-${book.id}") {
+        PendingHomeDownloadItem(book)
+      }
+    }
     itemsIndexed(state.items, key = { _, item -> item.id }) { index, item ->
       when (item) {
         is DividerItem -> {
@@ -424,6 +440,29 @@ private fun OnlineLibraryList(
           onlineLibraryViewModel.handleLoadMore(totalBookCount)
         }
       }
+  }
+}
+
+@Composable
+private fun PendingHomeDownloadItem(book: LibkiwixBook) {
+  Card(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(FIVE_DP),
+    shape = MaterialTheme.shapes.extraSmall,
+    elevation = CardDefaults.elevatedCardElevation(),
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+  ) {
+    Column(modifier = Modifier.padding(SIXTEEN_DP)) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        BookIcon(book.favicon, isOnlineLibrary = true)
+        Column(modifier = Modifier.padding(start = SIXTEEN_DP)) {
+          BookTitle(book.title, index = 0)
+          Text(text = stringResource(string.downloading))
+        }
+      }
+      LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+    }
   }
 }
 
