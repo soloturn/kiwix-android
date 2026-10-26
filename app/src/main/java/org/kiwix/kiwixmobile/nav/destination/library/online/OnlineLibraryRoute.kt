@@ -122,6 +122,7 @@ fun OnlineLibraryRoute(
 
   LaunchedEffect(Unit) {
     onlineLibraryViewModel.loadInitialLibrary()
+    onlineLibraryViewModel.startQueuedHomeBookDownload()
   }
   KiwixTheme {
     OnlineLibraryScreen(

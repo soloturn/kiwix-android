@@ -646,7 +646,7 @@ class EpubReaderActivity : BaseActivity() {
     val fragment = factory.instantiate(classLoader, EpubNavigatorFragment::class.java.name)
       as EpubNavigatorFragment
     previewNavigator = fragment
-    supportFragmentManager.commitNow { add(container, fragment, PREVIEW_NAVIGATOR_TAG) }
+    supportFragmentManager.commitNow { add(container.id, fragment, PREVIEW_NAVIGATOR_TAG) }
     observeHighlightAnnotations(fragment)
     return fragment
   }
