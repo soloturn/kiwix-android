@@ -39,6 +39,7 @@ import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
 
 const val NAV_ARG_SEARCH_STRING = "searchString"
+const val NAV_ARG_SEARCH_ALL_BOOKS = "searchAllBooks"
 
 @Composable
 fun SearchScreenRoute(
@@ -74,6 +75,7 @@ fun SearchScreenRoute(
   // Search Results
   LaunchedEffect(Unit) {
     viewModel.setAlertDialogShower(alertDialogShower)
+    viewModel.onSearchAllBooksChanged(arguments?.getBoolean(NAV_ARG_SEARCH_ALL_BOOKS) == true)
     viewModel.actions.tryEmit(
       Action.CreatedWithArguments(Bundle(arguments))
     )

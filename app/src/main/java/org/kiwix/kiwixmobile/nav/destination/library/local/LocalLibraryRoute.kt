@@ -72,6 +72,7 @@ import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibr
 import org.kiwix.kiwixmobile.ui.KiwixDestination
 
 const val VALIDATE_ZIM_FILES_MENU_BUTTON_TESTING_TAG = "validateZimFilesMenuButtonTestingTag"
+const val ALL_BOOKS_SEARCH_MENU_TESTING_TAG = "allBooksSearchMenuTestingTag"
 
 /**
  * Entry point for Local Library feature.
@@ -127,7 +128,8 @@ fun LocalLibraryRoute(
     val menus = actionMenuItems(
       navController = navController,
       selectionMode = uiState.value.fileSelectListState.selectionMode,
-      localLibraryViewModel = localLibraryViewModel
+      localLibraryViewModel = localLibraryViewModel,
+      includeAllBooksSearch = !isHomeScreen
     ) {
       localLibraryViewModel.filePickerMenuButtonClick(filePickerLauncher)
     }
@@ -236,10 +238,15 @@ fun actionMenuItems(
   navController: NavHostController,
   selectionMode: SelectionMode,
   localLibraryViewModel: LocalLibraryViewModel,
+  includeAllBooksSearch: Boolean = true,
   filePickerButtonClick: () -> Unit
 ) = when (selectionMode) {
   SelectionMode.MULTI -> multiModeMenuItem(localLibraryViewModel)
-  SelectionMode.NORMAL -> normalModeMenuItems(navController, filePickerButtonClick)
+  SelectionMode.NORMAL -> normalModeMenuItems(
+    navController,
+    filePickerButtonClick,
+    includeAllBooksSearch
+  )
 }
 
 private fun multiModeMenuItem(localLibraryViewModel: LocalLibraryViewModel) = listOf(
@@ -268,21 +275,37 @@ private fun multiModeMenuItem(localLibraryViewModel: LocalLibraryViewModel) = li
 
 private fun normalModeMenuItems(
   navController: NavHostController,
-  filePickerButtonClick: () -> Unit
-) =
-  listOf(
+  filePickerButtonClick: () -> Unit,
+  includeAllBooksSearch: Boolean
+) = buildList {
+  if (includeAllBooksSearch) {
+    add(
+      ActionMenuItem(
+        IconItem.Drawable(drawable.action_search),
+        string.search_label,
+        { navController.navigate(KiwixDestination.Search.createRoute(searchAllBooks = true)) },
+        isEnabled = true,
+        testingTag = ALL_BOOKS_SEARCH_MENU_TESTING_TAG
+      )
+    )
+  }
+  add(
     ActionMenuItem(
       IconItem.Drawable(drawable.ic_add_blue_24dp),
       R.string.select_zim_file,
       { filePickerButtonClick.invoke() },
       isEnabled = true,
       testingTag = SELECT_FILE_BUTTON_TESTING_TAG
-    ),
+    )
+  )
+  add(
     ActionMenuItem(
       IconItem.Drawable(R.drawable.ic_baseline_mobile_screen_share_24px),
       string.get_content_from_nearby_device,
       { navController.navigate(KiwixDestination.LocalFileTransfer.route) },
       isEnabled = true,
-      testingTag = LOCAL_FILE_TRANSFER_MENU_BUTTON_TESTING_TAG
+      testingTag = LOCAL_FILE_TRANSFER_MENU_BUTTON_TESTING_TAG,
+      isInOverflow = true
     )
   )
+}
