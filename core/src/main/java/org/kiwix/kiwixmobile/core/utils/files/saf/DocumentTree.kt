@@ -98,6 +98,33 @@ class DocumentTree(private val contentResolver: ContentResolver) {
   fun findChild(treeUri: Uri, parentDocumentId: String, name: String): DocumentEntry? =
     listChildren(treeUri, parentDocumentId).firstOrNull { it.name == name }
 
+  /** Finds a file beside [documentUri] when it is part of a granted SAF tree. */
+  fun findSibling(documentUri: Uri, name: String): DocumentEntry? =
+    if (isDocumentInTree(documentUri)) {
+      val treeUri = treeUriOf(documentUri)
+      val documentId = DocumentsContract.getDocumentId(documentUri)
+      parentDocumentId(treeUri, documentUri, documentId)?.let { parentId ->
+        findChild(treeUri, parentId, name)
+      }
+    } else {
+      null
+    }
+
+  /** Creates a file beside [documentUri] when it is part of a granted SAF tree. */
+  fun createSibling(
+    documentUri: Uri,
+    name: String,
+    mimeType: String = "application/octet-stream"
+  ): Uri? = if (isDocumentInTree(documentUri)) {
+    val treeUri = treeUriOf(documentUri)
+    val documentId = DocumentsContract.getDocumentId(documentUri)
+    parentDocumentId(treeUri, documentUri, documentId)?.let { parentId ->
+      createDocument(treeUri, name, mimeType, parentId)
+    }
+  } else {
+    null
+  }
+
   fun createDocument(
     treeUri: Uri,
     name: String,

@@ -100,7 +100,10 @@ class EpubReaderSettingsTest {
     val dark = EpubReaderSettings(themePreset = EpubThemePreset.DARK)
     assertEquals(Color(0xFF1C1C1E.toInt()), dark.toPreferences(true).backgroundColor)
     assertNull(EpubReaderSettings(themePreset = EpubThemePreset.WHITE).toPreferences(true).backgroundColor)
-    assertEquals(Theme.SEPIA.backgroundColor, EpubReaderSettings(themePreset = EpubThemePreset.SEPIA).backgroundColor(false))
+    assertEquals(
+      Theme.SEPIA.backgroundColor,
+      EpubReaderSettings(themePreset = EpubThemePreset.SEPIA).backgroundColor(false)
+    )
   }
 
   @Test

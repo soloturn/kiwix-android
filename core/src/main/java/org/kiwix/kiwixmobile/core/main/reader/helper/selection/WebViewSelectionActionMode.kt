@@ -23,4 +23,5 @@ import android.view.ActionMode
 interface WebViewSelectionActionMode {
   fun onActionModeStarted(actionMode: ActionMode)
   fun onActionModeFinished(actionMode: ActionMode)
+  fun onTouchReleased()
 }

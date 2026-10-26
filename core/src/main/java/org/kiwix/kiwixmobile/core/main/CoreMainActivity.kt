@@ -28,6 +28,7 @@ import android.os.Bundle
 import android.os.Process
 import android.view.ActionMode
 import android.view.MenuItem
+import android.view.MotionEvent
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.content.res.AppCompatResources
@@ -325,6 +326,14 @@ abstract class CoreMainActivity : BaseActivity() {
 
   fun registerSelectionActionModeListener(listener: WebViewSelectionActionMode?) {
     selectionActionModeListener = listener
+  }
+
+  override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+    val handled = super.dispatchTouchEvent(event)
+    if (event.actionMasked == MotionEvent.ACTION_UP) {
+      selectionActionModeListener?.onTouchReleased()
+    }
+    return handled
   }
 
   override fun onActionModeStarted(mode: ActionMode) {

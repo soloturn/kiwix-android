@@ -156,7 +156,10 @@ fun ReaderScreenRoute(
           NavigationItem(viewModel, activity)
         }
       },
-      onSystemBarsVisibilityChange = onSystemBarsVisibilityChange
+      onSystemBarsVisibilityChange = onSystemBarsVisibilityChange,
+      onSelectionMenuAction = viewModel::onSelectionMenuAction,
+      onHighlightSelection = viewModel::onHighlightSelection,
+      onDismissSelectionMenu = viewModel::dismissSelectionMenu
     )
     DialogHost(alertDialogShower)
   }
@@ -176,6 +179,10 @@ private fun RegisterWebViewSelectionListener(
 
         override fun onActionModeFinished(actionMode: ActionMode) {
           viewModel.onSelectionActionModeFinished(actionMode)
+        }
+
+        override fun onTouchReleased() {
+          viewModel.onSelectionTouchReleased()
         }
       }
     )
@@ -309,7 +316,12 @@ private fun CollectEffect(
           showNavigationHistoryDialog(effect, alertDialogShower, viewModel)
 
         is ReaderEffect.ShowAddNoteDialog ->
-          showAddNoteDialog(alertDialogShower, addNoteViewModel, effect.kiwixWebView)
+          showAddNoteDialog(
+            alertDialogShower,
+            addNoteViewModel,
+            effect.kiwixWebView,
+            effect.initialNoteText
+          )
 
         ReaderEffect.ShowTTSLanguageDialog ->
           activity.externalLinkOpener.showTTSLanguageDownloadDialog()
@@ -328,12 +340,14 @@ private fun showKiwixDialog(
 private fun showAddNoteDialog(
   alertDialogShower: AlertDialogShower,
   addNoteViewModel: AddNoteViewModel,
-  kiwixWebView: KiwixWebView?
+  kiwixWebView: KiwixWebView?,
+  initialNoteText: String? = null
 ) {
   val config = AddNoteDialogConfig(
     articleTitle = kiwixWebView?.title,
     currentWebViewUrl = kiwixWebView?.url,
-    currentWebViewTitle = kiwixWebView?.title
+    currentWebViewTitle = kiwixWebView?.title,
+    initialNoteText = initialNoteText.orEmpty()
   )
 
   alertDialogShower.show(
