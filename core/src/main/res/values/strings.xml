@@ -132,6 +132,15 @@
   <string name="local_zims" tools:keep="@string/local_zims">Device</string>
   <string name="remote_zims" tools:keep="@string/remote_zims">Online</string>
   <string name="library">Library</string>
+  <string name="home">Home</string>
+  <string name="home_search_books">Search books</string>
+  <string name="home_from_library">From your library</string>
+  <string name="home_categories">Categories</string>
+  <string name="home_search_results">Search results</string>
+  <string name="home_books_added_hint">Books you add will appear here.</string>
+  <string name="home_loading_categories">Loading categories…</string>
+  <string name="home_loading_books">Loading books…</string>
+  <string name="home_no_books_found">No books found.</string>
   <string name="delete_zim_body">The following ZIM file(s) will be deleted:\n\n%s</string>
   <string name="delete_zims_toast" tools:keep="@string/delete_zims_toast">Files deleted successfully</string>
   <string name="no_files_here" tools:keep="@string/no_files_here">No files here</string>

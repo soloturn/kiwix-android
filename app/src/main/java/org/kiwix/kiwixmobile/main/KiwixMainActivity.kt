@@ -133,6 +133,7 @@ class KiwixMainActivity : CoreMainActivity() {
   override val helpScreenRoute: String = KiwixDestination.Help.route
   override val topLevelDestinationsRoute =
     setOf(
+      KiwixDestination.Home.route,
       KiwixDestination.Explore.route,
       KiwixDestination.Library.route,
       KiwixDestination.Reader.route
@@ -175,7 +176,7 @@ class KiwixMainActivity : CoreMainActivity() {
         if (runBlocking { kiwixDataStore.showIntro.first() } && !isIntroScreenNotVisible()) {
           KiwixDestination.Intro.route
         } else {
-          KiwixDestination.Reader.route
+          KiwixDestination.Home.route
         }
       }
       RestoreDrawerStateOnOrientationChange()

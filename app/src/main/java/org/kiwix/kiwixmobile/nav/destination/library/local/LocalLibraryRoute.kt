@@ -35,6 +35,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,6 +44,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.MultiplePermissionsState
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.R
 import org.kiwix.kiwixmobile.core.R.drawable
 import org.kiwix.kiwixmobile.core.R.string
@@ -59,9 +61,14 @@ import org.kiwix.kiwixmobile.core.ui.theme.KiwixTheme
 import org.kiwix.kiwixmobile.core.utils.LanguageUtils
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
+import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.BooksOnDiskListItem.BookOnDisk
 import org.kiwix.kiwixmobile.core.zim_manager.fileselect_view.SelectionMode
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
+import org.kiwix.kiwixmobile.nav.destination.home.HomeScreen
+import org.kiwix.kiwixmobile.nav.destination.home.HomeScreenCallbacks
+import org.kiwix.kiwixmobile.nav.destination.home.HomeViewModel
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryViewModel.LocalLibraryUiActions.RequestReadWritePermission
+import org.kiwix.kiwixmobile.nav.destination.library.online.viewmodel.OnlineLibraryViewModel
 import org.kiwix.kiwixmobile.ui.KiwixDestination
 
 const val VALIDATE_ZIM_FILES_MENU_BUTTON_TESTING_TAG = "validateZimFilesMenuButtonTestingTag"
@@ -81,7 +88,10 @@ fun LocalLibraryRoute(
   validateZimViewModel: ValidateZimViewModel,
   navController: NavHostController,
   zimFileUriArg: String,
-  snackBarHostState: SnackbarHostState
+  snackBarHostState: SnackbarHostState,
+  homeViewModel: HomeViewModel? = null,
+  onlineLibraryViewModel: OnlineLibraryViewModel? = null,
+  isHomeScreen: Boolean = false
 ) {
   val alertDialogShower = remember { AlertDialogShower() }
   LaunchedEffect(Unit) {
@@ -94,6 +104,7 @@ fun LocalLibraryRoute(
     }
   }
   val mainActivity = LocalActivity.current as KiwixMainActivity
+  val coroutineScope = rememberCoroutineScope()
   val uiState = localLibraryViewModel.uiState.collectAsStateWithLifecycle()
   val readWritePermission =
     rememberMultiplePermissionsState(listOf(READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE))
@@ -113,38 +124,79 @@ fun LocalLibraryRoute(
     localLibraryViewModel.finishMultiModeFinished()
   }
   KiwixTheme {
-    LocalLibraryScreen(
-      state = uiState.value,
-      actionMenuItems = actionMenuItems(
-        navController = navController,
-        selectionMode = uiState.value.fileSelectListState.selectionMode,
-        localLibraryViewModel = localLibraryViewModel
-      ) {
-        localLibraryViewModel.filePickerMenuButtonClick(filePickerLauncher)
-      },
-      listState = rememberLazyListState(),
-      snackbarHostState = snackBarHostState,
-      onRefresh = localLibraryViewModel::onSwipeRefresh,
-      onDownloadButtonClick = localLibraryViewModel::onDownloadButtonClick,
-      onClick = localLibraryViewModel::onBookItemClick,
-      onLongClick = localLibraryViewModel::onBookItemLongClick,
-      onMultiSelect = localLibraryViewModel::onMultiSelect,
-      epubCallbacks = EpubItemCallbacks(
-        onClick = localLibraryViewModel::onEpubItemClick,
-        onLongClick = localLibraryViewModel::onEpubItemLongClick,
-        onMultiSelect = localLibraryViewModel::onEpubMultiSelect
-      ),
-      bottomAppBarScrollBehaviour = mainActivity.bottomAppBarScrollBehaviour,
-      onUserBackPressed = localLibraryViewModel::handleUserBackPressed,
-      navHostController = navController,
-      navigationIcon = {
-        NavigationIcon(
-          iconItem = navigationIconItem(uiState.value.fileSelectListState.selectionMode == SelectionMode.MULTI),
-          contentDescription = string.open_drawer,
-          onClick = localLibraryViewModel::onNavigationIconClick
-        )
-      }
-    )
+    val menus = actionMenuItems(
+      navController = navController,
+      selectionMode = uiState.value.fileSelectListState.selectionMode,
+      localLibraryViewModel = localLibraryViewModel
+    ) {
+      localLibraryViewModel.filePickerMenuButtonClick(filePickerLauncher)
+    }
+    val navigationIcon: @Composable () -> Unit = {
+      NavigationIcon(
+        iconItem = navigationIconItem(uiState.value.fileSelectListState.selectionMode == SelectionMode.MULTI),
+        contentDescription = string.open_drawer,
+        onClick = localLibraryViewModel::onNavigationIconClick
+      )
+    }
+    if (isHomeScreen) {
+      val homeVm = requireNotNull(homeViewModel)
+      val onlineVm = requireNotNull(onlineLibraryViewModel)
+      HomeScreen(
+        libraryState = uiState.value,
+        homeViewModel = homeVm,
+        callbacks = HomeScreenCallbacks(
+          onRefresh = {
+            localLibraryViewModel.onSwipeRefresh()
+            homeVm.refresh()
+          },
+          onLocalBookClick = localLibraryViewModel::onBookItemClick,
+          onEpubBookClick = localLibraryViewModel::onEpubItemClick,
+          onCatalogBookClick = { book, category ->
+            val downloadedBook = uiState.value.fileSelectListState.bookOnDiskListItems
+              .filterIsInstance<BookOnDisk>()
+              .firstOrNull { it.id == book.id }
+            if (downloadedBook != null) {
+              localLibraryViewModel.onBookItemClick(downloadedBook)
+            } else {
+              coroutineScope.launch {
+                onlineVm.kiwixDataStore.setSelectedOnlineContentCategory(category.orEmpty())
+                onlineVm.onSearchQueryChanged(book.title)
+                onlineVm.openSearchView()
+                onlineVm.queueHomeBookDownload(book)
+                navController.navigate(KiwixDestination.Explore.route)
+              }
+            }
+          },
+          onUserBackPressed = localLibraryViewModel::handleUserBackPressed,
+          navigationIcon = navigationIcon
+        ),
+        actionMenuItems = menus,
+        bottomAppBarScrollBehaviour = mainActivity.bottomAppBarScrollBehaviour,
+        navHostController = navController,
+        snackbarHostState = snackBarHostState
+      )
+    } else {
+      LocalLibraryScreen(
+        state = uiState.value,
+        actionMenuItems = menus,
+        listState = rememberLazyListState(),
+        snackbarHostState = snackBarHostState,
+        onRefresh = localLibraryViewModel::onSwipeRefresh,
+        onDownloadButtonClick = localLibraryViewModel::onDownloadButtonClick,
+        onClick = localLibraryViewModel::onBookItemClick,
+        onLongClick = localLibraryViewModel::onBookItemLongClick,
+        onMultiSelect = localLibraryViewModel::onMultiSelect,
+        epubCallbacks = EpubItemCallbacks(
+          onClick = localLibraryViewModel::onEpubItemClick,
+          onLongClick = localLibraryViewModel::onEpubItemLongClick,
+          onMultiSelect = localLibraryViewModel::onEpubMultiSelect
+        ),
+        bottomAppBarScrollBehaviour = mainActivity.bottomAppBarScrollBehaviour,
+        onUserBackPressed = localLibraryViewModel::handleUserBackPressed,
+        navHostController = navController,
+        navigationIcon = navigationIcon
+      )
+    }
     DialogHost(alertDialogShower)
   }
   LaunchedEffect(zimFileUriArg) {
