@@ -19,6 +19,7 @@
 package org.kiwix.kiwixmobile.core.epub.reader
 
 import android.app.ActivityManager
+import android.app.Presentation
 import android.app.SearchManager
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -28,12 +29,16 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.ActionMode
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageView
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -46,16 +51,21 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commitNow
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.base.BaseActivity
 import org.kiwix.kiwixmobile.core.utils.ExternalLinkOpener
@@ -63,9 +73,6 @@ import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.core.utils.dialog.DialogHost
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
-import org.readium.r2.navigator.input.InputListener
-import org.readium.r2.navigator.input.TapEvent
-import org.readium.r2.navigator.preferences.ReadingProgression
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.util.AbsoluteUrl
@@ -83,15 +90,47 @@ class EpubReaderActivity : BaseActivity() {
 
   @Inject lateinit var alertDialogShower: AlertDialogShower
 
-  private val viewModel: EpubReaderViewModel by viewModels()
-  private val darkTheme = MutableStateFlow(false)
-  private val pageReady = MutableStateFlow(false)
+  internal val viewModel: EpubReaderViewModel by viewModels()
+  internal val darkTheme = MutableStateFlow(false)
+  internal val pageReady = MutableStateFlow(false)
+  internal val pageModesAvailable = MutableStateFlow(false)
   private val selectionMenuLocator = MutableStateFlow<Locator?>(null)
+  internal val pageMode = MutableStateFlow(EpubPageMode.SINGLE_PAGE)
+  internal val pagePreviews = MutableStateFlow<List<EpubPagePreview>>(emptyList())
+  internal val overviewPages = MutableStateFlow<List<EpubPagePreview>>(emptyList())
+  internal val previewCache by lazy { EpubPreviewCache(cacheDir) }
+  internal val overviewPagesLoading = MutableStateFlow(false)
+  internal val overviewHasPrevious = MutableStateFlow(true)
+  internal val overviewHasNext = MutableStateFlow(true)
+  internal val visiblePageKey = MutableStateFlow<PageKey?>(null)
+  internal val previewPageKey = MutableStateFlow<PageKey?>(null)
+  internal data class PageKey(val resourceHref: String, val pageIndex: Int, val totalPages: Int)
+  internal val previewMutex = Mutex()
   private var selectionActionMode: ActionMode? = null
   private var selectionMenuOpening = false
-  private var navigator: EpubNavigatorFragment? = null
-  private lateinit var root: FrameLayout
-  private lateinit var navigatorContainer: FragmentContainerView
+  internal val carouselDoubleTapTimeout = ViewConfiguration.getDoubleTapTimeout().toLong()
+  internal val carouselTapDetector = DoubleTapDetector(carouselDoubleTapTimeout)
+  internal var carouselTapJob: Job? = null
+  internal var navigator: EpubNavigatorFragment? = null
+  internal var previewNavigator: EpubNavigatorFragment? = null
+  internal var previousCarouselNavigator: EpubNavigatorFragment? = null
+  internal var nextCarouselNavigator: EpubNavigatorFragment? = null
+  internal var previewCapture: VulkanPreviewCapture? = null
+  internal var previewCaptureInitializing = false
+  internal var previewPresentation: Presentation? = null
+  internal var previewJob: Job? = null
+  internal var previewRefreshJob: Job? = null
+  internal var overviewLoadJob: Job? = null
+  internal var previewInvalidationJob: Job? = null
+  internal var previewGeneration = 0L
+  private var previewViewport = 0 to 0
+  internal lateinit var root: FrameLayout
+  internal var previewNavigatorContainer: FragmentContainerView? = null
+  internal lateinit var navigatorContainer: FragmentContainerView
+  internal lateinit var previousCarouselContainer: FragmentContainerView
+  internal lateinit var nextCarouselContainer: FragmentContainerView
+  internal lateinit var previousPagePeek: ImageView
+  internal lateinit var nextPagePeek: ImageView
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // The navigator fragment needs a factory built from the opened book, so it can't be restored;
@@ -99,7 +138,51 @@ class EpubReaderActivity : BaseActivity() {
     super.onCreate(null)
     externalLinkOpener.initialize(this, alertDialogShower)
     darkTheme.value = isNightMode(resources.configuration)
+    setupReaderViews()
+    setUpImmersiveMode()
+    lifecycleScope.launch {
+      val ready = viewModel.state.filterIsInstance<EpubReaderUiState.Ready>().first()
+      attachNavigator(ready.book)
+      setTaskTitle(ready.book.title)
+    }
+    lifecycleScope.launch {
+      var previousRenderSettings: Pair<EpubReaderSettings, Boolean>? = null
+      combine(viewModel.settings, darkTheme, pageMode) { settings, dark, mode ->
+        Triple(settings, dark, mode)
+      }.collect { (settings, dark, mode) ->
+        val renderSettings = settings to dark
+        if (
+          navigator != null &&
+          previousRenderSettings != null &&
+          previousRenderSettings != renderSettings
+        ) {
+          invalidatePreviewCache()
+        }
+        previousRenderSettings = renderSettings
+        root.setBackgroundColor(settings.backgroundColor(dark))
+        val preferences = navigatorPreferences(settings, dark, mode)
+        navigator?.submitPreferences(preferences)
+        previewNavigator?.submitPreferences(preferences)
+        previousCarouselNavigator?.submitPreferences(preferences)
+        nextCarouselNavigator?.submitPreferences(preferences)
+      }
+    }
+  }
+
+  private fun setupReaderViews() {
     navigatorContainer = FragmentContainerView(this).apply { id = View.generateViewId() }
+    previousCarouselContainer = FragmentContainerView(this).apply {
+      id = View.generateViewId()
+      visibility = View.GONE
+      isClickable = false
+    }
+    nextCarouselContainer = FragmentContainerView(this).apply {
+      id = View.generateViewId()
+      visibility = View.GONE
+      isClickable = false
+    }
+    previousPagePeek = pagePeekView(previous = true)
+    nextPagePeek = pagePeekView(previous = false)
     // Immersive: the book fills the screen and the bars and overlay float above it. Only the
     // (constant) display cutout and fixed margins are reserved, never the system bars, so the
     // text doesn't re-paginate when the bars or overlay toggle.
@@ -109,30 +192,179 @@ class EpubReaderActivity : BaseActivity() {
     }
     root = FrameLayout(this).apply {
       addView(navigatorContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+      addView(previousCarouselContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+      addView(nextCarouselContainer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+      // Place each live Readium page over the full reader area; carousel transforms size them.
+      addView(previousPagePeek)
+      addView(nextPagePeek)
       addView(
         ComposeView(context).apply { setContent { Chrome() } },
         FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
       )
     }
     setContentView(root)
-    setUpImmersiveMode()
-    lifecycleScope.launch {
-      val ready = viewModel.state.filterIsInstance<EpubReaderUiState.Ready>().first()
-      attachNavigator(ready.book)
-      setTaskTitle(ready.book.title)
+    root.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+      val size = (right - left) to (bottom - top)
+      if (shouldInitializePreviewCapture(size)) {
+        initializePreviewCapture(size.first, size.second)
+      }
+      if (previewViewport.first > 0 && previewViewport != size && navigator != null) {
+        invalidatePreviewCache()
+      }
+      previewViewport = size
     }
+  }
+
+  private fun shouldInitializePreviewCapture(size: Pair<Int, Int>) =
+    size.first > 0 && size.second > 0 && previewCapture == null && !previewCaptureInitializing
+
+  private fun initializePreviewCapture(width: Int, height: Int) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
+      previewCapture != null ||
+      previewCaptureInitializing
+    ) {
+      return
+    }
+    previewCaptureInitializing = true
     lifecycleScope.launch {
-      combine(viewModel.settings, darkTheme, ::Pair).collect { (settings, dark) ->
-        root.setBackgroundColor(settings.backgroundColor(dark))
-        navigator?.submitPreferences(settings.toPreferences(dark))
+      val capture = withContext(Dispatchers.IO) {
+        runCatching { VulkanPreviewCapture(this@EpubReaderActivity, width, height) }.getOrNull()
+      }
+      previewCaptureInitializing = false
+      if (isFinishing || isDestroyed) {
+        capture?.close()
+        return@launch
+      }
+      if (capture == null || !capture.isAvailable || previewCapture != null) {
+        capture?.close()
+        pageModesAvailable.value = false
+        return@launch
+      }
+      previewCapture = capture
+      if (!showPreviewProbe(capture)) {
+        disablePreviewModes(capture)
+        return@launch
+      }
+      lifecycleScope.launch(Dispatchers.IO) {
+        val frame = capture.frameSequence()
+        val probe = capture.captureAfter(
+          frame,
+          PREVIEW_PROBE_BITMAP_SIZE,
+          PREVIEW_PROBE_BITMAP_SIZE,
+          PREVIEW_FRAME_TIMEOUT_MS
+        )
+        withContext(Dispatchers.Main) {
+          val canUsePreviewCapture =
+            probe != null &&
+              previewCapture === capture &&
+              !isFinishing &&
+              !isDestroyed
+          probe?.recycle()
+          if (canUsePreviewCapture) {
+            pageModesAvailable.value = true
+          } else {
+            disablePreviewModes(capture)
+          }
+        }
       }
     }
+  }
+
+  private fun showPreviewProbe(
+    capture: VulkanPreviewCapture
+  ): Boolean = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+    false
+  } else {
+    val presentation = capture.display
+      ?.let { display -> runCatching { Presentation(this, display) }.getOrNull() }
+    if (presentation != null) {
+      presentation.setContentView(
+        FrameLayout(presentation.context).apply {
+          setBackgroundColor(viewModel.settings.value.backgroundColor(darkTheme.value))
+        },
+        ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+      )
+    }
+    val shown = presentation?.let { runCatching { it.show() }.isSuccess } == true
+    if (shown) {
+      previewPresentation = presentation
+    } else {
+      presentation?.dismiss()
+    }
+    shown
+  }
+
+  internal fun disablePreviewModes(
+    capture: VulkanPreviewCapture,
+    reason: String = "preview capture unavailable"
+  ) {
+    if (previewCapture !== capture) return
+    cancelCarouselTap()
+    Log.e(PREVIEW_LOG_TAG, "Disabling page previews: $reason")
+    previewGeneration++
+    previewJob?.cancel()
+    previewRefreshJob?.cancel()
+    overviewLoadJob?.cancel()
+    previewInvalidationJob?.cancel()
+    previewNavigator?.let { fragment ->
+      supportFragmentManager.commitNow { remove(fragment) }
+    }
+    previewNavigator = null
+    previewNavigatorContainer = null
+    previousCarouselNavigator = null
+    nextCarouselNavigator = null
+    if (::previousCarouselContainer.isInitialized) previousCarouselContainer.visibility = View.GONE
+    if (::nextCarouselContainer.isInitialized) nextCarouselContainer.visibility = View.GONE
+    previewPresentation?.dismiss()
+    previewPresentation = null
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) capture.close()
+    previewCapture = null
+    previewCaptureInitializing = false
+    pageModesAvailable.value = false
+    pageMode.value = EpubPageMode.SINGLE_PAGE
+    previewPageKey.value = null
+    overviewPagesLoading.value = false
+    if (::navigatorContainer.isInitialized) setNavigatorSize(carousel = false)
+    pagePreviews.value = emptyList()
+    overviewPages.value = emptyList()
   }
 
   override fun dispatchTouchEvent(event: MotionEvent): Boolean {
     val handled = super.dispatchTouchEvent(event)
     if (event.actionMasked == MotionEvent.ACTION_UP) openSelectionMenuAfterRelease()
     return handled
+  }
+
+  override fun onDestroy() {
+    cancelCarouselTap()
+    previewGeneration++
+    previewJob?.cancel()
+    previewRefreshJob?.cancel()
+    previewInvalidationJob?.cancel()
+    navigator = null
+    supportFragmentManager.findFragmentByTag(PREVIEW_NAVIGATOR_TAG)?.let { fragment ->
+      supportFragmentManager.beginTransaction()
+        .remove(fragment)
+        .commitNowAllowingStateLoss()
+    }
+    supportFragmentManager.findFragmentByTag(LIVE_PREVIOUS_TAG)?.let { fragment ->
+      supportFragmentManager.beginTransaction().remove(fragment).commitNowAllowingStateLoss()
+    }
+    supportFragmentManager.findFragmentByTag(LIVE_NEXT_TAG)?.let { fragment ->
+      supportFragmentManager.beginTransaction().remove(fragment).commitNowAllowingStateLoss()
+    }
+    previousCarouselNavigator = null
+    nextCarouselNavigator = null
+    previewNavigator = null
+    previewNavigatorContainer = null
+    previewPresentation?.dismiss()
+    previewPresentation = null
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) previewCapture?.close()
+    previewCapture = null
+    pagePreviews.value = emptyList()
+    if (::previousPagePeek.isInitialized) previousPagePeek.setImageDrawable(null)
+    if (::nextPagePeek.isInitialized) nextPagePeek.setImageDrawable(null)
+    super.onDestroy()
   }
 
   private fun openSelectionMenuAfterRelease() {
@@ -191,6 +423,13 @@ class EpubReaderActivity : BaseActivity() {
     val annotations by viewModel.annotations.collectAsState()
     val selectionLocator by selectionMenuLocator.collectAsState()
     val bookShown by pageReady.collectAsState()
+    val shownPageMode by pageMode.collectAsState()
+    val canShowPageModes by pageModesAvailable.collectAsState()
+    val shownPagePreviews by pagePreviews.collectAsState()
+    val shownOverviewPages by overviewPages.collectAsState()
+    val overviewLoading by overviewPagesLoading.collectAsState()
+    val hasEarlierPages by overviewHasPrevious.collectAsState()
+    val hasLaterPages by overviewHasNext.collectAsState()
     val readingOrder = (state as? EpubReaderUiState.Ready)?.book?.publication?.readingOrder.orEmpty()
     DialogHost(alertDialogShower)
     EpubReaderScreen(
@@ -204,6 +443,14 @@ class EpubReaderActivity : BaseActivity() {
       ),
       search = search,
       previousPages = previousPages,
+      pageMode = shownPageMode,
+      pageModesAvailable = canShowPageModes,
+      pagePreviews = shownPagePreviews,
+      overviewPages = shownOverviewPages,
+      overviewPagesLoading = overviewLoading,
+      overviewHasPrevious = hasEarlierPages,
+      overviewHasNext = hasLaterPages,
+      loadPreviewBitmap = { loadPreviewBitmap(it) },
       annotations = annotations,
       selectionLocator = selectionLocator,
       chromeVisible = chromeVisible,
@@ -239,6 +486,7 @@ class EpubReaderActivity : BaseActivity() {
       navigator?.go(target)
     },
     onBookmark = viewModel::addBookmark,
+    onToggleBookmark = viewModel::toggleBookmark,
     onShowAnnotations = { viewModel.panels.showAnnotations = true },
     onAnnotationSelected = {
       viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
@@ -251,22 +499,45 @@ class EpubReaderActivity : BaseActivity() {
     onSearchSelection = ::searchSelection,
     onSelectAll = ::selectAll,
     onBookmarkSelection = { viewModel.toggleBookmark(it) },
-    onFavoriteSelection = viewModel::addFavorite,
     onHighlightSelection = viewModel::addHighlight,
     onUpdateAnnotationNote = { annotation, note ->
       viewModel.updateAnnotationNote(annotation.id, note)
     },
     onCopyAnnotation = ::copyAnnotation,
+    onPageModeSelected = ::selectPageMode,
+    onLoadMoreOverviewPages = ::loadMoreOverviewPages,
+    onSelectOverviewPage = { target ->
+      viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
+      navigator?.go(target)
+      viewModel.setChromeVisible(true)
+    },
+    onSelectCarouselPage = { target ->
+      viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
+      navigator?.go(target)
+    },
+    onCarouselPositionChanged = ::setLiveCarouselPosition,
     onNoteSelection = viewModel::addNote
   )
 
   private fun attachNavigator(book: OpenEpub) {
-    val factory = EpubNavigatorFactory(book.publication).createFragmentFactory(
-      initialLocator = viewModel.startLocator(book),
-      initialPreferences = viewModel.settings.value.toPreferences(darkTheme.value),
+    val initialLocator = viewModel.startLocator(book)
+    val initialPreferences = navigatorPreferences(
+      viewModel.settings.value,
+      darkTheme.value,
+      EpubPageMode.SINGLE_PAGE
+    )
+    val mainFactory = EpubNavigatorFactory(book.publication).createFragmentFactory(
+      initialLocator = initialLocator,
+      initialPreferences = initialPreferences,
       listener = linkListener,
       paginationListener = object : EpubNavigatorFragment.PaginationListener {
-        override fun onPageLoaded() = revealBook()
+        override fun onPageLoaded() {
+          pageReady.value = true
+        }
+
+        override fun onPageChanged(pageIndex: Int, totalPages: Int, locator: Locator) {
+          visiblePageKey.value = pageKey(locator, pageIndex, totalPages)
+        }
       },
       // The container's padding already keeps the book clear of the cutout.
       configuration = EpubNavigatorFragment.Configuration(
@@ -274,54 +545,110 @@ class EpubReaderActivity : BaseActivity() {
         selectionActionModeCallback = selectionActionModeCallback
       )
     )
-    supportFragmentManager.fragmentFactory = factory
+    supportFragmentManager.fragmentFactory = mainFactory
+    val mainFragment = mainFactory.instantiate(classLoader, EpubNavigatorFragment::class.java.name)
+      as EpubNavigatorFragment
     supportFragmentManager.commitNow {
-      replace(navigatorContainer.id, EpubNavigatorFragment::class.java, null, NAVIGATOR_TAG)
+      add(navigatorContainer.id, mainFragment, NAVIGATOR_TAG)
     }
-    val fragment = supportFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as? EpubNavigatorFragment
-      ?: return
-    navigator = fragment
-    observeHighlightAnnotations(fragment)
+    navigator = mainFragment
+    observeHighlightAnnotations(mainFragment, invalidateCacheOnChange = true)
     // The loading screen covers the book; a failed load must not leave it there.
-    observePageLoading(fragment)
+    observePageLoading(mainFragment)
+    lifecycleScope.launch {
+      mainFragment.currentLocator
+        .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+        .collect { locator ->
+          viewModel.onLocatorChanged(locator)
+        }
+    }
+    lifecycleScope.launch {
+      visiblePageKey
+        .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+        .collect {
+          if (pageMode.value == EpubPageMode.CAROUSEL) {
+            syncLiveCarouselNeighbors(pagePreviews.value, it)
+            refreshCarouselPreviews(mainFragment)
+          }
+        }
+    }
   }
 
-  private fun observeHighlightAnnotations(fragment: EpubNavigatorFragment) {
+  internal fun observeHighlightAnnotations(
+    fragment: EpubNavigatorFragment,
+    invalidateCacheOnChange: Boolean = false
+  ) {
     lifecycleScope.launch {
-      repeatOnLifecycle(Lifecycle.State.STARTED) {
-        viewModel.annotations.collectLatest { annotations ->
-          val highlights = annotations
-            .filter { it.kind == EpubAnnotationKind.HIGHLIGHT }
-            .map { annotation ->
-              org.readium.r2.navigator.Decoration(
-                id = annotation.id,
-                locator = annotation.locator,
-                style = org.readium.r2.navigator.Decoration.Style.Highlight(
-                  tint = annotation.color?.tint ?: EpubHighlightColor.LIGHT_YELLOW.tint
-                )
+      var previousHighlights: List<org.readium.r2.navigator.Decoration>? = null
+      combine(viewModel.annotations, viewModel.settings, darkTheme) { annotations, settings, nightMode ->
+        val darkReadingTheme = settings.effectivePreset(nightMode) in setOf(
+          EpubThemePreset.DARK,
+          EpubThemePreset.BLACK
+        )
+        annotations
+          .filter { it.kind == EpubAnnotationKind.HIGHLIGHT }
+          .map { annotation ->
+            org.readium.r2.navigator.Decoration(
+              id = annotation.id,
+              locator = annotation.locator,
+              style = org.readium.r2.navigator.Decoration.Style.Highlight(
+                tint = annotation.color?.tintFor(darkReadingTheme)
+                  ?: EpubHighlightColor.LIGHT_YELLOW.tintFor(darkReadingTheme)
               )
-            }
+            )
+          }
+      }
+        .distinctUntilChanged()
+        .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+        .collectLatest { highlights ->
+          if (
+            invalidateCacheOnChange &&
+            previousHighlights != null &&
+            previousHighlights != highlights
+          ) {
+            invalidatePreviewCache()
+          }
+          previousHighlights = highlights
           fragment.applyDecorations(highlights, ANNOTATION_DECORATION_GROUP)
         }
-      }
     }
   }
 
-  private fun observePageLoading(fragment: EpubNavigatorFragment) {
-    lifecycleScope.launch {
-      delay(REVEAL_TIMEOUT_MS)
-      revealBook()
-    }
-    fragment.addInputListener(
-      object : InputListener {
-        override fun onTap(event: TapEvent) = handleTap(fragment, event)
+  internal fun ensurePreviewNavigator(initialLocator: Locator): EpubNavigatorFragment? =
+    previewNavigator ?: ensurePreviewPresentation()?.let { container ->
+      (viewModel.state.value as? EpubReaderUiState.Ready)?.book?.let { book ->
+        createPreviewNavigator(container, book, initialLocator)
       }
+    }
+
+  private fun createPreviewNavigator(
+    container: FragmentContainerView,
+    book: OpenEpub,
+    initialLocator: Locator
+  ): EpubNavigatorFragment {
+    val factory = EpubNavigatorFactory(book.publication).createFragmentFactory(
+      initialLocator = initialLocator,
+      initialPreferences = navigatorPreferences(
+        viewModel.settings.value,
+        darkTheme.value,
+        pageMode.value
+      ),
+      listener = linkListener,
+      paginationListener = object : EpubNavigatorFragment.PaginationListener {
+        override fun onPageLoaded() = Unit
+
+        override fun onPageChanged(pageIndex: Int, totalPages: Int, locator: Locator) {
+          previewPageKey.value = pageKey(locator, pageIndex, totalPages)
+        }
+      },
+      configuration = EpubNavigatorFragment.Configuration(shouldApplyInsetsPadding = false)
     )
-    lifecycleScope.launch {
-      repeatOnLifecycle(Lifecycle.State.STARTED) {
-        fragment.currentLocator.collect(viewModel::onLocatorChanged)
-      }
-    }
+    val fragment = factory.instantiate(classLoader, EpubNavigatorFragment::class.java.name)
+      as EpubNavigatorFragment
+    previewNavigator = fragment
+    attachPreviewNavigator(container, fragment)
+    observeHighlightAnnotations(fragment)
+    return fragment
   }
 
   /** Names the Recents entry after the book. */
@@ -334,15 +661,14 @@ class EpubReaderActivity : BaseActivity() {
     }
   }
 
-  private fun revealBook() {
-    pageReady.value = true
-  }
-
   private val selectionActionModeCallback = object : ActionMode.Callback {
     override fun onCreateActionMode(mode: ActionMode, menu: android.view.Menu): Boolean {
       selectionActionMode = mode
       selectionMenuOpening = false
       menu.clear()
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        mode.hide(SELECTION_ACTION_MODE_HIDE_MS)
+      }
       return true
     }
 
@@ -403,38 +729,13 @@ class EpubReaderActivity : BaseActivity() {
   }
 
   /** Links never reach here; Readium follows them itself. Scrolling books have no edge zones. */
-  private fun handleTap(fragment: EpubNavigatorFragment, event: TapEvent): Boolean {
-    // Taps reach the book through the loading screen, which must not act on them.
-    if (!pageReady.value) return true
-    val overflow = fragment.overflow.value
-    val zone = if (overflow.scroll) {
-      TapZone.CENTER
-    } else {
-      EpubTapZones.classify(
-        event.point.x,
-        fragment.publicationView.width.toFloat(),
-        overflow.readingProgression == ReadingProgression.RTL
-      )
-    }
-    val overlayVisible = viewModel.chromeVisible.value
-    val action = EpubTapZones.actionFor(zone, overlayVisible)
-    if (EpubTapZones.dismissesOverlay(action, overlayVisible)) viewModel.setChromeVisible(false)
-    when (action) {
-      TapAction.PREVIOUS_PAGE -> fragment.goBackward(animated = true)
-      TapAction.NEXT_PAGE -> fragment.goForward(animated = true)
-      TapAction.SHOW_OVERLAY -> viewModel.setChromeVisible(true)
-      TapAction.HIDE_OVERLAY -> Unit
-    }
-    return true
-  }
-
   private fun goToAdjacentChapter(next: Boolean) {
     val book = (viewModel.state.value as? EpubReaderUiState.Ready)?.book ?: return
     val current = navigator?.currentLocator?.value ?: return
     adjacentChapter(book.publication.readingOrder, current, next)?.let { navigator?.go(it) }
   }
 
-  private val linkListener = object : EpubNavigatorFragment.Listener {
+  internal val linkListener = object : EpubNavigatorFragment.Listener {
     override fun onExternalLinkActivated(url: AbsoluteUrl) {
       val intent = EpubExternalLinks.intentFor(url.toString()) ?: return
       lifecycleScope.launch { externalLinkOpener.openExternalUrl(intent) }
@@ -447,8 +748,20 @@ class EpubReaderActivity : BaseActivity() {
   }
 
   override fun onStop() {
+    cancelCarouselTap()
+    previewGeneration++
+    previewJob?.cancel()
+    previewRefreshJob?.cancel()
+    previewInvalidationJob?.cancel()
     viewModel.persistPosition()
     super.onStop()
+  }
+
+  override fun onStart() {
+    super.onStart()
+    if (navigator != null && pageMode.value != EpubPageMode.SINGLE_PAGE) {
+      selectPageMode(pageMode.value)
+    }
   }
 
   private fun isNightMode(configuration: Configuration) =
@@ -456,14 +769,38 @@ class EpubReaderActivity : BaseActivity() {
 
   companion object {
     private const val NAVIGATOR_TAG = "epubNavigator"
+    internal const val LIVE_PREVIOUS_TAG = "epubLiveCarouselPrevious"
+    internal const val LIVE_NEXT_TAG = "epubLiveCarouselNext"
+    internal const val PREVIEW_NAVIGATOR_TAG = "epubPreviewNavigator"
+    internal const val PREVIEW_LOG_TAG = "EpubPreview"
     private const val BOOK_SCHEME = "epub"
-    private const val REVEAL_TIMEOUT_MS = 5_000L
 
     // Constant top and bottom margin around the page, so the overlay toggling never reflows it.
-    private const val READING_MARGIN_DP = 32
+    internal const val READING_MARGIN_DP = 32
     private const val ANNOTATION_DECORATION_GROUP = "kiwix-annotations"
     private const val SELECTION_READY_RETRIES = 5
     private const val SELECTION_READY_RETRY_MS = 100L
+    private const val SELECTION_ACTION_MODE_HIDE_MS = 600_000L
+    internal const val PAGE_PREVIEW_SCALE = 0.3f
+    internal const val PAGE_PREVIEW_INITIAL_READY_TIMEOUT_MS = 15_000L
+    internal const val PAGE_PREVIEW_TURN_TIMEOUT_MS = 2_000L
+    internal const val PREVIEW_FRAME_TIMEOUT_MS = 2_000L
+    private const val PREVIEW_PROBE_BITMAP_SIZE = 8
+    internal const val PAGE_CAROUSEL_RADIUS = 1
+    internal const val PAGE_OVERVIEW_PAGE_COUNT = 9
+    internal const val CAROUSEL_PAGE_WIDTH = 0.82f
+    internal const val CAROUSEL_PAGE_HEIGHT = 0.76f
+    internal const val LIVE_CAROUSEL_PAGE_WIDTH = 0.77f
+    internal const val LIVE_CAROUSEL_PAGE_STEP_INSET_DP = 80
+    internal const val CAROUSEL_PEEK_HEIGHT = 0.72f
+    internal const val CAROUSEL_PEEK_SCALE = 0.72f
+    internal const val PAGE_PEEK_WIDTH = 0.1f
+    internal const val OVERVIEW_LOAD_BATCH = 9
+    internal const val PREVIEW_REFRESH_DEBOUNCE_MS = 250L
+    internal const val PREVIEW_INVALIDATION_DEBOUNCE_MS = 150L
+    internal const val PREVIOUS_PAGE_OFFSET = -1
+    internal const val NEXT_PAGE_OFFSET = 1
+    internal const val PAGE_EDGE_PROGRESS = 0.001
 
     /**
      * The main activity is singleInstance, so the reader can't share its task. Each book is its
