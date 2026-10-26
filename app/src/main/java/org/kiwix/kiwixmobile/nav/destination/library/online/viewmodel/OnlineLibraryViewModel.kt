@@ -185,7 +185,8 @@ class OnlineLibraryViewModel @Inject constructor(
     val noContentMessage: String = "",
     val showNoContent: Boolean = false,
     val showStorageSelectDialog: Boolean = false,
-    val showCategoryDialog: Boolean = false
+    val showCategoryDialog: Boolean = false,
+    val pendingHomeDownload: LibkiwixBook? = null
   )
 
   /**
@@ -236,6 +237,9 @@ class OnlineLibraryViewModel @Inject constructor(
 
   private val _uiState = MutableStateFlow(OnlineLibraryUiState())
   val uiState = _uiState.asStateFlow()
+  private val homeBookDownloadProgress = PendingHomeBookDownloadProgress(viewModelScope) { book ->
+    _uiState.update { it.copy(pendingHomeDownload = book) }
+  }
   internal val onlineLibraryRequest = MutableSharedFlow<OnlineLibraryRequest>(
     replay = 1,
     onBufferOverflow = BufferOverflow.DROP_OLDEST
@@ -256,6 +260,14 @@ class OnlineLibraryViewModel @Inject constructor(
 
   var downloadBookItem: BookItem? = null
     internal set
+
+  fun queueHomeBookDownload(book: LibkiwixBook) {
+    homeBookDownloadProgress.queue(book)
+  }
+
+  fun startQueuedHomeBookDownload() {
+    homeBookDownloadProgress.startQueued()?.let(::onBookItemClick)
+  }
 
   @VisibleForTesting
   internal fun setUiStateForTest(state: OnlineLibraryUiState) {
@@ -306,6 +318,7 @@ class OnlineLibraryViewModel @Inject constructor(
   }.launchIn(viewModelScope)
 
   private fun updateLibraryItems(items: List<LibraryListItem>) {
+    homeBookDownloadProgress.onLibraryItemsUpdated(items)
     _uiState.update { current ->
       current.copy(
         items = items,
@@ -589,7 +602,10 @@ class OnlineLibraryViewModel @Inject constructor(
       when (action) {
         ShowStorageSelection -> showStorageSelectDialog(false)
         is StartDownload -> downloadFile()
-        NoInternet -> emitNoInternetSnackbar()
+        NoInternet -> {
+          homeBookDownloadProgress.clear(item.book.id)
+          emitNoInternetSnackbar()
+        }
         RequestStoragePermission -> sendUiEvent(RequestPermission(WRITE_EXTERNAL_STORAGE))
         RequestNotificationPermission -> if (isAndroid13OrAbove) {
           sendUiEvent(RequestPermission(POST_NOTIFICATIONS))
@@ -617,8 +633,11 @@ class OnlineLibraryViewModel @Inject constructor(
           onBookItemClick(item)
         }
 
-        is NotEnoughSpace -> emitNoSpaceSnackbar(action.availableSpace) {
-          showStorageSelectDialog(true)
+        is NotEnoughSpace -> {
+          homeBookDownloadProgress.clear(item.book.id)
+          emitNoSpaceSnackbar(action.availableSpace) {
+            showStorageSelectDialog(true)
+          }
         }
 
         else -> Unit
@@ -810,6 +829,7 @@ class OnlineLibraryViewModel @Inject constructor(
   }
 
   override fun onCleared() {
+    homeBookDownloadProgress.cancel()
     coroutineJobs.forEach {
       it.cancel()
     }
