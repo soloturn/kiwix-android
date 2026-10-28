@@ -63,7 +63,7 @@ internal fun EpubReaderActivity.handleTap(
   return true
 }
 
-private fun EpubReaderActivity.handleCarouselTap() {
+internal fun EpubReaderActivity.handleCarouselTap() {
   if (carouselTapDetector.registerTap(SystemClock.uptimeMillis())) {
     cancelCarouselTap()
     viewModel.setChromeVisible(false)

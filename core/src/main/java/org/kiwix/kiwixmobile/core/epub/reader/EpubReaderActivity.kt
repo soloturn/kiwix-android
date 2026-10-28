@@ -497,6 +497,7 @@ class EpubReaderActivity : BaseActivity() {
     },
     onSelectCarouselPage = ::selectCarouselPage,
     onCarouselPositionChanged = ::onCarouselPositionChanged,
+    onCarouselTap = ::handleCarouselTap,
     onNoteSelection = viewModel::addNote
   )
 

@@ -26,6 +26,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -88,6 +89,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -120,6 +122,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
 import org.kiwix.kiwixmobile.core.ui.components.KiwixSearchView
@@ -233,6 +236,7 @@ data class EpubReaderActions(
   val onSelectOverviewPage: (Locator) -> Unit = {},
   val onSelectCarouselPage: (Locator) -> Unit = {},
   val onCarouselPositionChanged: (String?, Float) -> Unit = { _, _ -> },
+  val onCarouselTap: () -> Unit = {},
   val onDismissSelectionMenu: () -> Unit = {},
   val onCopySelection: (String) -> Unit = {},
   val onShareSelection: (String) -> Unit = {},
@@ -436,6 +440,7 @@ private fun CarouselPageLayer(state: EpubReaderMainLayoutState, actions: EpubRea
       onBookmarkToggle = actions.onToggleBookmark,
       onPositionChanged = actions.onCarouselPositionChanged,
       onPageSettled = actions.onSelectCarouselPage,
+      onPageTap = actions.onCarouselTap,
     )
   }
 }
@@ -864,10 +869,12 @@ internal fun PageCarousel(
   onBookmarkToggle: (Locator) -> Unit,
   onPositionChanged: (String?, Float) -> Unit,
   onPageSettled: (Locator) -> Unit,
+  onPageTap: () -> Unit,
 ) {
   val currentPages by rememberUpdatedState(pages)
   val currentBookmarkedLocators by rememberUpdatedState(bookmarkedLocators)
   val currentOnBookmarkToggle by rememberUpdatedState(onBookmarkToggle)
+  val currentOnPageTap by rememberUpdatedState(onPageTap)
   val currentIndex = currentLocator?.let { current ->
     pages.indexOfFirst { it.locator.sameBookmarkPosition(current) }
       .coerceIn(0, (pages.size - 1).coerceAtLeast(0))
@@ -894,22 +901,51 @@ internal fun PageCarousel(
     key = { page -> pages[page].cacheKey },
     verticalAlignment = Alignment.CenterVertically
   ) { page ->
-    val preview = pages[page]
-    val placement = when {
-      page < pagerState.currentPage -> BookmarkButtonPlacement.PREVIOUS_PAGE
-      page > pagerState.currentPage -> BookmarkButtonPlacement.NEXT_PAGE
-      else -> BookmarkButtonPlacement.CENTER
-    }
-    BoxWithConstraints(Modifier.fillMaxSize().testTag("${EPUB_READER_PAGE_CAROUSEL_TESTING_TAG}_$page")) {
-      CarouselPageBookmarkToggle(
-        locator = preview.locator,
-        page = page,
-        placement = placement,
-        bookmarkedLocators = currentBookmarkedLocators,
-        onBookmarkToggle = currentOnBookmarkToggle,
-        topOffset = maxHeight * ((1f - EpubReaderActivity.CAROUSEL_PAGE_HEIGHT) / 2f) + EIGHT_DP
-      )
-    }
+    CarouselPage(
+      page = page,
+      locator = pages[page].locator,
+      pagerState = pagerState,
+      bookmarkedLocators = currentBookmarkedLocators,
+      onBookmarkToggle = currentOnBookmarkToggle,
+      onTap = currentOnPageTap
+    )
+  }
+}
+
+@Composable
+private fun CarouselPage(
+  page: Int,
+  locator: Locator,
+  pagerState: PagerState,
+  bookmarkedLocators: List<Locator>,
+  onBookmarkToggle: (Locator) -> Unit,
+  onTap: () -> Unit
+) {
+  val scope = rememberCoroutineScope()
+  val noIndication = remember { MutableInteractionSource() }
+  val placement = when {
+    page < pagerState.currentPage -> BookmarkButtonPlacement.PREVIOUS_PAGE
+    page > pagerState.currentPage -> BookmarkButtonPlacement.NEXT_PAGE
+    else -> BookmarkButtonPlacement.CENTER
+  }
+  BoxWithConstraints(
+    Modifier
+      .fillMaxSize()
+      .testTag("${EPUB_READER_PAGE_CAROUSEL_TESTING_TAG}_$page")
+      // The pager covers the live book, so taps are handled here: the centre page leaves the
+      // carousel (a double tap opens the overview), a neighbor scrolls into the centre.
+      .clickable(interactionSource = noIndication, indication = null) {
+        if (page == pagerState.currentPage) onTap() else scope.launch { pagerState.animateScrollToPage(page) }
+      }
+  ) {
+    CarouselPageBookmarkToggle(
+      locator = locator,
+      page = page,
+      placement = placement,
+      bookmarkedLocators = bookmarkedLocators,
+      onBookmarkToggle = onBookmarkToggle,
+      topOffset = maxHeight * ((1f - EpubReaderActivity.CAROUSEL_PAGE_HEIGHT) / 2f) + EIGHT_DP
+    )
   }
 }
 

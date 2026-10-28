@@ -51,7 +51,8 @@ internal fun EpubReaderActivity.CarouselHost() {
       bookmarkedLocators = bookmarks,
       onBookmarkToggle = viewModel::toggleBookmark,
       onPositionChanged = ::onCarouselPositionChanged,
-      onPageSettled = ::selectCarouselPage
+      onPageSettled = ::selectCarouselPage,
+      onPageTap = ::handleCarouselTap
     )
   }
 }

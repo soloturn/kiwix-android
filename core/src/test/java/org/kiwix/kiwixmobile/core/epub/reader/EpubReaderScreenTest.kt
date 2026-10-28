@@ -311,6 +311,20 @@ class EpubReaderScreenTest {
   }
 
   @Test
+  fun `tapping the centre carousel page asks the host to leave the carousel`() {
+    var taps = 0
+    show(
+      pageMode = EpubPageMode.CAROUSEL,
+      pagePreviews = listOf(EpubPagePreview(locator, "page-1", pageIndex = 0)),
+      actions = EpubReaderActions(onCarouselTap = { taps++ })
+    )
+
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_CAROUSEL_TESTING_TAG + "_0").performClick()
+
+    composeTestRule.runOnIdle { assertEquals(1, taps) }
+  }
+
+  @Test
   fun `search results show their text and navigate to the selected locator`() {
     var selected: Locator? = null
     show(
