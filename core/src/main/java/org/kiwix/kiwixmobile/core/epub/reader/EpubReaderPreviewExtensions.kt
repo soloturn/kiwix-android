@@ -43,6 +43,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commitNow
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -62,6 +64,7 @@ import kotlin.coroutines.resume
 
 private typealias PageKey = EpubReaderActivity.PageKey
 private const val PAGE_LOADING_REVEAL_TIMEOUT_MS = 5_000L
+private const val MAX_CAROUSEL_WINDOW_PAGES = 7
 
 internal fun EpubReaderActivity.navigatorPreferences(
   settings: EpubReaderSettings,
@@ -285,6 +288,7 @@ private fun EpubReaderActivity.publishPreviewWindow(
 ) {
   publishPreviewProgress(mode, previews)
   if (mode == EpubPageMode.OVERVIEW) setPageEdgePeeks(false) else updateCarouselPeeks(previews)
+  if (mode == EpubPageMode.CAROUSEL) refreshCarouselPreviews()
 }
 
 private fun logPreviewWindow(
@@ -324,6 +328,74 @@ internal fun EpubReaderActivity.applyReaderInsetsToCarouselPages() {
       applyReadingInsets(view, insets, margin)
     }
   }
+}
+
+internal fun EpubReaderActivity.setActiveNavigator(fragment: EpubNavigatorFragment) {
+  navigator = fragment
+  activeNavigatorPositionJob?.cancel()
+  activeNavigatorPositionJob = lifecycleScope.launch {
+    fragment.currentLocator
+      .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
+      .collect(viewModel::onLocatorChanged)
+  }
+}
+
+internal fun EpubReaderActivity.selectCarouselPage(target: Locator) {
+  val current = navigator ?: return
+  if (current.currentLocator.value.sameBookmarkPosition(target)) return
+  viewModel.rememberPreviousPage(current.currentLocator.value)
+  val pages = pagePreviews.value
+  val currentIndex = pages.indexOfFirst { it.matches(visiblePageKey.value) }
+  val targetIndex = pages.indexOfFirst { it.locator.sameBookmarkPosition(target) }
+  val delta = targetIndex - currentIndex
+  val forward = when (delta) {
+    1 -> true
+    -1 -> false
+    else -> null
+  }
+  val neighbor = when (forward) {
+    true -> nextCarouselNavigator
+    false -> previousCarouselNavigator
+    null -> null
+  }
+  if (forward != null && neighbor?.currentLocator?.value?.sameBookmarkPosition(target) == true) {
+    promoteCarouselNeighbor(forward, pages[targetIndex])
+  } else {
+    current.go(target)
+  }
+}
+
+private fun EpubReaderActivity.promoteCarouselNeighbor(
+  forward: Boolean,
+  page: EpubPagePreview
+) {
+  val currentFragment = navigator ?: return
+  val previousFragment = previousCarouselNavigator
+  val nextFragment = nextCarouselNavigator
+  val currentContainer = navigatorContainer
+  val previousContainer = previousCarouselContainer
+  val nextContainer = nextCarouselContainer
+  val promoted = (if (forward) nextFragment else previousFragment) ?: return
+
+  if (forward) {
+    navigatorContainer = nextContainer
+    previousCarouselContainer = currentContainer
+    nextCarouselContainer = previousContainer
+    previousCarouselNavigator = currentFragment
+    nextCarouselNavigator = previousFragment
+  } else {
+    navigatorContainer = previousContainer
+    previousCarouselContainer = nextContainer
+    nextCarouselContainer = currentContainer
+    previousCarouselNavigator = nextFragment
+    nextCarouselNavigator = currentFragment
+  }
+
+  setActiveNavigator(promoted)
+  visiblePageKey.value = PageKey(page.resourceHref, page.pageIndex, page.totalPages)
+  syncLiveCarouselNeighbors(pagePreviews.value, visiblePageKey.value)
+  val currentIndex = pagePreviews.value.indexOfFirst { it.matches(visiblePageKey.value) }
+  if (currentIndex >= 0) setLiveCarouselPosition(currentIndex.toFloat())
 }
 
 private fun EpubReaderActivity.scaleCarouselPage(view: View) {
@@ -366,9 +438,8 @@ private fun EpubReaderActivity.syncLiveCarouselNavigator(
   tag: String
 ): EpubNavigatorFragment? = when {
   target == null -> {
-    fragment?.let { supportFragmentManager.commitNow { remove(it) } }
     container.visibility = View.GONE
-    null
+    fragment
   }
 
   fragment != null -> {
@@ -382,6 +453,7 @@ private fun EpubReaderActivity.syncLiveCarouselNavigator(
     if (book == null) {
       null
     } else {
+      lateinit var created: EpubNavigatorFragment
       val factory = EpubNavigatorFactory(book.publication).createFragmentFactory(
         initialLocator = target,
         initialPreferences = navigatorPreferences(
@@ -391,16 +463,25 @@ private fun EpubReaderActivity.syncLiveCarouselNavigator(
         ),
         listener = linkListener,
         paginationListener = object : EpubNavigatorFragment.PaginationListener {
-          override fun onPageLoaded() = Unit
-          override fun onPageChanged(pageIndex: Int, totalPages: Int, locator: Locator) = Unit
+          override fun onPageLoaded() {
+            if (navigator === created) pageReady.value = true
+          }
+
+          override fun onPageChanged(pageIndex: Int, totalPages: Int, locator: Locator) {
+            if (navigator === created) visiblePageKey.value = pageKey(locator, pageIndex, totalPages)
+          }
         },
-        configuration = EpubNavigatorFragment.Configuration(shouldApplyInsetsPadding = false)
+        configuration = EpubNavigatorFragment.Configuration(
+          shouldApplyInsetsPadding = false,
+          selectionActionModeCallback = selectionActionModeCallback
+        )
       )
-      val created = factory.instantiate(classLoader, EpubNavigatorFragment::class.java.name)
+      created = factory.instantiate(classLoader, EpubNavigatorFragment::class.java.name)
         as EpubNavigatorFragment
       container.visibility = View.VISIBLE
       supportFragmentManager.commitNow { add(container.id, created, tag) }
       observeHighlightAnnotations(created)
+      observePageLoading(created)
       created
     }
   }
@@ -571,55 +652,127 @@ private fun EpubReaderActivity.setOverviewEdgeUnavailable(before: Boolean) {
   if (before) overviewHasPrevious.value = false else overviewHasNext.value = false
 }
 
-internal fun EpubReaderActivity.refreshCarouselPreviews(fragment: EpubNavigatorFragment) {
+internal fun EpubReaderActivity.refreshCarouselPreviews() {
   val key = visiblePageKey.value ?: return
-  val index = pagePreviews.value.indexOfFirst { it.matches(key) }
-  if (index in 1 until pagePreviews.value.lastIndex) return
+  if (!shouldRefreshCarouselPreviews(key)) return
   previewRefreshJob?.cancel()
   previewRefreshJob = lifecycleScope.launch {
     delay(EpubReaderActivity.PREVIEW_REFRESH_DEBOUNCE_MS)
     if (pageMode.value != EpubPageMode.CAROUSEL) return@launch
-    val currentKey = visiblePageKey.value ?: return@launch
-    val currentLocator = fragment.currentLocator.value
     val generation = ++previewGeneration
     previewJob?.cancel()
-    previewJob = lifecycleScope.launch {
-      previewMutex.withLock {
-        if (generation != previewGeneration || pageMode.value != EpubPageMode.CAROUSEL) {
-          return@withLock
-        }
-        val previewFragment = previewNavigator ?: return@withLock
-        if (!navigatePreviewTo(previewFragment, currentLocator, currentKey, generation)) return@withLock
-        val previous = discoverNeighborPages(
-          previewFragment,
-          EpubReaderActivity.PAGE_CAROUSEL_RADIUS,
-          generation,
-          forward = false
-        )
-        if (!navigatePreviewTo(previewFragment, currentLocator, currentKey, generation)) return@withLock
-        val next = discoverNeighborPages(
-          previewFragment,
-          EpubReaderActivity.PAGE_CAROUSEL_RADIUS,
-          generation,
-          forward = true
-        )
-        val current = EpubPagePreview(
-          currentLocator,
-          liveCarouselPageKey(currentKey),
-          currentKey.pageIndex,
-          currentKey.resourceHref,
-          currentKey.totalPages,
-          viewModel.chapterTitleFor(currentLocator)
-        )
-        val previews = previous.asReversed() + current + next
-        if (generation == previewGeneration && pageMode.value == EpubPageMode.CAROUSEL) {
-          pagePreviews.value = previews
-          updateCarouselPeeks(previews)
-        }
-      }
+    previewJob = lifecycleScope.launch { refreshCarouselPreviewWindow(generation) }
+  }
+}
+
+private fun EpubReaderActivity.shouldRefreshCarouselPreviews(key: PageKey): Boolean {
+  val pages = pagePreviews.value
+  val index = pages.indexOfFirst { it.matches(key) }
+  return index < 0 || index <= 1 || index >= pages.lastIndex - 1
+}
+
+private suspend fun EpubReaderActivity.refreshCarouselPreviewWindow(generation: Long) {
+  previewMutex.withLock {
+    if (!isCurrentCarouselPreviewGeneration(generation)) return@withLock
+    val key = visiblePageKey.value ?: return@withLock
+    val active = navigator ?: return@withLock
+    val preview = previewNavigator ?: ensurePreviewNavigator(active.currentLocator.value) ?: return@withLock
+    val window = pagePreviews.value
+    val index = window.indexOfFirst { it.matches(key) }
+    val updated = if (index < 0) {
+      recoverCarouselPreviewWindow(preview, active, key, generation)
+    } else {
+      extendCarouselPreviewWindow(preview, window, index, generation)
+    }
+    if (updated != null && isCurrentCarouselPreviewGeneration(generation)) {
+      pagePreviews.value = updated
+      updateCarouselPeeks(updated)
     }
   }
 }
+
+private suspend fun EpubReaderActivity.recoverCarouselPreviewWindow(
+  preview: EpubNavigatorFragment,
+  active: EpubNavigatorFragment,
+  key: PageKey,
+  generation: Long
+): List<EpubPagePreview>? {
+  val locator = active.currentLocator.value
+  if (navigatePreviewTo(preview, locator, key, generation)) {
+    val previous = discoverNeighborPages(
+      preview,
+      EpubReaderActivity.PAGE_CAROUSEL_RADIUS,
+      generation,
+      forward = false
+    )
+    if (navigatePreviewTo(preview, locator, key, generation)) {
+      val next = discoverNeighborPages(
+        preview,
+        EpubReaderActivity.PAGE_CAROUSEL_RADIUS,
+        generation,
+        forward = true
+      )
+      val current = EpubPagePreview(
+        locator,
+        liveCarouselPageKey(key),
+        key.pageIndex,
+        key.resourceHref,
+        key.totalPages,
+        viewModel.chapterTitleFor(locator)
+      )
+      return previous.asReversed() + current + next
+    }
+  }
+  return null
+}
+
+private suspend fun EpubReaderActivity.extendCarouselPreviewWindow(
+  preview: EpubNavigatorFragment,
+  initialWindow: List<EpubPagePreview>,
+  currentIndex: Int,
+  generation: Long
+): List<EpubPagePreview> {
+  var window = initialWindow
+  val needsPrevious = currentIndex <= 1
+  val needsNext = currentIndex >= initialWindow.lastIndex - 1
+  if (needsPrevious) window = extendCarouselPreviewEdge(preview, window, false, generation)
+  if (needsNext) window = extendCarouselPreviewEdge(preview, window, true, generation)
+  return window
+}
+
+private suspend fun EpubReaderActivity.extendCarouselPreviewEdge(
+  preview: EpubNavigatorFragment,
+  window: List<EpubPagePreview>,
+  forward: Boolean,
+  generation: Long
+): List<EpubPagePreview> {
+  val edge = if (forward) window.lastOrNull() else window.firstOrNull()
+  val neighboringPages = if (edge != null && isCurrentCarouselPreviewGeneration(generation)) {
+    discoverCarouselEdgeNeighbors(preview, edge, forward, generation)
+  } else {
+    emptyList()
+  }
+  return when {
+    neighboringPages.isEmpty() -> window
+    forward -> (window + neighboringPages).takeLast(MAX_CAROUSEL_WINDOW_PAGES)
+    else -> (neighboringPages + window).take(MAX_CAROUSEL_WINDOW_PAGES)
+  }
+}
+
+private suspend fun EpubReaderActivity.discoverCarouselEdgeNeighbors(
+  preview: EpubNavigatorFragment,
+  edge: EpubPagePreview,
+  forward: Boolean,
+  generation: Long
+): List<EpubPagePreview> {
+  val edgeKey = PageKey(edge.resourceHref, edge.pageIndex, edge.totalPages)
+  val canNavigate = !isBookBoundary(edgeKey, edge.locator, forward) &&
+    navigatePreviewTo(preview, edge.locator, edgeKey, generation)
+  return if (canNavigate) discoverNeighborPages(preview, 1, generation, forward) else emptyList()
+}
+
+private fun EpubReaderActivity.isCurrentCarouselPreviewGeneration(generation: Long) =
+  generation == previewGeneration && pageMode.value == EpubPageMode.CAROUSEL
 
 internal fun EpubReaderActivity.invalidatePreviewCache() {
   if (navigator == null) return

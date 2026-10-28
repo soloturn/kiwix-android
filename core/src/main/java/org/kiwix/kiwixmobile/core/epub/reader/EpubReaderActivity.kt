@@ -111,6 +111,7 @@ class EpubReaderActivity : BaseActivity() {
   internal val carouselTapDetector = DoubleTapDetector(carouselDoubleTapTimeout)
   internal var carouselTapJob: Job? = null
   internal var navigator: EpubNavigatorFragment? = null
+  internal var activeNavigatorPositionJob: Job? = null
   internal var previewNavigator: EpubNavigatorFragment? = null
   internal var previousCarouselNavigator: EpubNavigatorFragment? = null
   internal var nextCarouselNavigator: EpubNavigatorFragment? = null
@@ -334,6 +335,7 @@ class EpubReaderActivity : BaseActivity() {
     previewJob?.cancel()
     previewRefreshJob?.cancel()
     previewInvalidationJob?.cancel()
+    activeNavigatorPositionJob?.cancel()
     navigator = null
     supportFragmentManager.findFragmentByTag(PREVIEW_NAVIGATOR_TAG)?.let { fragment ->
       supportFragmentManager.beginTransaction()
@@ -504,10 +506,7 @@ class EpubReaderActivity : BaseActivity() {
       navigator?.go(target)
       viewModel.setChromeVisible(true)
     },
-    onSelectCarouselPage = { target ->
-      viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
-      navigator?.go(target)
-    },
+    onSelectCarouselPage = ::selectCarouselPage,
     onCarouselPositionChanged = ::setLiveCarouselPosition,
     onNoteSelection = viewModel::addNote
   )
@@ -519,6 +518,7 @@ class EpubReaderActivity : BaseActivity() {
       darkTheme.value,
       EpubPageMode.SINGLE_PAGE
     )
+    lateinit var mainFragment: EpubNavigatorFragment
     val mainFactory = EpubNavigatorFactory(book.publication).createFragmentFactory(
       initialLocator = initialLocator,
       initialPreferences = initialPreferences,
@@ -529,7 +529,7 @@ class EpubReaderActivity : BaseActivity() {
         }
 
         override fun onPageChanged(pageIndex: Int, totalPages: Int, locator: Locator) {
-          visiblePageKey.value = pageKey(locator, pageIndex, totalPages)
+          if (navigator === mainFragment) visiblePageKey.value = pageKey(locator, pageIndex, totalPages)
         }
       },
       // The container's padding already keeps the book clear of the cutout.
@@ -539,29 +539,22 @@ class EpubReaderActivity : BaseActivity() {
       )
     )
     supportFragmentManager.fragmentFactory = mainFactory
-    val mainFragment = mainFactory.instantiate(classLoader, EpubNavigatorFragment::class.java.name)
+    mainFragment = mainFactory.instantiate(classLoader, EpubNavigatorFragment::class.java.name)
       as EpubNavigatorFragment
     supportFragmentManager.commitNow {
       add(navigatorContainer.id, mainFragment, NAVIGATOR_TAG)
     }
-    navigator = mainFragment
+    setActiveNavigator(mainFragment)
     observeHighlightAnnotations(mainFragment, invalidateCacheOnChange = true)
     // The loading screen covers the book; a failed load must not leave it there.
     observePageLoading(mainFragment)
-    lifecycleScope.launch {
-      mainFragment.currentLocator
-        .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
-        .collect { locator ->
-          viewModel.onLocatorChanged(locator)
-        }
-    }
     lifecycleScope.launch {
       visiblePageKey
         .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
         .collect {
           if (pageMode.value == EpubPageMode.CAROUSEL) {
             syncLiveCarouselNeighbors(pagePreviews.value, it)
-            refreshCarouselPreviews(mainFragment)
+            refreshCarouselPreviews()
           }
         }
     }
@@ -654,7 +647,7 @@ class EpubReaderActivity : BaseActivity() {
     }
   }
 
-  private val selectionActionModeCallback = object : ActionMode.Callback {
+  internal val selectionActionModeCallback = object : ActionMode.Callback {
     override fun onCreateActionMode(mode: ActionMode, menu: android.view.Menu): Boolean {
       selectionActionMode = mode
       selectionMenuOpening = false
