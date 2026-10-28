@@ -111,8 +111,8 @@ import org.kiwix.kiwixmobile.core.utils.ComposeDimens.DOWNLOADING_LIBRARY_PROGRE
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.DOWNLOADING_LIBRARY_PROGRESS_CARD_VIEW_DEFAULT_MARGIN
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.DOWNLOADING_LIBRARY_PROGRESS_CARD_VIEW_WIDTH
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.EIGHT_DP
-import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FORTY_EIGHT_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FIVE_DP
+import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FORTY_EIGHT_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FOUR_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.ONE_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.SIXTEEN_DP

@@ -165,7 +165,7 @@ fun LocalLibraryRoute(
                 onlineVm.onSearchQueryChanged(book.title)
                 onlineVm.openSearchView()
                 onlineVm.queueHomeBookDownload(book)
-                navController.navigate(KiwixDestination.Downloads.route)
+                navController.navigate(KiwixDestination.Explore.route)
               }
             }
           },
