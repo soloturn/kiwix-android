@@ -57,6 +57,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -99,9 +100,9 @@ class EpubReaderActivity : BaseActivity() {
   internal val pagePreviews = MutableStateFlow<List<EpubPagePreview>>(emptyList())
   internal val overviewPages = MutableStateFlow<List<EpubPagePreview>>(emptyList())
   internal val previewCache by lazy { EpubPreviewCache(cacheDir) }
-  internal val overviewPagesLoading = MutableStateFlow(false)
-  internal val overviewHasPrevious = MutableStateFlow(true)
-  internal val overviewHasNext = MutableStateFlow(true)
+  internal val overviewState = OverviewState()
+  internal val overviewViewport = MutableStateFlow(OverviewViewport())
+  internal val overviewCaptured = MutableSharedFlow<String>(extraBufferCapacity = OVERVIEW_CAPTURE_BUFFER)
   internal val visiblePageKey = MutableStateFlow<PageKey?>(null)
   internal val previewPageKey = MutableStateFlow<PageKey?>(null)
   internal val resourcePageCounts = HashMap<String, Int>()
@@ -123,7 +124,7 @@ class EpubReaderActivity : BaseActivity() {
   internal var previewPresentation: Presentation? = null
   internal var previewJob: Job? = null
   internal var previewRefreshJob: Job? = null
-  internal var overviewLoadJob: Job? = null
+  internal var overviewWorkerJob: Job? = null
   internal var previewInvalidationJob: Job? = null
   internal var previewGeneration = 0L
   private var previewViewport = 0 to 0
@@ -301,7 +302,7 @@ class EpubReaderActivity : BaseActivity() {
     previewGeneration++
     previewJob?.cancel()
     previewRefreshJob?.cancel()
-    overviewLoadJob?.cancel()
+    overviewWorkerJob?.cancel()
     previewInvalidationJob?.cancel()
     previewNavigator?.let { fragment ->
       supportFragmentManager.commitNow { remove(fragment) }
@@ -320,7 +321,6 @@ class EpubReaderActivity : BaseActivity() {
     pageModesAvailable.value = false
     pageMode.value = EpubPageMode.SINGLE_PAGE
     previewPageKey.value = null
-    overviewPagesLoading.value = false
     if (::navigatorContainer.isInitialized) setNavigatorSize(carousel = false)
     pagePreviews.value = emptyList()
     overviewPages.value = emptyList()
@@ -430,10 +430,8 @@ class EpubReaderActivity : BaseActivity() {
       pageMode = pageMode.collectAsState().value,
       pageModesAvailable = pageModesAvailable.collectAsState().value,
       overviewPages = overviewPages.collectAsState().value,
-      overviewPagesLoading = overviewPagesLoading.collectAsState().value,
-      overviewHasPrevious = overviewHasPrevious.collectAsState().value,
-      overviewHasNext = overviewHasNext.collectAsState().value,
       loadPreviewBitmap = { loadPreviewBitmap(it) },
+      peekPreviewBitmap = { previewCache.peek(it.cacheKey) },
       annotations = viewModel.annotations.collectAsState().value,
       selectionLocator = selectionMenuLocator.collectAsState().value,
       chromeVisible = viewModel.chromeVisible.collectAsState().value,
@@ -489,7 +487,7 @@ class EpubReaderActivity : BaseActivity() {
     },
     onCopyAnnotation = ::copyAnnotation,
     onPageModeSelected = ::selectPageMode,
-    onLoadMoreOverviewPages = ::loadMoreOverviewPages,
+    onOverviewViewportChanged = ::onOverviewViewportChanged,
     onSelectOverviewPage = { target ->
       viewModel.rememberPreviousPage(navigator?.currentLocator?.value ?: locator)
       navigator?.go(target)
@@ -764,7 +762,6 @@ class EpubReaderActivity : BaseActivity() {
     internal const val PREVIEW_FRAME_TIMEOUT_MS = 2_000L
     private const val PREVIEW_PROBE_BITMAP_SIZE = 8
     internal const val PAGE_CAROUSEL_RADIUS = 1
-    internal const val PAGE_OVERVIEW_PAGE_COUNT = 9
     internal const val CAROUSEL_PAGE_WIDTH = 0.82f
     internal const val CAROUSEL_PAGE_HEIGHT = 0.76f
     internal const val LIVE_CAROUSEL_PAGE_WIDTH = 0.77f
@@ -772,7 +769,8 @@ class EpubReaderActivity : BaseActivity() {
     internal const val CAROUSEL_PEEK_HEIGHT = 0.72f
     internal const val CAROUSEL_PEEK_SCALE = 0.72f
     internal const val PAGE_PEEK_WIDTH = 0.1f
-    internal const val OVERVIEW_LOAD_BATCH = 9
+    private const val OVERVIEW_CAPTURE_BUFFER = 64
+    internal const val OVERVIEW_SETTLE_TIMEOUT_MS = 400L
     internal const val PREVIEW_REFRESH_DEBOUNCE_MS = 250L
     internal const val PREVIEW_INVALIDATION_DEBOUNCE_MS = 150L
     internal const val PREVIOUS_PAGE_OFFSET = -1

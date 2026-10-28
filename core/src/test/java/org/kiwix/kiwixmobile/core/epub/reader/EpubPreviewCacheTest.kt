@@ -44,10 +44,50 @@ class EpubPreviewCacheTest {
       EpubPreviewCache(root).put("book/page/1", original)
 
       assertTrue(original.isRecycled)
-      val files = File(root, "epub-previews-v1").listFiles().orEmpty()
+      val files = File(root, "epub-previews-v2").listFiles().orEmpty()
       assertEquals(1, files.size)
       assertEquals("webp", files.single().extension)
-      assertEquals(Bitmap.Config.RGB_565, EpubPreviewCache(root).get("book/page/1")?.config)
+      val reopened = EpubPreviewCache(root)
+      assertTrue(reopened.contains("book/page/1"))
+      assertEquals(null, reopened.peek("book/page/1"))
+      assertEquals(Bitmap.Config.RGB_565, reopened.get("book/page/1")?.config)
+      assertTrue(reopened.peek("book/page/1") != null)
+    } finally {
+      root.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `page counts are stored per layout scope and survive a new cache instance`() {
+    val root = File(
+      ApplicationProvider.getApplicationContext<android.content.Context>().cacheDir,
+      "epub-preview-cache-counts-${System.nanoTime()}"
+    )
+
+    try {
+      EpubPreviewCache(root).savePageCounts("book|large", mapOf("c1.xhtml" to 12, "c2.xhtml" to 7))
+
+      val reopened = EpubPreviewCache(root)
+      assertEquals(mapOf("c1.xhtml" to 12, "c2.xhtml" to 7), reopened.loadPageCounts("book|large"))
+      assertEquals(emptyMap<String, Int>(), reopened.loadPageCounts("book|small"))
+    } finally {
+      root.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `thumbnails of the first cache version are deleted`() {
+    val root = File(
+      ApplicationProvider.getApplicationContext<android.content.Context>().cacheDir,
+      "epub-preview-cache-old-${System.nanoTime()}"
+    )
+    val old = File(root, "epub-previews-v1").apply { mkdirs() }
+    File(old, "stale.webp").writeText("x")
+
+    try {
+      EpubPreviewCache(root)
+
+      assertTrue(!old.exists())
     } finally {
       root.deleteRecursively()
     }

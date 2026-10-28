@@ -57,6 +57,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -133,6 +134,7 @@ import org.kiwix.kiwixmobile.core.ui.theme.KiwixTheme
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.EIGHT_DP
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.SIXTEEN_DP
 import org.readium.r2.shared.publication.Locator
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 const val EPUB_READER_LOADING_TESTING_TAG = "epubReaderLoadingTestingTag"
@@ -166,7 +168,7 @@ const val EPUB_READER_PAGE_THUMBNAIL_TESTING_TAG = "epubReaderPageThumbnailTesti
 private const val PERCENT = 100
 private const val TRACK_ALPHA = 0.24f
 private const val PAGE_OVERVIEW_GRID_COLUMNS = 3
-private const val PAGE_OVERVIEW_LOAD_THRESHOLD = PAGE_OVERVIEW_GRID_COLUMNS * 2
+private const val PAGE_OVERVIEW_PREFETCH_ITEMS = PAGE_OVERVIEW_GRID_COLUMNS * 2
 private const val SEEK_SETTLE_MS = 800L
 private const val ANNOTATION_CONTEXT_CHARS = 48
 private val ANNOTATION_DIALOG_MAX_HEIGHT = 700.dp
@@ -232,7 +234,7 @@ data class EpubReaderActions(
   val onUpdateAnnotationNote: (EpubAnnotation, String) -> Unit = { _, _ -> },
   val onCopyAnnotation: (EpubAnnotation) -> Unit = {},
   val onPageModeSelected: (EpubPageMode) -> Unit = {},
-  val onLoadMoreOverviewPages: (Boolean) -> Unit = {},
+  val onOverviewViewportChanged: (List<EpubPagePreview>, Boolean) -> Unit = { _, _ -> },
   val onSelectOverviewPage: (Locator) -> Unit = {},
   val onSelectCarouselPage: (Locator) -> Unit = {},
   val onCarouselPositionChanged: (String?, Float) -> Unit = { _, _ -> },
@@ -295,10 +297,8 @@ fun EpubReaderScreen(
   pageModesAvailable: Boolean = true,
   pagePreviews: List<EpubPagePreview> = emptyList(),
   overviewPages: List<EpubPagePreview> = emptyList(),
-  overviewPagesLoading: Boolean = false,
-  overviewHasPrevious: Boolean = false,
-  overviewHasNext: Boolean = false,
   loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap? = { null },
+  peekPreviewBitmap: (EpubPagePreview) -> Bitmap? = { null },
   annotations: List<EpubAnnotation> = emptyList(),
   selectionLocator: Locator? = null,
   content: (@Composable () -> Unit)? = null
@@ -337,19 +337,18 @@ fun EpubReaderScreen(
     pageMode = shownPageMode,
     pagePreviews = pagePreviews,
     carouselLayer = content,
-    loadPreviewBitmap = loadPreviewBitmap,
     currentPageBookmarked = currentPageBookmarked,
     bookmarkedLocators = bookmarkedLocators,
     showBookmark = showBookmark,
     overlay = overlay,
     chrome = chromeState,
     overviewPages = overviewPages,
-    overview = PageOverviewState(overviewPagesLoading, overviewHasPrevious, overviewHasNext),
     overviewActions = PageOverviewActions(
-      actions.onLoadMoreOverviewPages,
+      actions.onOverviewViewportChanged,
       actions.onPageModeSelected,
       actions.onSelectOverviewPage,
-      loadPreviewBitmap
+      loadPreviewBitmap,
+      peekPreviewBitmap
     )
   )
   KiwixTheme {
@@ -378,14 +377,12 @@ private data class EpubReaderMainLayoutState(
   val pageMode: EpubPageMode,
   val pagePreviews: List<EpubPagePreview>,
   val carouselLayer: (@Composable () -> Unit)?,
-  val loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?,
   val currentPageBookmarked: Boolean,
   val bookmarkedLocators: List<Locator>,
   val showBookmark: Boolean,
   val overlay: EpubOverlayColors,
   val chrome: ReaderChromeState,
   val overviewPages: List<EpubPagePreview>,
-  val overview: PageOverviewState,
   val overviewActions: PageOverviewActions
 )
 
@@ -448,7 +445,7 @@ private fun CarouselPageLayer(state: EpubReaderMainLayoutState, actions: EpubRea
 @Composable
 private fun PageOverviewLayer(state: EpubReaderMainLayoutState) {
   if (state.pageMode != EpubPageMode.OVERVIEW) return
-  PageOverviewGrid(state.overviewPages, state.overview, state.overviewActions)
+  PageOverviewGrid(state.overviewPages, state.reading.locator, state.overviewActions)
 }
 
 private fun shouldShowBookmarkMargin(
@@ -1081,7 +1078,7 @@ private fun ReaderPanels(
 @Composable
 private fun PageOverviewGrid(
   pages: List<EpubPagePreview>,
-  state: PageOverviewState,
+  currentLocator: Locator?,
   actions: PageOverviewActions
 ) {
   Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -1094,7 +1091,7 @@ private fun PageOverviewGrid(
       } else {
         PageOverviewGridContent(
           pages,
-          state,
+          currentLocator,
           actions,
           Modifier.weight(1f)
         )
@@ -1117,15 +1114,39 @@ private fun PageOverviewHeader(onModeSelected: (EpubPageMode) -> Unit) {
   }
 }
 
+/** A grid row: a chapter heading across the grid, or one page. */
+private sealed interface OverviewCell {
+  val key: String
+
+  data class Chapter(val title: String, val href: String) : OverviewCell {
+    override val key = "chapter-$href-$title"
+  }
+
+  data class Page(val preview: EpubPagePreview, val index: Int) : OverviewCell {
+    override val key = "page-${preview.resourceHref}-${preview.pageIndex}"
+  }
+}
+
+private fun overviewCells(pages: List<EpubPagePreview>): List<OverviewCell> = buildList {
+  pages.forEachIndexed { index, preview ->
+    if (isNewPreviewChapter(pages, index, preview)) {
+      add(OverviewCell.Chapter(preview.chapterTitle, preview.resourceHref))
+    }
+    add(OverviewCell.Page(preview, index))
+  }
+}
+
 @Composable
 private fun PageOverviewGridContent(
   pages: List<EpubPagePreview>,
-  state: PageOverviewState,
+  currentLocator: Locator?,
   actions: PageOverviewActions,
   modifier: Modifier
 ) {
+  val cells = remember(pages) { overviewCells(pages) }
   val gridState = rememberLazyGridState()
-  PageOverviewLoadMoreEffect(gridState, pages.size, state, actions.onLoadMore)
+  PageOverviewFocusEffect(gridState, cells, currentLocator)
+  PageOverviewViewportEffect(gridState, cells, actions.onViewportChanged)
   LazyVerticalGrid(
     columns = GridCells.Fixed(PAGE_OVERVIEW_GRID_COLUMNS),
     state = gridState,
@@ -1133,50 +1154,38 @@ private fun PageOverviewGridContent(
     horizontalArrangement = Arrangement.spacedBy(EIGHT_DP),
     verticalArrangement = Arrangement.spacedBy(EIGHT_DP)
   ) {
-    pages.forEachIndexed { index, preview ->
-      if (isNewPreviewChapter(pages, index, preview)) {
-        item(
-          key = "chapter-${preview.resourceHref}-${preview.chapterTitle}",
-          span = { GridItemSpan(maxLineSpan) }
-        ) {
-          Text(
-            preview.chapterTitle,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.fillMaxWidth().padding(top = EIGHT_DP, bottom = 4.dp)
-          )
-        }
-      }
-      item(key = "page-${preview.resourceHref}-${preview.pageIndex}") {
-        PagePreviewCard(
-          preview,
-          index,
-          actions.loadPreviewBitmap,
+    items(
+      cells,
+      key = { it.key },
+      span = { GridItemSpan(if (it is OverviewCell.Chapter) maxLineSpan else 1) }
+    ) { cell ->
+      when (cell) {
+        is OverviewCell.Chapter -> Text(
+          cell.title,
+          style = MaterialTheme.typography.titleMedium,
+          modifier = Modifier.fillMaxWidth().padding(top = EIGHT_DP, bottom = 4.dp)
+        )
+
+        is OverviewCell.Page -> PagePreviewCard(
+          cell.preview,
+          cell.index,
+          actions,
           Modifier.fillMaxWidth().height(256.dp)
         ) {
-          actions.onSelect(preview.locator)
+          actions.onSelect(cell.preview.locator)
           actions.onModeSelected(EpubPageMode.CAROUSEL)
         }
-      }
-    }
-    if (state.loading) {
-      item(span = { GridItemSpan(maxLineSpan) }) {
-        CircularProgressIndicator(Modifier.padding(EIGHT_DP).size(24.dp))
       }
     }
   }
 }
 
-private data class PageOverviewState(
-  val loading: Boolean,
-  val hasPrevious: Boolean,
-  val hasNext: Boolean
-)
-
 private data class PageOverviewActions(
-  val onLoadMore: (Boolean) -> Unit,
+  val onViewportChanged: (List<EpubPagePreview>, Boolean) -> Unit,
   val onModeSelected: (EpubPageMode) -> Unit,
   val onSelect: (Locator) -> Unit,
-  val loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?
+  val loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?,
+  val peekPreviewBitmap: (EpubPagePreview) -> Bitmap?
 )
 
 private fun isNewPreviewChapter(
@@ -1186,66 +1195,73 @@ private fun isNewPreviewChapter(
 ) = preview.chapterTitle.isNotBlank() &&
   (index == 0 || pages[index - 1].chapterTitle != preview.chapterTitle)
 
+/** The page of [pages] that [locator] is on, or -1 when its chapter is not in the list. */
+internal fun currentOverviewPageIndex(pages: List<EpubPagePreview>, locator: Locator): Int {
+  val href = locator.href.toString().substringBefore('#')
+  val progression = locator.locations.progression ?: 0.0
+  return pages.withIndex()
+    .filter { it.value.resourceHref == href }
+    .minByOrNull { abs((it.value.locator.locations.progression ?: 0.0) - progression) }
+    ?.index ?: -1
+}
+
+/** Opens the grid at the page being read, and again once that chapter's pages become known. */
 @Composable
-private fun PageOverviewLoadMoreEffect(
+private fun PageOverviewFocusEffect(
   gridState: LazyGridState,
-  pageCount: Int,
-  state: PageOverviewState,
-  onLoadMore: (Boolean) -> Unit
+  cells: List<OverviewCell>,
+  currentLocator: Locator?
 ) {
-  var requestedLoad by remember { mutableStateOf<Pair<Boolean, Int>?>(null) }
-  val currentOnLoadMore by rememberUpdatedState(onLoadMore)
-  val currentLoading by rememberUpdatedState(state.loading)
-  val currentHasPrevious by rememberUpdatedState(state.hasPrevious)
-  val currentHasNext by rememberUpdatedState(state.hasNext)
-  val currentPageCount by rememberUpdatedState(pageCount)
-  LaunchedEffect(gridState) {
-    snapshotFlow {
-      overviewLoadRequest(
-        gridState.firstVisibleItemIndex,
-        gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0,
-        currentPageCount,
-        currentLoading,
-        currentHasPrevious,
-        currentHasNext
-      )
-    }.collect { request ->
-      if (request != null && requestedLoad != request) {
-        requestedLoad = request
-        currentOnLoadMore(request.first)
-      }
+  var focused by remember { mutableStateOf(false) }
+  LaunchedEffect(cells, currentLocator) {
+    val pages = cells.filterIsInstance<OverviewCell.Page>()
+    val pageIndex = currentLocator?.let { currentOverviewPageIndex(pages.map { it.preview }, it) } ?: -1
+    if (!focused && pageIndex >= 0) {
+      gridState.scrollToItem(cells.indexOf(pages[pageIndex]))
+      // A chapter that is not measured yet is one placeholder; wait for its real pages.
+      focused = pages[pageIndex].preview.totalPages > 0
     }
   }
 }
 
-private fun overviewLoadRequest(
-  firstVisible: Int,
-  lastVisible: Int,
-  pageCount: Int,
-  loading: Boolean,
-  hasPrevious: Boolean,
-  hasNext: Boolean
-): Pair<Boolean, Int>? = if (loading) {
-  null
-} else {
-  val direction = when {
-    firstVisible <= PAGE_OVERVIEW_LOAD_THRESHOLD && hasPrevious -> true
-    lastVisible >= pageCount - PAGE_OVERVIEW_LOAD_THRESHOLD && hasNext -> false
-    else -> null
+/**
+ * Reports the pages on screen, with a little look-ahead, and whether the grid is moving, so that
+ * thumbnails are only produced for what is shown and never while scrolling.
+ */
+@Composable
+private fun PageOverviewViewportEffect(
+  gridState: LazyGridState,
+  cells: List<OverviewCell>,
+  onViewportChanged: (List<EpubPagePreview>, Boolean) -> Unit
+) {
+  val currentOnViewportChanged by rememberUpdatedState(onViewportChanged)
+  LaunchedEffect(gridState, cells) {
+    snapshotFlow {
+      val visible = gridState.layoutInfo.visibleItemsInfo
+      Triple(visible.firstOrNull()?.index ?: 0, visible.lastOrNull()?.index ?: -1, gridState.isScrollInProgress)
+    }.distinctUntilChanged().collect { (first, last, scrolling) ->
+      val end = (last + PAGE_OVERVIEW_PREFETCH_ITEMS + 1).coerceAtMost(cells.size)
+      val shown = if (last < 0) {
+        emptyList()
+      } else {
+        cells.subList(first.coerceAtLeast(0), end).filterIsInstance<OverviewCell.Page>().map { it.preview }
+      }
+      currentOnViewportChanged(shown, scrolling)
+    }
   }
-  direction?.let { it to pageCount }
 }
 
 @Composable
 private fun PagePreviewCard(
   preview: EpubPagePreview,
   index: Int,
-  loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?,
+  actions: PageOverviewActions,
   modifier: Modifier,
   onClick: () -> Unit
 ) {
-  val bitmap by produceState<Bitmap?>(null, preview.cacheKey) {
-    value = loadPreviewBitmap(preview)
+  // A thumbnail already in memory shows on the first frame instead of after a coroutine hop.
+  val bitmap by produceState(actions.peekPreviewBitmap(preview), preview.cacheKey) {
+    if (value == null) value = actions.loadPreviewBitmap(preview)
   }
   Surface(
     modifier = modifier.clickable(onClick = onClick)
@@ -1266,9 +1282,15 @@ private fun PagePreviewCard(
         Box(Modifier.weight(1f).fillMaxWidth())
       }
       Text(
-        stringResource(R.string.epub_page_number, preview.pageIndex + 1),
+        if (preview.totalPages > 0) {
+          stringResource(R.string.epub_page_number, preview.pageIndex + 1)
+        } else {
+          preview.chapterTitle
+        },
         style = MaterialTheme.typography.titleSmall,
-        modifier = Modifier.padding(bottom = EIGHT_DP)
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(bottom = EIGHT_DP, start = EIGHT_DP, end = EIGHT_DP)
       )
     }
   }

@@ -98,8 +98,6 @@ class EpubReaderScreenTest {
     pageModesAvailable: Boolean = true,
     pagePreviews: List<EpubPagePreview> = emptyList(),
     overviewPages: List<EpubPagePreview> = emptyList(),
-    overviewHasPrevious: Boolean = false,
-    overviewHasNext: Boolean = false,
     panels: EpubReaderPanels = EpubReaderPanels(),
     annotations: List<EpubAnnotation> = emptyList(),
     selectionLocator: Locator? = null
@@ -117,8 +115,6 @@ class EpubReaderScreenTest {
       pageModesAvailable = pageModesAvailable,
       pagePreviews = pagePreviews,
       overviewPages = overviewPages,
-      overviewHasPrevious = overviewHasPrevious,
-      overviewHasNext = overviewHasNext,
       panels = panels,
       annotations = annotations,
       selectionLocator = selectionLocator
@@ -168,23 +164,13 @@ class EpubReaderScreenTest {
   fun `page overview scrolls through the book and selection opens carousel`() {
     var selected: Locator? = null
     var mode: EpubPageMode? = null
-    var loadedLaterPages = false
-    val pages = (1..30).map { index ->
-      EpubPagePreview(
-        locator.copyWithLocations(totalProgression = index / 31.0),
-        "overview-page-$index",
-        pageIndex = index - 1,
-        chapterTitle = if (index < 11) "Chapter 1" else "Chapter 2"
-      )
-    }
+    val pages = overviewTestPages()
     show(
       pageMode = EpubPageMode.OVERVIEW,
       overviewPages = pages,
-      overviewHasNext = true,
       actions = EpubReaderActions(
         onSelectOverviewPage = { selected = it },
-        onPageModeSelected = { mode = it },
-        onLoadMoreOverviewPages = { before -> loadedLaterPages = !before }
+        onPageModeSelected = { mode = it }
       )
     )
 
@@ -198,41 +184,63 @@ class EpubReaderScreenTest {
 
     assertEquals(pages[29].locator, selected)
     assertEquals(EpubPageMode.CAROUSEL, mode)
-    assertTrue(loadedLaterPages)
   }
 
   @Test
-  fun `overview loads the next batch after page count and loading state change`() {
+  fun `overview reports the pages on screen so thumbnails are made only for them`() {
+    val reports = mutableListOf<Pair<List<EpubPagePreview>, Boolean>>()
     val pages = (0..29).map { index ->
-      EpubPagePreview(locator, "overview-page-$index", pageIndex = index)
+      EpubPagePreview(locator, "overview-page-$index", pageIndex = index, totalPages = 30)
     }
-    val displayedPages = mutableStateOf(pages.take(3))
-    val loading = mutableStateOf(true)
-    val requests = mutableListOf<Boolean>()
-    composeTestRule.setContent {
-      EpubReaderScreen(
-        ready,
-        EpubReaderSettings(),
-        EpubReadingState(locator = locator),
-        true,
-        EpubReaderActions(onLoadMoreOverviewPages = { requests += it }),
-        pageMode = EpubPageMode.OVERVIEW,
-        overviewPages = displayedPages.value,
-        overviewPagesLoading = loading.value,
-        overviewHasPrevious = false,
-        overviewHasNext = true
+    show(
+      pageMode = EpubPageMode.OVERVIEW,
+      overviewPages = pages,
+      actions = EpubReaderActions(onOverviewViewportChanged = { shown, scrolling -> reports += shown to scrolling })
+    )
+
+    composeTestRule.runOnIdle {
+      val (shown, scrolling) = reports.last()
+      assertEquals(pages.first(), shown.first())
+      assertTrue(shown.size < pages.size)
+      assertTrue(!scrolling)
+    }
+    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).performScrollToIndex(29)
+    composeTestRule.runOnIdle { assertTrue(reports.last().first.contains(pages[29])) }
+  }
+
+  @Test
+  fun `an unmeasured chapter shows its title until its pages are known`() {
+    val chapter = EpubPagePreview(locator, "overview:unmeasured:c1", pageIndex = 0, totalPages = 0, chapterTitle = "Chapter 1")
+    show(pageMode = EpubPageMode.OVERVIEW, overviewPages = listOf(chapter))
+
+    composeTestRule.onAllNodesWithText("Chapter 1").assertCountEquals(2)
+    composeTestRule.onAllNodesWithText("Page 1").assertCountEquals(0)
+  }
+
+  @Test
+  fun `the current page is found by its progression within its chapter`() {
+    val pages = (0 until 4).map { index ->
+      EpubPagePreview(
+        locator.copyWithLocations(progression = index / 4.0),
+        "p$index",
+        pageIndex = index,
+        totalPages = 4
       )
     }
-    composeTestRule.runOnIdle { assertTrue(requests.isEmpty()) }
-    composeTestRule.runOnIdle { loading.value = false }
-    composeTestRule.runOnIdle { assertEquals(listOf(false), requests) }
-    composeTestRule.runOnIdle {
-      loading.value = true
-      displayedPages.value = pages
-    }
-    composeTestRule.runOnIdle { loading.value = false }
-    composeTestRule.onNodeWithTag(EPUB_READER_PAGE_OVERVIEW_TESTING_TAG).performScrollToIndex(29)
-    composeTestRule.runOnIdle { assertEquals(listOf(false, false), requests) }
+
+    assertEquals(2, currentOverviewPageIndex(pages, locator.copyWithLocations(progression = 0.5)))
+    assertEquals(3, currentOverviewPageIndex(pages, locator.copyWithLocations(progression = 0.9)))
+    assertEquals(-1, currentOverviewPageIndex(emptyList(), locator))
+  }
+
+  private fun overviewTestPages() = (1..30).map { index ->
+    EpubPagePreview(
+      locator.copyWithLocations(totalProgression = index / 31.0),
+      "overview-page-$index",
+      pageIndex = index - 1,
+      totalPages = 30,
+      chapterTitle = if (index < 11) "Chapter 1" else "Chapter 2"
+    )
   }
 
   @Test
@@ -515,8 +523,6 @@ class EpubReaderReaderControlsTest {
     pageModesAvailable: Boolean = true,
     pagePreviews: List<EpubPagePreview> = emptyList(),
     overviewPages: List<EpubPagePreview> = emptyList(),
-    overviewHasPrevious: Boolean = false,
-    overviewHasNext: Boolean = false,
     panels: EpubReaderPanels = EpubReaderPanels(),
     annotations: List<EpubAnnotation> = emptyList(),
     selectionLocator: Locator? = null
@@ -534,8 +540,6 @@ class EpubReaderReaderControlsTest {
       pageModesAvailable = pageModesAvailable,
       pagePreviews = pagePreviews,
       overviewPages = overviewPages,
-      overviewHasPrevious = overviewHasPrevious,
-      overviewHasNext = overviewHasNext,
       panels = panels,
       annotations = annotations,
       selectionLocator = selectionLocator

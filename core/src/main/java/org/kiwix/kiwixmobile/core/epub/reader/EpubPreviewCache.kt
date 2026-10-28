@@ -21,18 +21,25 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
 import android.util.LruCache
+import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
 
 /** Bounded decoded and encoded storage for EPUB page thumbnails. */
 internal class EpubPreviewCache(cacheDir: File) {
-  private val directory = File(cacheDir, "epub-previews-v1")
+  private val directory = File(cacheDir, "epub-previews-v2")
   private val memoryCache = object : LruCache<String, Bitmap>(MAX_MEMORY_BYTES) {
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
   }
+
+  // Guards the disk byte count only; decoding and encoding never run under it, so reading a
+  // thumbnail doesn't wait for another one to be written.
+  private val diskLock = Any()
   private var diskCacheBytes = 0L
 
   init {
+    // Keys of the first version changed on every launch, so its files can never be hit again.
+    File(cacheDir, "epub-previews-v1").deleteRecursively()
     directory.listFiles()?.filter { it.name.endsWith(TEMP_SUFFIX) }?.forEach(File::delete)
     diskCacheBytes = directory.listFiles()
       ?.filter { it.isFile && isImageFile(it) }
@@ -40,7 +47,35 @@ internal class EpubPreviewCache(cacheDir: File) {
     trimDiskCache()
   }
 
-  @Synchronized
+  /** Page counts per chapter that were measured under [scope], or none if never stored. */
+  fun loadPageCounts(scope: String): Map<String, Int> {
+    val file = countsFile(scope)
+    return if (file.isFile) {
+      runCatching {
+        val json = JSONObject(file.readText())
+        json.keys().asSequence().associateWith(json::getInt)
+      }.getOrDefault(emptyMap())
+    } else {
+      emptyMap()
+    }
+  }
+
+  fun savePageCounts(scope: String, counts: Map<String, Int>) {
+    if (counts.isEmpty() || (!directory.exists() && !directory.mkdirs())) return
+    val target = countsFile(scope)
+    val temporary = File(directory, "${target.name}-$TEMP_SUFFIX")
+    val written = runCatching { temporary.writeText(JSONObject(counts).toString()) }.isSuccess
+    if (!written || !temporary.renameTo(target)) temporary.delete()
+  }
+
+  private fun countsFile(scope: String) = File(directory, "counts-${scope.sha256()}$COUNTS_SUFFIX")
+
+  /** The decoded thumbnail when it is already in memory, without touching the disk. */
+  fun peek(key: String): Bitmap? = memoryCache.get(key)
+
+  /** Whether a thumbnail is stored, in memory or on disk, without decoding it. */
+  fun contains(key: String): Boolean = memoryCache.get(key) != null || fileFor(key).isFile
+
   fun get(key: String): Bitmap? {
     val bitmap = memoryCache.get(key) ?: decodeFromDisk(key)
     if (bitmap != null) {
@@ -60,7 +95,7 @@ internal class EpubPreviewCache(cacheDir: File) {
     } else {
       null
     }
-    if (decoded == null && file.delete()) diskCacheBytes -= encodedSize
+    if (decoded == null && file.delete()) synchronized(diskLock) { diskCacheBytes -= encodedSize }
     return decoded?.let {
       if (it.config == Bitmap.Config.RGB_565) {
         it
@@ -71,7 +106,6 @@ internal class EpubPreviewCache(cacheDir: File) {
   }
 
   /** Takes ownership of [bitmap], storing an RGB_565 version in both caches. */
-  @Synchronized
   fun put(key: String, bitmap: Bitmap) {
     val optimized = if (bitmap.config == Bitmap.Config.RGB_565) {
       bitmap
@@ -95,20 +129,22 @@ internal class EpubPreviewCache(cacheDir: File) {
     val temporary = File(directory, "${target.name}-$TEMP_SUFFIX")
     val encoded = runCatching {
       temporary.outputStream().use { output ->
-        val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-          Bitmap.CompressFormat.WEBP_LOSSLESS
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+          bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, WEBP_QUALITY, output)
         } else {
-          Bitmap.CompressFormat.PNG
+          bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, output)
         }
-        bitmap.compress(format, WEBP_EFFORT, output)
       }
     }.getOrDefault(false)
-    if (encoded && trimDiskCache(temporary.length()) && temporary.renameTo(target)) {
-      target.setLastModified(System.currentTimeMillis())
-      diskCacheBytes += target.length()
-    } else {
-      temporary.delete()
-    }
+    val stored = encoded && publish(temporary, target)
+    if (stored) target.setLastModified(System.currentTimeMillis()) else temporary.delete()
+  }
+
+  /** Moves an encoded file into place, under the lock that guards the disk byte count. */
+  private fun publish(temporary: File, target: File): Boolean = synchronized(diskLock) {
+    val renamed = trimDiskCache(temporary.length()) && temporary.renameTo(target)
+    if (renamed) diskCacheBytes += target.length()
+    renamed
   }
 
   private fun fileFor(key: String): File = File(
@@ -146,9 +182,11 @@ internal class EpubPreviewCache(cacheDir: File) {
     const val MAX_MEMORY_BYTES = 16 * 1024 * 1024
     const val MAX_MEMORY_ENTRIES = 27
     const val MAX_DISK_BYTES = 128L * 1024 * 1024
-    const val WEBP_EFFORT = 20
+    const val WEBP_QUALITY = 80
+    const val PNG_QUALITY = 100
     const val WEBP_SUFFIX = ".webp"
     const val PNG_SUFFIX = ".png"
     const val TEMP_SUFFIX = ".tmp"
+    const val COUNTS_SUFFIX = ".json"
   }
 }
