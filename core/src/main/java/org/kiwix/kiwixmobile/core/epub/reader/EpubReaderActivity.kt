@@ -104,6 +104,7 @@ class EpubReaderActivity : BaseActivity() {
   internal val visiblePageKey = MutableStateFlow<PageKey?>(null)
   internal val previewPageKey = MutableStateFlow<PageKey?>(null)
   internal val resourcePageCounts = HashMap<String, Int>()
+  internal var promotedAtMs = 0L
   internal data class PageKey(val resourceHref: String, val pageIndex: Int, val totalPages: Int)
   internal val previewMutex = Mutex()
   private var selectionActionMode: ActionMode? = null

@@ -26,6 +26,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.os.Trace
 import android.util.Log
 import android.view.Display
 import android.view.PixelCopy
@@ -400,8 +401,28 @@ private fun EpubReaderActivity.promoteCarouselNeighbor(
   visiblePageKey.value = key
   // Publish the new neighbors now so the recycled navigator starts loading during the snap.
   // The pager reports its own position next, so views aren't moved here.
-  ensureCarouselWindow(key)
-  syncLiveCarouselNeighbors(pagePreviews.value, key, moveViews = false)
+  val windowReady = try {
+    Trace.beginSection("epub.promote")
+    ensureCarouselWindow(key).also {
+      syncLiveCarouselNeighbors(pagePreviews.value, key, moveViews = false)
+    }
+  } finally {
+    Trace.endSection()
+  }
+  promotedAtMs = SystemClock.elapsedRealtime()
+  if (!windowReady) Log.d(EpubReaderActivity.PREVIEW_LOG_TAG, "wall: no arithmetic neighbor for $key")
+}
+
+/** Logs how long the recycled neighbor took to show its page after a promotion. */
+private fun EpubReaderActivity.logNeighborReady() {
+  val startedAt = promotedAtMs
+  if (startedAt > 0L) {
+    promotedAtMs = 0L
+    Log.d(
+      EpubReaderActivity.PREVIEW_LOG_TAG,
+      "neighborReady ms=${SystemClock.elapsedRealtime() - startedAt}"
+    )
+  }
 }
 
 /**
@@ -563,7 +584,12 @@ private fun EpubReaderActivity.syncLiveCarouselNavigator(
           }
 
           override fun onPageChanged(pageIndex: Int, totalPages: Int, locator: Locator) {
-            if (navigator === created) visiblePageKey.value = pageKey(locator, pageIndex, totalPages)
+            if (navigator === created) {
+              visiblePageKey.value = pageKey(locator, pageIndex, totalPages)
+            } else {
+              pageKey(locator, pageIndex, totalPages)
+              logNeighborReady()
+            }
           }
         },
         configuration = EpubNavigatorFragment.Configuration(
