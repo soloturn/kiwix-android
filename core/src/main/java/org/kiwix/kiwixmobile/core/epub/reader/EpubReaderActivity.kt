@@ -43,6 +43,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -410,50 +411,36 @@ class EpubReaderActivity : BaseActivity() {
 
   @Composable
   private fun Chrome() {
-    val state by viewModel.state.collectAsState()
-    val settings by viewModel.settings.collectAsState()
-    val locator by viewModel.currentLocator.collectAsState()
-    val previousPages by viewModel.previousPages.collectAsState()
-    val chromeVisible by viewModel.chromeVisible.collectAsState()
-    val positions by viewModel.positions.collectAsState()
-    val search by viewModel.search.collectAsState()
-    val annotations by viewModel.annotations.collectAsState()
-    val selectionLocator by selectionMenuLocator.collectAsState()
-    val bookShown by pageReady.collectAsState()
-    val shownPageMode by pageMode.collectAsState()
-    val canShowPageModes by pageModesAvailable.collectAsState()
-    val shownPagePreviews by pagePreviews.collectAsState()
-    val shownOverviewPages by overviewPages.collectAsState()
-    val overviewLoading by overviewPagesLoading.collectAsState()
-    val hasEarlierPages by overviewHasPrevious.collectAsState()
-    val hasLaterPages by overviewHasNext.collectAsState()
-    val readingOrder = (state as? EpubReaderUiState.Ready)?.book?.publication?.readingOrder.orEmpty()
     DialogHost(alertDialogShower)
+    ReaderScreenHost()
+  }
+
+  /** Wires the screen to the view model; the swipe-rate carousel pages are left to [CarouselHost]. */
+  @Composable
+  private fun ReaderScreenHost() {
+    val state by viewModel.state.collectAsState()
+    val reading = collectReadingState(state)
+    val positions by viewModel.positions.collectAsState()
     EpubReaderScreen(
       state = state,
-      settings = settings,
-      reading = EpubReadingState(
-        locator = locator,
-        positionCount = positions.size,
-        hasPreviousChapter = locator?.let { adjacentChapter(readingOrder, it, next = false) } != null,
-        hasNextChapter = locator?.let { adjacentChapter(readingOrder, it, next = true) } != null
-      ),
-      search = search,
-      previousPages = previousPages,
-      pageMode = shownPageMode,
-      pageModesAvailable = canShowPageModes,
-      pagePreviews = shownPagePreviews,
-      overviewPages = shownOverviewPages,
-      overviewPagesLoading = overviewLoading,
-      overviewHasPrevious = hasEarlierPages,
-      overviewHasNext = hasLaterPages,
+      settings = viewModel.settings.collectAsState().value,
+      reading = reading,
+      search = viewModel.search.collectAsState().value,
+      previousPages = viewModel.previousPages.collectAsState().value,
+      pageMode = pageMode.collectAsState().value,
+      pageModesAvailable = pageModesAvailable.collectAsState().value,
+      overviewPages = overviewPages.collectAsState().value,
+      overviewPagesLoading = overviewPagesLoading.collectAsState().value,
+      overviewHasPrevious = overviewHasPrevious.collectAsState().value,
+      overviewHasNext = overviewHasNext.collectAsState().value,
       loadPreviewBitmap = { loadPreviewBitmap(it) },
-      annotations = annotations,
-      selectionLocator = selectionLocator,
-      chromeVisible = chromeVisible,
-      pageReady = bookShown,
+      annotations = viewModel.annotations.collectAsState().value,
+      selectionLocator = selectionMenuLocator.collectAsState().value,
+      chromeVisible = viewModel.chromeVisible.collectAsState().value,
+      pageReady = pageReady.collectAsState().value,
       panels = viewModel.panels,
-      actions = readerActions(positions, locator)
+      actions = readerActions(positions, reading.locator),
+      content = remember<@Composable () -> Unit> { { CarouselHost() } }
     )
   }
 

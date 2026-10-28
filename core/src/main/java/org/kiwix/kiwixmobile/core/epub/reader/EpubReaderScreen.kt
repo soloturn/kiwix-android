@@ -296,7 +296,8 @@ fun EpubReaderScreen(
   overviewHasNext: Boolean = false,
   loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap? = { null },
   annotations: List<EpubAnnotation> = emptyList(),
-  selectionLocator: Locator? = null
+  selectionLocator: Locator? = null,
+  content: (@Composable () -> Unit)? = null
 ) {
   val ready = state as? EpubReaderUiState.Ready
   val shownPageMode = if (pageModesAvailable) pageMode else EpubPageMode.SINGLE_PAGE
@@ -322,9 +323,7 @@ fun EpubReaderScreen(
     pageReady,
     previousPages,
     shownPageMode,
-    pageModesAvailable,
-    pagePreviews,
-    overviewPages
+    pageModesAvailable
   )
   val layoutState = EpubReaderMainLayoutState(
     uiState = state,
@@ -333,6 +332,7 @@ fun EpubReaderScreen(
     pageReady = pageReady,
     pageMode = shownPageMode,
     pagePreviews = pagePreviews,
+    carouselLayer = content,
     loadPreviewBitmap = loadPreviewBitmap,
     currentPageBookmarked = currentPageBookmarked,
     bookmarkedLocators = bookmarkedLocators,
@@ -373,6 +373,7 @@ private data class EpubReaderMainLayoutState(
   val pageReady: Boolean,
   val pageMode: EpubPageMode,
   val pagePreviews: List<EpubPagePreview>,
+  val carouselLayer: (@Composable () -> Unit)?,
   val loadPreviewBitmap: suspend (EpubPagePreview) -> Bitmap?,
   val currentPageBookmarked: Boolean,
   val bookmarkedLocators: List<Locator>,
@@ -423,17 +424,20 @@ private fun BoxWithConstraintsScope.EpubReaderPageLayers(
 
 @Composable
 private fun CarouselPageLayer(state: EpubReaderMainLayoutState, actions: EpubReaderActions) {
-  if (state.pageMode != EpubPageMode.CAROUSEL || state.ready == null || state.pagePreviews.isEmpty()) {
-    return
+  if (state.pageMode != EpubPageMode.CAROUSEL || state.ready == null) return
+  val layer = state.carouselLayer
+  when {
+    // The host-supplied layer observes the pages itself, so a swipe doesn't recompose this screen.
+    layer != null -> layer()
+    state.pagePreviews.isNotEmpty() -> PageCarousel(
+      pages = state.pagePreviews,
+      currentLocator = state.reading.locator,
+      bookmarkedLocators = state.bookmarkedLocators,
+      onBookmarkToggle = actions.onToggleBookmark,
+      onPositionChanged = actions.onCarouselPositionChanged,
+      onPageSettled = actions.onSelectCarouselPage,
+    )
   }
-  PageCarousel(
-    pages = state.pagePreviews,
-    currentLocator = state.reading.locator,
-    bookmarkedLocators = state.bookmarkedLocators,
-    onBookmarkToggle = actions.onToggleBookmark,
-    onPositionChanged = actions.onCarouselPositionChanged,
-    onPageSettled = actions.onSelectCarouselPage,
-  )
 }
 
 @Composable
@@ -779,9 +783,7 @@ private data class ReaderChromeState(
   val pageReady: Boolean,
   val previousPages: List<Locator>,
   val pageMode: EpubPageMode,
-  val pageModesAvailable: Boolean,
-  val pagePreviews: List<EpubPagePreview>,
-  val overviewPages: List<EpubPagePreview>
+  val pageModesAvailable: Boolean
 )
 
 @Composable
@@ -855,7 +857,7 @@ private fun ReaderChromeState.shouldShowPreviousPages(searchOpen: Boolean) =
   ready != null && pageReady && chromeVisible && !searchOpen && pageMode != EpubPageMode.OVERVIEW
 
 @Composable
-private fun PageCarousel(
+internal fun PageCarousel(
   pages: List<EpubPagePreview>,
   currentLocator: Locator?,
   bookmarkedLocators: List<Locator>,
