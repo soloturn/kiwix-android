@@ -26,6 +26,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,6 +61,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -113,6 +117,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.graphics.toColorInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
 import org.kiwix.kiwixmobile.core.ui.components.KiwixSearchView
@@ -225,7 +232,7 @@ data class EpubReaderActions(
   val onLoadMoreOverviewPages: (Boolean) -> Unit = {},
   val onSelectOverviewPage: (Locator) -> Unit = {},
   val onSelectCarouselPage: (Locator) -> Unit = {},
-  val onCarouselPositionChanged: (Float) -> Unit = {},
+  val onCarouselPositionChanged: (String?, Float) -> Unit = { _, _ -> },
   val onDismissSelectionMenu: () -> Unit = {},
   val onCopySelection: (String) -> Unit = {},
   val onShareSelection: (String) -> Unit = {},
@@ -853,42 +860,31 @@ private fun PageCarousel(
   currentLocator: Locator?,
   bookmarkedLocators: List<Locator>,
   onBookmarkToggle: (Locator) -> Unit,
-  onPositionChanged: (Float) -> Unit,
+  onPositionChanged: (String?, Float) -> Unit,
   onPageSettled: (Locator) -> Unit,
 ) {
   val currentPages by rememberUpdatedState(pages)
   val currentBookmarkedLocators by rememberUpdatedState(bookmarkedLocators)
   val currentOnBookmarkToggle by rememberUpdatedState(onBookmarkToggle)
-  val currentOnPageSettled by rememberUpdatedState(onPageSettled)
-  val currentOnPositionChanged by rememberUpdatedState(onPositionChanged)
   val currentIndex = currentLocator?.let { current ->
     pages.indexOfFirst { it.locator.sameBookmarkPosition(current) }
       .coerceIn(0, (pages.size - 1).coerceAtLeast(0))
   } ?: 0
   val pagerState = rememberPagerState(initialPage = currentIndex) { pages.size }
   LaunchedEffect(currentIndex) {
+    // Never interrupt a drag or fling; the pager follows its page keys when the window changes.
+    snapshotFlow { pagerState.isScrollInProgress }.first { !it }
     if (pagerState.currentPage != currentIndex) {
       pagerState.scrollToPage(currentIndex)
     }
   }
-  LaunchedEffect(pagerState) {
-    var wasScrolling = false
-    snapshotFlow { pagerState.isScrollInProgress to pagerState.settledPage }
-      .collect { (scrolling, page) ->
-        if (scrolling) {
-          wasScrolling = true
-        } else if (wasScrolling) {
-          wasScrolling = false
-          currentPages.getOrNull(page)?.let { currentOnPageSettled(it.locator) }
-        }
-      }
-  }
-  LaunchedEffect(pagerState) {
-    snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }
-      .collect { currentOnPositionChanged(it) }
-  }
+  CarouselPagerEffects(pagerState, pages, onPositionChanged, onPageSettled)
   HorizontalPager(
     state = pagerState,
+    flingBehavior = PagerDefaults.flingBehavior(
+      state = pagerState,
+      pagerSnapDistance = PagerSnapDistance.atMost(1)
+    ),
     modifier = Modifier.fillMaxSize(),
     contentPadding = PaddingValues(horizontal = 48.dp),
     pageSpacing = SIXTEEN_DP,
@@ -912,6 +908,52 @@ private fun PageCarousel(
         topOffset = maxHeight * ((1f - EpubReaderActivity.CAROUSEL_PAGE_HEIGHT) / 2f) + EIGHT_DP
       )
     }
+  }
+}
+
+@Composable
+private fun CarouselPagerEffects(
+  pagerState: PagerState,
+  pages: List<EpubPagePreview>,
+  onPositionChanged: (String?, Float) -> Unit,
+  onPageSettled: (Locator) -> Unit
+) {
+  val currentPages by rememberUpdatedState(pages)
+  val currentOnPageSettled by rememberUpdatedState(onPageSettled)
+  val currentOnPositionChanged by rememberUpdatedState(onPositionChanged)
+  val dragged by pagerState.interactionSource.collectIsDraggedAsState()
+
+  // Indexes shift when the window changes, so resolve a page through the keys of the last measure.
+  fun pageAt(index: Int) = pagerState.layoutInfo.visiblePagesInfo
+    .firstOrNull { it.index == index }?.key
+    ?.let { key -> currentPages.firstOrNull { it.cacheKey == key } }
+  LaunchedEffect(pagerState) {
+    // Hand the target page over as soon as the release decides it, so the recycled neighbor
+    // loads during the snap animation instead of after it.
+    snapshotFlow { pagerState.targetPage.takeUnless { dragged } }
+      .filterNotNull()
+      .distinctUntilChanged()
+      .collect { page -> pageAt(page)?.let { currentOnPageSettled(it.locator) } }
+  }
+  LaunchedEffect(pagerState) {
+    var wasScrolling = false
+    snapshotFlow { pagerState.isScrollInProgress to pagerState.settledPage }
+      .collect { (scrolling, page) ->
+        if (scrolling) {
+          wasScrolling = true
+        } else if (wasScrolling) {
+          wasScrolling = false
+          pageAt(page)?.let { currentOnPageSettled(it.locator) }
+        }
+      }
+  }
+  LaunchedEffect(pagerState) {
+    // Report the position relative to a page key so a window change can't misplace the views.
+    snapshotFlow {
+      val page = pagerState.currentPage
+      val key = pagerState.layoutInfo.visiblePagesInfo.firstOrNull { it.index == page }?.key
+      (key as? String) to pagerState.currentPageOffsetFraction
+    }.collect { (key, offset) -> currentOnPositionChanged(key, offset) }
   }
 }
 

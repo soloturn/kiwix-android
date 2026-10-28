@@ -103,6 +103,7 @@ class EpubReaderActivity : BaseActivity() {
   internal val overviewHasNext = MutableStateFlow(true)
   internal val visiblePageKey = MutableStateFlow<PageKey?>(null)
   internal val previewPageKey = MutableStateFlow<PageKey?>(null)
+  internal val resourcePageCounts = HashMap<String, Int>()
   internal data class PageKey(val resourceHref: String, val pageIndex: Int, val totalPages: Int)
   internal val previewMutex = Mutex()
   private var selectionActionMode: ActionMode? = null
@@ -507,7 +508,7 @@ class EpubReaderActivity : BaseActivity() {
       viewModel.setChromeVisible(true)
     },
     onSelectCarouselPage = ::selectCarouselPage,
-    onCarouselPositionChanged = ::setLiveCarouselPosition,
+    onCarouselPositionChanged = ::onCarouselPositionChanged,
     onNoteSelection = viewModel::addNote
   )
 
@@ -553,8 +554,9 @@ class EpubReaderActivity : BaseActivity() {
         .flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
         .collect {
           if (pageMode.value == EpubPageMode.CAROUSEL) {
+            val windowReady = it != null && ensureCarouselWindow(it)
             syncLiveCarouselNeighbors(pagePreviews.value, it)
-            refreshCarouselPreviews()
+            if (!windowReady) refreshCarouselPreviews()
           }
         }
     }
