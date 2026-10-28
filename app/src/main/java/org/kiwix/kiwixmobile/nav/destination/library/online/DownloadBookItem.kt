@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -169,7 +170,9 @@ fun PauseStopButtonsRow(
   onStopClick: (LibraryDownloadItem) -> Unit,
   modifier: Modifier = Modifier
 ) {
-  val context = LocalContext.current
+  val pauseDescription = stringResource(string.tts_pause)
+  val resumeDescription = stringResource(string.tts_resume)
+  val stopDescription = stringResource(string.stop)
   val isPaused = item.downloadState == DownloadState.Paused
   val borderStroke = BorderStroke(ONE_DP, Color.LightGray)
   val buttonShape = RoundedCornerShape(FOUR_DP)
@@ -182,8 +185,7 @@ fun PauseStopButtonsRow(
     DownloadActionButton(
       icon = getPauseResumeButtonIcon(isPaused),
       iconTestTag = if (isPaused) RESUME_ICON_TESTING_TAG else PAUSE_ICON_TESTING_TAG,
-      contentDescription = context.getString(string.tts_pause) +
-        "/${context.getString(string.tts_resume)}/${item.hashCode()}",
+      contentDescription = "$pauseDescription/$resumeDescription/${item.hashCode()}",
       buttonTestTag = DOWNLOADING_PAUSE_BUTTON_TESTING_TAG,
       buttonShape = buttonShape,
       borderStroke = borderStroke,
@@ -193,7 +195,7 @@ fun PauseStopButtonsRow(
     DownloadActionButton(
       icon = IconItem.Drawable(R.drawable.ic_stop_24dp),
       iconTestTag = null,
-      contentDescription = context.getString(string.stop) + item.hashCode(),
+      contentDescription = stopDescription + item.hashCode(),
       buttonTestTag = DOWNLOADING_STOP_BUTTON_TESTING_TAG,
       buttonShape = buttonShape,
       borderStroke = borderStroke,

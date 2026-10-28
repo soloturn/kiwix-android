@@ -134,7 +134,7 @@ class KiwixMainActivity : CoreMainActivity() {
   override val topLevelDestinationsRoute =
     setOf(
       KiwixDestination.Home.route,
-      KiwixDestination.Downloads.route,
+      KiwixDestination.Explore.route,
       KiwixDestination.Library.route,
       KiwixDestination.Reader.route
     )

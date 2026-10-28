@@ -228,9 +228,9 @@ private fun bottomNavigationItems() = listOf(
     testingTag = BOTTOM_NAV_LIBRARY_ITEM_TESTING_TAG
   ),
   BottomNavItem(
-    route = KiwixDestination.Downloads.route,
+    route = KiwixDestination.Explore.route,
     title = stringResource(id = R.string.download),
-    iconRes = drawable.ic_download_navigation_white_24dp,
+    iconRes = drawable.ic_explore_navigation_white_24dp,
     testingTag = BOTTOM_NAV_DOWNLOADS_ITEM_TESTING_TAG
   )
 )
