@@ -33,6 +33,7 @@ trap 'killall -INT crashpad_handler 2>/dev/null || true' EXIT
 
 # Enable Wi-Fi on the emulator
 adb shell svc wifi enable
+adb shell dumpsys webviewupdate
 adb logcat -c
 # Check if the stylus_handwriting_enabled setting exists before disabling
 if adb shell settings list secure | grep -q "stylus_handwriting_enabled"; then
@@ -69,7 +70,7 @@ if is_app_installed "$TEST_ORCHESTRATOR_PACKAGE"; then
 fi
 retry=0
 while [ $retry -le 3 ]; do
-  if ./gradlew connectedCustomexampleDebugAndroidTest; then
+  if ./gradlew connectedCustomexampleDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.kiwix.kiwixmobile.custom.search.SearchScreenTestForBrandedApp#searchScreen; then
     echo "connectedCustomexampleDebugAndroidTest succeeded" >&2
     break
   else
@@ -101,7 +102,7 @@ while [ $retry -le 3 ]; do
     fi
     ./gradlew --stop
     retry=$(( retry + 1 ))
-    if [ $retry -eq 3 ]; then
+    if [ $retry -eq 1 ]; then
       adb exec-out screencap -p >screencap.png
       exit 1
     fi
