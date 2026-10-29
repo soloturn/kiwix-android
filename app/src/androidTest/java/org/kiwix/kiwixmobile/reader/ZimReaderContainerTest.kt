@@ -168,7 +168,8 @@ class ZimReaderContainerTest {
 
     // Non-existent entry
     val missing = container.load("nonexistent/path.html", emptyMap())
-    assertNull(missing.mimeType)
+    assertEquals(404, missing.statusCode)
+    assertEquals("Not Found", missing.reasonPhrase)
   }
 
   @Test
