@@ -78,6 +78,13 @@ runs:
           trap '(sleep 30; while pgrep -x crashpad_handler >/dev/null 2>&1; do echo "crashpad_handler: still running, killing"; pkill -9 crashpad_handler || true; sleep 5; done; echo "crashpad_handler: gone") &' EXIT
           bash -c "$ANDROID_EMULATOR_SCRIPT"
 
+    # The emulator runner installs the SDK emulator package on every attempt. A failed
+    # download (dl.google.com) otherwise burns all attempts within seconds, so back off.
+    - name: Wait before attempt 2
+      if: steps.attempt-1.outcome == 'failure'
+      shell: bash
+      run: sleep 60
+
     - name: Emulator test - attempt 2
       id: attempt-2
       if: steps.attempt-1.outcome == 'failure'
@@ -103,6 +110,11 @@ runs:
         script: |
           trap '(sleep 30; while pgrep -x crashpad_handler >/dev/null 2>&1; do echo "crashpad_handler: still running, killing"; pkill -9 crashpad_handler || true; sleep 5; done; echo "crashpad_handler: gone") &' EXIT
           bash -c "$ANDROID_EMULATOR_SCRIPT"
+
+    - name: Wait before attempt 3
+      if: steps.attempt-2.outcome == 'failure'
+      shell: bash
+      run: sleep 180
 
     - name: Emulator test - attempt 3
       id: attempt-3
