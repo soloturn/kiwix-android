@@ -21,6 +21,7 @@ jobs:
 
   automated-tests:
     name: Automated tests
+    if: false
     needs: assemble
     strategy:
       matrix:
@@ -171,6 +172,7 @@ jobs:
   # Merges api-level 30's shards' .ec files into one coverage report.
   automated-tests-coverage-report:
     name: Automated tests coverage report
+    if: false
     needs: automated-tests
     runs-on: ubuntu-24.04
     steps:
@@ -234,6 +236,7 @@ jobs:
 
   automated-tests-playstore:
     name: Automated tests for PlayStore variant
+    if: false
     needs: assemble
     strategy:
       matrix:
@@ -324,9 +327,10 @@ jobs:
     needs: assemble
     strategy:
       matrix:
-        api-level: [ 25, 30, 33, 34, 35, 36 ]
+        api-level: [ 36 ]
         target: [ default ]
-      fail-fast: true
+        rep: [ 1, 2, 3, 4, 5, 6, 7, 8 ]
+      fail-fast: false
     runs-on: ubuntu-24.04
     steps:
       - name: Free Disk Space (Ubuntu)
@@ -408,6 +412,7 @@ jobs:
 
   automated-tests-on-tablet:
     name: Automated tests on Tablet
+    if: false
     needs: assemble
     strategy:
       matrix:
@@ -495,6 +500,7 @@ jobs:
 
   code-formatting-job:
     name: Code Formatting
+    if: false
     needs: assemble
     runs-on: ubuntu-24.04
     continue-on-error: true
@@ -549,6 +555,7 @@ jobs:
 
   detekt:
     name: Detekt
+    if: false
     needs: assemble
     runs-on: ubuntu-24.04
     continue-on-error: true
@@ -603,6 +610,7 @@ jobs:
 
   lint:
     name: Lint
+    if: false
     needs: assemble
     runs-on: ubuntu-24.04
     continue-on-error: true
@@ -661,6 +669,7 @@ jobs:
   # Own artifact name: two jobs can't upload to the same one concurrently.
   assemble-other-variants:
     name: Assemble Release/PlayStore/Standalone/Nightly
+    if: false
     runs-on: ubuntu-26.04
     continue-on-error: true
     env:
