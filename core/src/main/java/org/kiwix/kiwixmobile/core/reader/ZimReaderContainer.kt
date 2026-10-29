@@ -27,6 +27,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.kiwix.kiwixmobile.core.di.IoDispatcher
 import org.kiwix.kiwixmobile.core.reader.ZimFileReader.Factory
+import java.io.ByteArrayInputStream
 import java.net.HttpURLConnection
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -145,16 +146,20 @@ class ZimReaderContainer @Inject constructor(
   fun getRedirect(url: String): String = withReaderOrNull { it?.getRedirect(url) }.orEmpty()
   fun load(url: String, requestHeaders: Map<String, String>): WebResourceResponse = runBlocking {
     return@runBlocking withReaderSuspend { reader ->
+      val item = reader?.getItem(url)
+      if (reader == null || item == null) {
+        return@withReaderSuspend missingEntryResponse(url)
+      }
       WebResourceResponse(
-        reader?.getMimeTypeFromUrl(url),
+        reader.getMimeTypeFromUrl(url),
         Charsets.UTF_8.name(),
-        reader?.load(url)
+        reader.load(url)
       )
         .apply {
           val headers = mutableMapOf("Accept-Ranges" to "bytes")
           if ("Range" in requestHeaders.keys) {
             setStatusCodeAndReasonPhrase(HttpURLConnection.HTTP_PARTIAL, "Partial Content")
-            val fullSize = reader?.getItem(url)?.itemSize() ?: 0L
+            val fullSize = item.itemSize() ?: 0L
             val lastByte = fullSize - 1
             val byteRanges = requestHeaders.getValue("Range").substringAfter("=").split("-")
             headers["Content-Range"] = "bytes ${byteRanges[0]}-$lastByte/$fullSize"
@@ -168,6 +173,26 @@ class ZimReaderContainer @Inject constructor(
         }
     }
   }
+
+  // An entry the ZIM does not have (typically ad or tracker scripts of a zimit page) gets a
+  // real 404, not an empty 200 without a MIME type. A rewritten about:blank iframe is the one
+  // exception: it gets an empty HTML document so the frame still loads.
+  private fun missingEntryResponse(url: String): WebResourceResponse =
+    if (url.contains("about:blank") || url.contains("about%3Ablank")) {
+      emptyResponse("text/html", HttpURLConnection.HTTP_OK, "OK")
+    } else {
+      emptyResponse("text/plain", HttpURLConnection.HTTP_NOT_FOUND, "Not Found")
+    }
+
+  private fun emptyResponse(mimeType: String, status: Int, reason: String) =
+    WebResourceResponse(
+      mimeType,
+      Charsets.UTF_8.name(),
+      status,
+      reason,
+      emptyMap(),
+      ByteArrayInputStream(ByteArray(0))
+    )
 
   val zimReaderSource get() = withReaderOrNull { it?.zimReaderSource }
   val zimFileTitle get() = withReaderOrNull { it?.title }
