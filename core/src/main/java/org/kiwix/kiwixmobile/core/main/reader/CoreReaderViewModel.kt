@@ -1049,15 +1049,15 @@ abstract class CoreReaderViewModel(
   }
 
   /**
-   * Show the TOC sidebar hint on the first run of the app, unless it's a debug build.
-   * This is to guide users to the contents drawer feature.
-   * Subclasses like BrandedViewModel override this method to provide custom
-   * behavior, such as not showing this dialog when it is disabled in branded app.
+   * Show the TOC sidebar hint on the first run of the app, unless it's a debug build
+   * or the TOC sidebar is not available ([isTocSidebarEnabled] is false, e.g. a branded
+   * app built with `disable_sidebar`). This guides users to the contents drawer feature.
    *
-   * WARNING: If modifying this method, ensure thorough testing with branded apps
-   *          to verify proper functionality.
+   * Called for every navigation, so it returns early without touching DataStore when
+   * there is nothing to show.
    */
   override fun webViewUrlLoading() {
+    if (!isTocSidebarEnabled()) return
     viewModelScope.launch {
       if (kiwixDataStore.isFirstRun.first() && !kiwixDataStore.isDebugBuild.first()) {
         contentsDrawerHint()

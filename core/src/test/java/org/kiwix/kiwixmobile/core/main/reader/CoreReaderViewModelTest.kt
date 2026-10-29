@@ -1687,6 +1687,7 @@ internal class CoreReaderViewModelTest {
       // Conditions Requires to run
       coEvery { kiwixDataStore.isFirstRun } returns flowOf(true)
       coEvery { kiwixDataStore.isDebugBuild } returns flowOf(false)
+      coEvery { kiwixDataStore.setIsFirstRun(any()) } just Runs
 
       viewModel.effects.test {
         viewModel.webViewUrlLoading()
@@ -1704,6 +1705,52 @@ internal class CoreReaderViewModelTest {
         cancelAndIgnoreRemainingEvents()
       }
     }
+
+  @Test
+  fun webViewUrlLoading_whenTocSidebarIsDisabled_doesNotTouchDataStoreOrShowHint() = runTest {
+    viewModel.tocSidebarEnabled = false
+
+    viewModel.effects.test {
+      repeat(3) { viewModel.webViewUrlLoading() }
+      advanceUntilIdle()
+
+      expectNoEvents()
+      verify(exactly = 0) { kiwixDataStore.isFirstRun }
+      coVerify(exactly = 0) { kiwixDataStore.setIsFirstRun(any()) }
+      assertThat(viewModel.uiState.value.showTableOfContentDrawer).isFalse()
+      cancelAndIgnoreRemainingEvents()
+    }
+  }
+
+  @Test
+  fun webViewUrlLoading_whenDebugBuild_doesNotShowHintOrWriteFirstRun() = runTest {
+    coEvery { kiwixDataStore.isFirstRun } returns flowOf(true)
+    coEvery { kiwixDataStore.isDebugBuild } returns flowOf(true)
+
+    viewModel.effects.test {
+      viewModel.webViewUrlLoading()
+      advanceUntilIdle()
+
+      expectNoEvents()
+      coVerify(exactly = 0) { kiwixDataStore.setIsFirstRun(any()) }
+      cancelAndIgnoreRemainingEvents()
+    }
+  }
+
+  @Test
+  fun webViewUrlLoading_whenNotFirstRun_doesNotShowHintOrWriteFirstRun() = runTest {
+    coEvery { kiwixDataStore.isFirstRun } returns flowOf(false)
+    coEvery { kiwixDataStore.isDebugBuild } returns flowOf(false)
+
+    viewModel.effects.test {
+      viewModel.webViewUrlLoading()
+      advanceUntilIdle()
+
+      expectNoEvents()
+      coVerify(exactly = 0) { kiwixDataStore.setIsFirstRun(any()) }
+      cancelAndIgnoreRemainingEvents()
+    }
+  }
 
   @Test
   fun webViewUrlFinishedLoading_savesHistoryAndSession() = runTest {
@@ -3206,6 +3253,8 @@ internal class CoreReaderViewModelTest {
       findInPageManager,
       mainDispatcher
     ) {
+    var tocSidebarEnabled = true
+
     override fun openLocalLibrary() {}
     override fun openSearch(
       searchString: String,
@@ -3226,7 +3275,7 @@ internal class CoreReaderViewModelTest {
     }
 
     override fun shouldShowSpellCheckedSuggestions(): Boolean = false
-    override fun isTocSidebarEnabled(): Boolean = true
+    override fun isTocSidebarEnabled(): Boolean = tocSidebarEnabled
     override fun isBrandedApp(): Boolean = false
 
     override fun openBookmarkScreen() {
