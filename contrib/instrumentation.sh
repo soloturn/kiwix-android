@@ -19,7 +19,11 @@
 #
 
 logcat_pid=
+progress_pid=
 diagnostics_pid=
+# Appended across attempts (the action reruns this script on a fresh emulator
+# on the same runner), so a rerun can skip tests that already finished.
+progress_log=/tmp/instrumentation_progress.log
 stop_diagnostics() {
   kill "$diagnostics_pid" 2>/dev/null || true
   wait "$diagnostics_pid" 2>/dev/null || true
@@ -30,12 +34,15 @@ start_logcat() {
   # shellcheck disable=SC2035
   adb logcat TestRunner:I System.err:W AndroidRuntime:E ActivityManager:W *:E -v color &
   logcat_pid=$!
+  adb logcat TestRunner:I '*:S' -v brief >>"$progress_log" &
+  progress_pid=$!
 }
 stop_logcat() {
   if [ -n "$logcat_pid" ]; then
-    kill "$logcat_pid" 2>/dev/null || true
-    wait "$logcat_pid" 2>/dev/null || true
+    kill "$logcat_pid" "$progress_pid" 2>/dev/null || true
+    wait "$logcat_pid" "$progress_pid" 2>/dev/null || true
     logcat_pid=
+    progress_pid=
   fi
 }
 # Keep runner evidence alongside the JUnit failures for the classifier below.
@@ -121,15 +128,41 @@ raise SystemExit(1)
 PY
 }
 
+# Tests that finished without failing in an earlier attempt, as Class#method
+# for AndroidJUnitRunner's notClass filter. Their results died with that emulator.
+finished_tests() {
+  python3 - "$progress_log" <<'PY'
+import re
+import sys
+
+passed, failed = set(), set()
+try:
+    lines = open(sys.argv[1], errors="ignore").read().splitlines()
+except OSError:
+    lines = []
+for line in lines:
+    m = re.search(r"TestRunner.*?(finished|failed): (.+)\(([\w.$]+)\)\s*$", line)
+    if m:
+        (passed if m.group(1) == "finished" else failed).add(f"{m.group(3)}#{m.group(2)}")
+print(",".join(sorted(passed - failed)))
+PY
+}
+
 retry=0
 while [ $retry -le 4 ]; do
+  skip_args=()
+  skip_tests="$(finished_tests)"
+  if [ -n "$skip_tests" ]; then
+    echo "Skipping $(tr ',' '\n' <<<"$skip_tests" | wc -l) tests that already finished" >&2
+    skip_args=("-Pandroid.testInstrumentationRunnerArguments.notClass=${skip_tests}")
+  fi
   # Bound each test invocation so a stalled instrumentation run fails in finite time.
   # A retry must classify only this attempt's results, never stale XML from a
   # previous infrastructure failure.
   find "$test_results_dir" -name 'TEST-*.xml' -type f -delete 2>/dev/null || true
 
   # Slower tests can override this default with @Test(timeout).
-  if ./gradlew "$task" "${shard_args[@]}" \
+  if ./gradlew "$task" "${shard_args[@]}" "${skip_args[@]}" \
     -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000; then
     echo "$task succeeded" >&2
     break
