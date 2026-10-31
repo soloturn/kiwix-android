@@ -186,7 +186,7 @@ while [ $retry -le 4 ]; do
     # A dead emulator would hang every adb call below; fail so the action retries on a fresh one.
     if ! timeout 30 adb shell true; then
       echo "Emulator is offline; failing fast so the action retries on a fresh emulator" >&2
-      exit 1
+      exit 75
     fi
     adb kill-server
     adb start-server
