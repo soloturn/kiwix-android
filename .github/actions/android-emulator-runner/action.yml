@@ -301,7 +301,8 @@ runs:
           # Can survive `adb emu kill` on its own: ReactiveCircus/android-emulator-runner#385.
           killall -INT crashpad_handler 2>/dev/null || true
 
-          if [ "$script_started" = true ]; then
+          # 75 (EX_TEMPFAIL): the script found its emulator dead mid-run; retry on a fresh one.
+          if [ "$script_started" = true ] && [ "$script_exit" -ne 75 ]; then
             exit "$script_exit"
           fi
         done
