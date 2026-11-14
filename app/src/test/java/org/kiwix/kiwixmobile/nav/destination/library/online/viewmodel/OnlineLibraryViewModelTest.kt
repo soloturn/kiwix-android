@@ -688,7 +688,8 @@ class OnlineLibraryViewModelTest {
           observeNetwork,
           storageDeviceProvider,
           onlineLibraryTabsUseCase,
-          mainDispatcherRule.dispatcher
+          mainDispatcherRule.dispatcher,
+          libraryFolder
         )
 
         dialogViewModel.onlineLibraryRequest.test {
