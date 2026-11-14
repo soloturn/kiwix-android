@@ -1012,12 +1012,14 @@ abstract class CoreReaderViewModel(
           // menu was clicked - by the time the user confirms this dialog, the
           // book may have been closed or swapped out from under us.
           val pageUrl = getCurrentWebView().url
-          val result = zimReaderContainer.withReader { reader ->
-            addBookShortcut(
-              zimFileReader = reader,
-              pageUrl = pageUrl,
-              customName = nameState.value
-            )
+          val result = withContext(ioDispatcher) {
+            zimReaderContainer.withReader { reader ->
+              addBookShortcut(
+                zimFileReader = reader,
+                pageUrl = pageUrl,
+                customName = nameState.value
+              )
+            }
           }
           if (result == null || result == ShortcutResult.NotSupported) {
             emitEffect(ReaderEffect.ShowToast(context.getString(string.shortcut_disabled_message)))

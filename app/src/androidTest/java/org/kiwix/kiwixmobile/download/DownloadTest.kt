@@ -56,6 +56,7 @@ import org.kiwix.kiwixmobile.ui.KiwixDestination
 import org.kiwix.kiwixmobile.utils.KiwixIdlingResource.Companion.getInstance
 import java.util.concurrent.TimeUnit
 
+const val TWO_MINUTES_IN_MILLISECONDS = 2 * 60 * 1000
 
 @LargeTest
 @HiltAndroidTest

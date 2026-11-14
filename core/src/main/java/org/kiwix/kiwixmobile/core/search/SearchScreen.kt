@@ -187,6 +187,7 @@ private fun SearchScreenContent(
       searchViewModel,
       lazyListState,
       progressBarTrackColor,
+      showOpenInNewTabIcon,
       // Results take the remaining height so they scroll under the fixed chips.
       modifier = Modifier.weight(1f)
     )
@@ -260,6 +261,7 @@ private fun SearchResults(
   searchViewModel: SearchViewModel,
   lazyListState: LazyListState,
   progressBarTrackColor: Color,
+  showOpenInNewTabIcon: Boolean,
   modifier: Modifier = Modifier
 ) {
   Box(
@@ -485,20 +487,28 @@ private fun SearchListItem(
     }
 
     if (showOpenInNewTabIcon) {
-      IconButton(
-        onClick = { onNewTabIconClick(searchListItem) },
-        modifier = Modifier
-          .testTag(OPEN_ITEM_IN_NEW_TAB_ICON_TESTING_TAG)
-          .size(OPEN_IN_NEW_TAB_ICON_SIZE)
-          .padding(end = SIX_DP)
-      ) {
-        Icon(
-          painter = painterResource(id = R.drawable.ic_open_in_new_24dp),
-          contentDescription =
-            stringResource(R.string.search_open_in_new_tab) + searchListItem.hashCode()
-        )
-      }
+      OpenInNewTabButton(searchListItem, onNewTabIconClick)
     }
+  }
+}
+
+@Composable
+private fun OpenInNewTabButton(
+  searchListItem: SearchListItem,
+  onNewTabIconClick: (SearchListItem) -> Unit
+) {
+  IconButton(
+    onClick = { onNewTabIconClick(searchListItem) },
+    modifier = Modifier
+      .testTag(OPEN_ITEM_IN_NEW_TAB_ICON_TESTING_TAG)
+      .size(OPEN_IN_NEW_TAB_ICON_SIZE)
+      .padding(end = SIX_DP)
+  ) {
+    Icon(
+      painter = painterResource(id = R.drawable.ic_open_in_new_24dp),
+      contentDescription =
+        stringResource(R.string.search_open_in_new_tab) + searchListItem.hashCode()
+    )
   }
 }
 

@@ -21,7 +21,6 @@ package org.kiwix.kiwixmobile.custom.testutils
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.os.SystemClock
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By

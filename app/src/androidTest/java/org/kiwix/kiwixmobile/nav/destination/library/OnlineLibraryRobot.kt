@@ -22,7 +22,6 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
-import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onNodeWithTag
 import applyWithViewHierarchyPrinting
 import org.kiwix.kiwixmobile.BaseRobot
@@ -30,7 +29,6 @@ import org.kiwix.kiwixmobile.core.R.string
 import org.kiwix.kiwixmobile.core.ui.components.TOOLBAR_TITLE_TESTING_TAG
 import org.kiwix.kiwixmobile.testutils.TestUtils.TEST_PAUSE_MS_FOR_DOWNLOAD_TEST
 import org.kiwix.kiwixmobile.testutils.TestUtils.testFlakyView
-import org.kiwix.kiwixmobile.testutils.TestUtils.waitUntil
 
 fun onlineLibrary(func: OnlineLibraryRobot.() -> Unit) =
   OnlineLibraryRobot().applyWithViewHierarchyPrinting(func)
